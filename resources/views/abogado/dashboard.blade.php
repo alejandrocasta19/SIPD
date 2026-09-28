@@ -312,7 +312,7 @@
     <section class="hero">
         <div>
             <div class="hero-kicker">PANEL DE GESTIÓN</div>
-            <h2>{{ $saludo }}, {{ $user->name }}</h2>
+            <h2>{{ $saludo }}, {{ $user->name }} 👋</h2>
             <p>
                 <i class="fas fa-exclamation-triangle"></i>
                 @if($sinAbogado > 0)
@@ -331,8 +331,8 @@
                     <i class="fas fa-users"></i> Equipo
                 </a>
             @else
-                <a class="btn-pill dark" href="{{ route('abogado.mis-casos') }}">
-                    <i class="fas fa-folder-open"></i> Mis casos
+                <a class="btn-pill dark" href="{{ route('abogado.consultarproceso') }}">
+                    <i class="fas fa-folder-open"></i> Procesos
                 </a>
             @endif
         </div>
@@ -340,7 +340,7 @@
 
     <div class="section-head">
         <h3>Pipeline de procesos</h3>
-        <a href="{{ $user->role === 'abogado' ? route('abogado.mis-casos') : route('abogado.consultarproceso') }}">Ver todos →</a>
+        <a href="{{ route('abogado.consultarproceso') }}">Ver todos →</a>
     </div>
 
     <section class="pipeline">
@@ -462,7 +462,7 @@
             <section class="card">
                 <div class="card-title">
                     <span>Procesos recientes</span>
-                    <a href="{{ $user->role === 'abogado' ? route('abogado.mis-casos') : route('abogado.consultarproceso') }}" style="color:#16a34a;font-size:14px;font-weight:600;text-decoration:none;">Ver todos →</a>
+                    <a href="{{ route('abogado.consultarproceso') }}" style="color:#16a34a;font-size:14px;font-weight:600;text-decoration:none;">Ver todos →</a>
                 </div>
 
                 @forelse($recientes as $proceso)
@@ -521,8 +521,12 @@
             </section>
 
             <section class="card">
-                <div class="card-title">Herramientas</div>
+                <div class="card-title">Accesos directos</div>
                 <div class="links">
+                    <a href="{{ route('abogado.estadistica') }}">
+                        <span><i class="fas fa-chart-bar left"></i> Estadísticas del sistema</span>
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
                     <a href="{{ route('abogado.plazos') }}">
                         <span><i class="far fa-clock left"></i> Plazos y vencimientos</span>
                         <i class="fas fa-chevron-right"></i>
@@ -533,14 +537,6 @@
                     </a>
                     <a href="{{ route('abogado.resoluciones') }}">
                         <span><i class="far fa-file-alt left"></i> Resoluciones emitidas</span>
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                    <a href="{{ route('abogado.reincidencias') }}">
-                        <span><i class="fas fa-history left"></i> Reincidencias</span>
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                    <a href="{{ route('abogado.reportes') }}">
-                        <span><i class="fas fa-chart-bar left"></i> Estadísticas / Reportes</span>
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
