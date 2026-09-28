@@ -31,15 +31,35 @@
         }
 
         .sipd-sidebar {
-            background: #07111f;
-            color: #fff;
-            padding: 22px 16px 16px;
+            background: #0f172a;
+            color: #f1f5f9;
+            padding: 24px 14px 16px;
             display: flex;
             flex-direction: column;
             position: sticky;
             top: 0;
             height: 100vh;
+            box-sizing: border-box;
         }
+
+        .sipd-sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .sipd-sidebar-nav::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sipd-sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,.1);
+            border-radius: 4px;
+        }
+
+        .sipd-sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,.2);
+        }
+
 
         .sipd-brand {
             display: flex;
@@ -51,13 +71,16 @@
         }
 
         .sipd-brand-mark {
-            width: 34px;
-            height: 34px;
+            width: 36px;
+            height: 36px;
             border-radius: 10px;
-            background: #22c55e;
+            background: #15803d; /* Elegant deep green */
+            color: #fff;
             display: grid;
             place-items: center;
             font-weight: 800;
+            font-size: 18px;
+            box-shadow: 0 4px 12px rgba(21, 128, 61, 0.3);
         }
 
         .sipd-brand strong {
@@ -90,22 +113,40 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 10px 12px;
-            border-radius: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
             color: #94a3b8;
             text-decoration: none;
-            font-size: 14px;
+            font-size: 13.5px;
             font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
         }
 
-        .sipd-nav a i { width: 16px; text-align: center; }
+        .sipd-nav a i { width: 18px; text-align: center; opacity: 0.8; transition: transform 0.2s; }
 
-        .sipd-nav a:hover { background: rgba(255,255,255,.05); color: #fff; }
+        .sipd-nav a:hover { 
+            background: rgba(255,255,255,.03); 
+            color: #f8fafc; 
+        }
+
+        .sipd-nav a:hover i {
+            opacity: 1;
+            transform: scale(1.1);
+        }
 
         .sipd-nav a.active {
-            background: #ecfdf5;
-            color: #166534;
+            background: rgba(255,255,255,.05);
+            color: #fff;
             font-weight: 600;
+            border-left: 4px solid #16a34a;
+            border-radius: 0 8px 8px 0;
+            padding-left: 10px;
+        }
+        
+        .sipd-nav a.active i {
+            color: #4ade80;
+            opacity: 1;
         }
 
         .sipd-side-user {
@@ -122,14 +163,16 @@
         }
 
         .sipd-side-user .ava {
-            width: 32px;
-            height: 32px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
-            background: #22c55e;
+            background: linear-gradient(135deg, #16a34a, #15803d);
             display: grid;
             place-items: center;
             font-size: 12px;
             font-weight: 700;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(22, 163, 74, 0.2);
         }
 
         .sipd-side-user b,
@@ -194,7 +237,14 @@
             text-decoration: none;
             background: #fff;
             border-radius: 999px;
-            box-shadow: 0 1px 2px rgba(15,23,42,.06);
+            box-shadow: 0 2px 4px rgba(15,23,42,.04);
+            border: 1px solid #f1f5f9;
+            transition: all 0.2s ease;
+        }
+        
+        .sipd-bell:hover, .sipd-user:hover {
+            box-shadow: 0 4px 6px rgba(15,23,42,.06);
+            border-color: #e2e8f0;
         }
 
         .sipd-bell {
@@ -280,8 +330,8 @@
             width: 280px;
             padding: 12px 8px 8px;
             border: 0;
-            border-radius: 16px;
-            box-shadow: 0 12px 40px rgba(15,23,42,.12);
+            border-radius: 12px;
+            box-shadow: 0 16px 48px rgba(15,23,42,.12);
             margin-top: 8px;
         }
 
@@ -341,10 +391,11 @@
         }
 
         .sipd-page-title {
-            margin: 0 0 20px;
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -.03em;
+            margin: 0 0 24px;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            color: #0f172a;
         }
 
         .dropdown-menu { font-size: 14px; }
@@ -463,7 +514,8 @@
         }
 
         .pwd-cancel { background: #f1f5f9; color: #475569; }
-        .pwd-save { background: #22c55e; color: #fff; }
+        .pwd-save { background: #16a34a; color: #fff; transition: background 0.2s; }
+        .pwd-save:hover { background: #15803d; }
 
         .pf-box {
             width: 100%;
@@ -559,17 +611,21 @@
 <body>
     @php
         $pageTitle = $pageTitle ?? (request()->routeIs('abogado.dashboard') ? 'Inicio' : 'SIPD');
-        $iniciales = collect(preg_split('/\s+/', trim(auth()->user()->name)))
-            ->filter()
-            ->take(2)
-            ->map(function ($part) { return strtoupper(substr($part, 0, 1)); })
-            ->implode('');
+        $nameParts  = collect(preg_split('/\s+/', trim(auth()->user()->name)))->filter()->values();
+        $iniciales  = $nameParts->take(2)->map(fn($p) => strtoupper(substr($p, 0, 1)))->implode('');
+        // Primer nombre + primer apellido (o solo el primer nombre si hay uno)
+        $nombreCorto = $nameParts->get(0, '') . ($nameParts->get(2) ? ' ' . $nameParts->get(2) : ($nameParts->get(1) ? ' ' . $nameParts->get(1) : ''));
+        $isManager = in_array(auth()->user()->role, ['admin', 'coordinadora'], true);
+        $visibleProcesses = \App\Models\ProcesoDisciplinario::query();
+        if (!$isManager) {
+            $visibleProcesses->where('user_id', auth()->id());
+        }
 
-        $notifVencidos = \App\Models\ProcesoDisciplinario::whereIn('estado', ['Pendiente', 'En Proceso'])
+        $notifVencidos = (clone $visibleProcesses)->whereIn('estado', ['Pendiente', 'En Proceso'])
             ->where('created_at', '<', now()->subDays(15))
             ->count();
-        $notifSinRh = \App\Models\ProcesoDisciplinario::whereNull('user_id')->count();
-        $notifDescargos = \App\Models\ProcesoDisciplinario::whereIn('estado', ['Pendiente', 'En Proceso'])
+        $notifSinRh = (clone $visibleProcesses)->whereNull('user_id')->count();
+        $notifDescargos = (clone $visibleProcesses)->whereIn('estado', ['Pendiente', 'En Proceso'])
             ->where(function ($query) {
                 $query->whereNull('descargos')->orWhere('descargos', '');
             })
@@ -587,43 +643,89 @@
                 </div>
             </a>
 
-            <div class="sipd-nav-label">PRINCIPAL</div>
-            <nav class="sipd-nav">
-                <a href="{{ route('abogado.dashboard') }}" class="{{ request()->routeIs('abogado.dashboard') ? 'active' : '' }}">
-                    <i class="fas fa-home"></i> Inicio
-                </a>
-                <a href="{{ route('abogado.consultarproceso') }}" class="{{ request()->routeIs('abogado.consultarproceso', 'abogado.detalleproceso') ? 'active' : '' }}">
-                    <i class="fas fa-folder-open"></i> Procesos
-                </a>
-                <a href="{{ route('abogado.estadistica') }}" class="{{ request()->routeIs('abogado.estadistica') ? 'active' : '' }}">
-                    <i class="fas fa-chart-bar"></i> Estadísticas
-                </a>
-                @if(auth()->user()->role == 'coordinadora')
-                    <a href="{{ route('coordinadora.abogados') }}" class="{{ request()->routeIs('coordinadora.abogados') ? 'active' : '' }}">
-                        <i class="fas fa-user-tie"></i> RH
+            <div class="sipd-sidebar-nav">
+                <div class="sipd-nav-label">PRINCIPAL</div>
+                <nav class="sipd-nav">
+                    <a href="{{ route('abogado.dashboard') }}" class="{{ request()->routeIs('abogado.dashboard') ? 'active' : '' }}">
+                        <i class="fas fa-home"></i> Inicio
                     </a>
-                @endif
-            </nav>
+                    <a href="{{ route('abogado.registro') }}" class="{{ request()->routeIs('abogado.registro') ? 'active' : '' }}">
+                        <i class="fas fa-plus-circle"></i> Nuevo Proceso
+                    </a>
+                    @if($isManager)
+                        <a href="{{ route('abogado.consultarproceso') }}" class="{{ request()->routeIs('abogado.consultarproceso', 'abogado.detalleproceso') && !request()->routeIs('documentos.*') ? 'active' : '' }}">
+                            <i class="fas fa-search"></i> Buscar Procesos
+                        </a>
+                    @else
+                        <a href="{{ route('abogado.mis-casos') }}" class="{{ request()->routeIs('abogado.mis-casos', 'abogado.detalleproceso') && !request()->routeIs('documentos.*') ? 'active' : '' }}">
+                            <i class="fas fa-search"></i> Mis Casos
+                        </a>
+                    @endif
+                    <a href="{{ route('abogado.reincidencias') }}" class="{{ request()->routeIs('abogado.reincidencias') ? 'active' : '' }}">
+                        <i class="fas fa-history"></i> Reincidencias
+                    </a>
+                </nav>
 
-            <div class="sipd-nav-label">MÓDULOS</div>
-            <nav class="sipd-nav">
-                <a href="{{ route('abogado.plazos') }}" class="{{ request()->routeIs('abogado.plazos') ? 'active' : '' }}">
-                    <i class="far fa-clock"></i> Plazos y términos
-                </a>
-                <a href="{{ route('abogado.partes') }}" class="{{ request()->routeIs('abogado.partes') ? 'active' : '' }}">
-                    <i class="fas fa-user-friends"></i> Partes involucradas
-                </a>
-                <a href="{{ route('abogado.resoluciones') }}" class="{{ request()->routeIs('abogado.resoluciones') ? 'active' : '' }}">
-                    <i class="far fa-file-alt"></i> Resoluciones
-                </a>
-            </nav>
+                <div class="sipd-nav-label">MÓDULOS DE CONTROL</div>
+                <nav class="sipd-nav">
+                    <a href="{{ route('abogado.plazos') }}" class="{{ request()->routeIs('abogado.plazos') ? 'active' : '' }}">
+                        <i class="far fa-clock"></i> Plazos y términos
+                    </a>
+                    <a href="{{ route('abogado.partes') }}" class="{{ request()->routeIs('abogado.partes') ? 'active' : '' }}">
+                        <i class="fas fa-user-friends"></i> Partes involucradas
+                    </a>
+                    <a href="{{ route('abogado.resoluciones') }}" class="{{ request()->routeIs('abogado.resoluciones') ? 'active' : '' }}">
+                        <i class="far fa-file-alt"></i> Resoluciones
+                    </a>
+                </nav>
+
+                <div class="sipd-nav-label">GESTIÓN DOCUMENTAL</div>
+                <nav class="sipd-nav">
+                    <a href="{{ route('documentos.hub') }}"
+                       class="{{ request()->routeIs('documentos.*') ? 'active' : '' }}"
+                       title="Central de Documentos Oficiales">
+                        <i class="fas fa-file-signature"></i> Autos y Actas
+                    </a>
+                    @if(request()->routeIs('documentos.*') && request()->route('id'))
+                        @php $docCasoId = request()->route('id'); @endphp
+                        <a href="{{ route('documentos.edit', [$docCasoId, 'disciplinario']) }}"
+                           class="{{ request()->routeIs('documentos.edit') && request()->route('tipo') === 'disciplinario' ? 'active' : '' }}"
+                           style="padding-left:28px;font-size:13px;">
+                            <i class="fas fa-balance-scale"></i> Apertura Disciplinarios
+                        </a>
+                        <a href="{{ route('documentos.edit', [$docCasoId, 'comprobacion']) }}"
+                           class="{{ request()->routeIs('documentos.edit') && request()->route('tipo') === 'comprobacion' ? 'active' : '' }}"
+                           style="padding-left:28px;font-size:13px;">
+                            <i class="fas fa-search"></i> Apertura Comprobación
+                        </a>
+                        <a href="{{ route('documentos.edit', [$docCasoId, 'acta']) }}"
+                           class="{{ request()->routeIs('documentos.edit') && request()->route('tipo') === 'acta' ? 'active' : '' }}"
+                           style="padding-left:28px;font-size:13px;">
+                            <i class="fas fa-gavel"></i> Acta Cargos y Descargos
+                        </a>
+                    @endif
+                </nav>
+
+                <div class="sipd-nav-label">REPORTES</div>
+                <nav class="sipd-nav">
+                    <a href="{{ route('abogado.reportes') }}" class="{{ request()->routeIs('abogado.estadistica', 'abogado.reportes') ? 'active' : '' }}">
+                        <i class="fas fa-chart-bar"></i> Estadísticas / Reportes
+                    </a>
+                    @if($isManager)
+                        <a href="{{ route('coordinadora.abogados') }}" class="{{ request()->routeIs('coordinadora.abogados') ? 'active' : '' }}">
+                            <i class="fas fa-user-tie"></i> Gestión de RH
+                        </a>
+                    @endif
+                </nav>
+            </div>
+
 
             <div class="sipd-side-user">
                 <div class="who">
                     <span class="ava">{{ $iniciales }}</span>
                     <div>
-                        <b>{{ auth()->user()->name }}</b>
-                        <small>{{ auth()->user()->role }}</small>
+                        <b>{{ $nombreCorto }}</b>
+                        <small>{{ auth()->user()->cargo ?: ucfirst(auth()->user()->role) }}</small>
                     </div>
                 </div>
                 <a class="sipd-logout" href="{{ route('logout') }}"
@@ -679,8 +781,8 @@
                     <a class="sipd-user dropdown-toggle" href="#" data-toggle="dropdown">
                         <span class="ava">{{ $iniciales }}</span>
                         <span>
-                            <b>{{ auth()->user()->name }}</b>
-                            <small>{{ auth()->user()->role }}</small>
+                            <b>{{ $nombreCorto }}</b>
+                            <small>{{ auth()->user()->cargo ?: ucfirst(auth()->user()->role) }}</small>
                         </span>
                         <i class="fas fa-chevron-down chev"></i>
                     </a>
@@ -690,7 +792,7 @@
                             <div>
                                 <b>{{ auth()->user()->name }}</b>
                                 <span>{{ auth()->user()->email }}</span>
-                                <small>{{ auth()->user()->role }}</small>
+                                <small>{{ auth()->user()->cargo ?: ucfirst(auth()->user()->role) }}</small>
                             </div>
                         </div>
                         <div class="dropdown-divider"></div>
