@@ -642,82 +642,60 @@
                     <small>PROCESOS DISCIPLINARIOS</small>
                 </div>
             </a>
-
-            <div class="sipd-sidebar-nav">
-                <div class="sipd-nav-label">PRINCIPAL</div>
+            <div class="sipd-sidebar-nav">
                 <nav class="sipd-nav">
                     <a href="{{ route('abogado.dashboard') }}" class="{{ request()->routeIs('abogado.dashboard') ? 'active' : '' }}">
                         <i class="fas fa-home"></i> Inicio
                     </a>
+
                     <a href="{{ route('abogado.registro') }}" class="{{ request()->routeIs('abogado.registro') ? 'active' : '' }}">
-                        <i class="fas fa-plus-circle"></i> Nuevo Proceso
+                        <i class="fas fa-plus-circle"></i> Registrar proceso
                     </a>
+
                     @if($isManager)
                         <a href="{{ route('abogado.consultarproceso') }}" class="{{ request()->routeIs('abogado.consultarproceso', 'abogado.detalleproceso') && !request()->routeIs('documentos.*') ? 'active' : '' }}">
-                            <i class="fas fa-search"></i> Buscar Procesos
+                            <i class="fas fa-search"></i> Buscar proceso
                         </a>
                     @else
                         <a href="{{ route('abogado.mis-casos') }}" class="{{ request()->routeIs('abogado.mis-casos', 'abogado.detalleproceso') && !request()->routeIs('documentos.*') ? 'active' : '' }}">
-                            <i class="fas fa-search"></i> Mis Casos
+                            <i class="fas fa-folder-open"></i> Mis procesos
                         </a>
                     @endif
-                    <a href="{{ route('abogado.reincidencias') }}" class="{{ request()->routeIs('abogado.reincidencias') ? 'active' : '' }}">
-                        <i class="fas fa-history"></i> Reincidencias
-                    </a>
-                </nav>
 
-                <div class="sipd-nav-label">MÓDULOS DE CONTROL</div>
-                <nav class="sipd-nav">
-                    <a href="{{ route('abogado.plazos') }}" class="{{ request()->routeIs('abogado.plazos') ? 'active' : '' }}">
-                        <i class="far fa-clock"></i> Plazos y términos
-                    </a>
-                    <a href="{{ route('abogado.partes') }}" class="{{ request()->routeIs('abogado.partes') ? 'active' : '' }}">
-                        <i class="fas fa-user-friends"></i> Partes involucradas
-                    </a>
-                    <a href="{{ route('abogado.resoluciones') }}" class="{{ request()->routeIs('abogado.resoluciones') ? 'active' : '' }}">
-                        <i class="far fa-file-alt"></i> Resoluciones
-                    </a>
-                </nav>
-
-                <div class="sipd-nav-label">GESTIÓN DOCUMENTAL</div>
-                <nav class="sipd-nav">
-                    <a href="{{ route('documentos.hub') }}"
-                       class="{{ request()->routeIs('documentos.*') ? 'active' : '' }}"
-                       title="Central de Documentos Oficiales">
+                    <a href="{{ route('documentos.hub') }}" class="{{ request()->routeIs('documentos.*') ? 'active' : '' }}">
                         <i class="fas fa-file-signature"></i> Autos y Actas
                     </a>
+
                     @if(request()->routeIs('documentos.*') && request()->route('id'))
                         @php $docCasoId = request()->route('id'); @endphp
                         <a href="{{ route('documentos.edit', [$docCasoId, 'disciplinario']) }}"
                            class="{{ request()->routeIs('documentos.edit') && request()->route('tipo') === 'disciplinario' ? 'active' : '' }}"
-                           style="padding-left:28px;font-size:13px;">
-                            <i class="fas fa-balance-scale"></i> Apertura Disciplinarios
+                           style="padding-left:30px;font-size:13px;border-left:2px solid #334155;margin-left:14px;border-radius:0 8px 8px 0;">
+                            <i class="fas fa-balance-scale"></i> Auto Disciplinario
                         </a>
                         <a href="{{ route('documentos.edit', [$docCasoId, 'comprobacion']) }}"
                            class="{{ request()->routeIs('documentos.edit') && request()->route('tipo') === 'comprobacion' ? 'active' : '' }}"
-                           style="padding-left:28px;font-size:13px;">
-                            <i class="fas fa-search"></i> Apertura Comprobación
+                           style="padding-left:30px;font-size:13px;border-left:2px solid #334155;margin-left:14px;border-radius:0 8px 8px 0;">
+                            <i class="fas fa-search"></i> Auto Comprobación
                         </a>
                         <a href="{{ route('documentos.edit', [$docCasoId, 'acta']) }}"
                            class="{{ request()->routeIs('documentos.edit') && request()->route('tipo') === 'acta' ? 'active' : '' }}"
-                           style="padding-left:28px;font-size:13px;">
-                            <i class="fas fa-gavel"></i> Acta Cargos y Descargos
+                           style="padding-left:30px;font-size:13px;border-left:2px solid #334155;margin-left:14px;border-radius:0 8px 8px 0;">
+                            <i class="fas fa-gavel"></i> Acta de Descargos
                         </a>
                     @endif
-                </nav>
 
-                <div class="sipd-nav-label">REPORTES</div>
-                <nav class="sipd-nav">
                     <a href="{{ route('abogado.reportes') }}" class="{{ request()->routeIs('abogado.estadistica', 'abogado.reportes') ? 'active' : '' }}">
-                        <i class="fas fa-chart-bar"></i> Estadísticas / Reportes
+                        <i class="fas fa-chart-bar"></i> Reportes
                     </a>
+
                     @if($isManager)
                         <a href="{{ route('coordinadora.abogados') }}" class="{{ request()->routeIs('coordinadora.abogados') ? 'active' : '' }}">
-                            <i class="fas fa-user-tie"></i> Gestión de RH
+                            <i class="fas fa-user-tie"></i> Equipo de trabajo
                         </a>
                     @endif
                 </nav>
-            </div>
+            </div> </div>
 
 
             <div class="sipd-side-user">
