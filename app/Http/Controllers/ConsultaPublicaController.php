@@ -7,8 +7,14 @@ use Illuminate\Http\Request;
 
 class ConsultaPublicaController extends Controller
 {
-    public function create()
+    public function create(Request $request)
     {
+        if ($request->boolean('nueva')) {
+            $request->session()->forget('consulta_publica_cedula');
+
+            return redirect()->route('consulta.publica');
+        }
+
         $cedula = session('consulta_publica_cedula');
 
         if (!$cedula) {
@@ -24,7 +30,13 @@ class ConsultaPublicaController extends Controller
             'cedula' => ['required', 'string', 'max:30'],
         ]);
 
-        $cedula = preg_replace('/\s+/', '', $data['cedula']);
+        $cedula = ProcesoDisciplinario::normalizarCedula($data['cedula']);
+
+        if (strlen($cedula) < 5 || strlen($cedula) > 15) {
+            return back()
+                ->withErrors(['cedula' => 'Ingresa un número de cédula válido.'])
+                ->withInput();
+        }
 
         $request->session()->put('consulta_publica_cedula', $cedula);
 
@@ -34,18 +46,20 @@ class ConsultaPublicaController extends Controller
     private function datosConsulta(string $cedula): array
     {
         $seguimientos = ProcesoDisciplinario::query()
-            ->where('cedula', $cedula)
+            ->porCedula($cedula)
             ->with([
                 'documentoEstados',
                 'evidencias:id,caso_id,created_at',
+                'anexos:id,caso_id,created_at',
             ])
-            ->withCount('evidencias')
+            ->withCount(['evidencias', 'anexos'])
             ->latest()
             ->get()
             ->map(fn (ProcesoDisciplinario $proceso) => $proceso->seguimientoPublico());
 
         return [
             'cedula' => $cedula,
+            'cedulaFormato' => ProcesoDisciplinario::formatearCedula($cedula),
             'seguimientos' => $seguimientos,
             'consultado' => true,
         ];

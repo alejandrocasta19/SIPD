@@ -16,28 +16,20 @@
             <h1>Plazos y términos</h1>
             <p>Control de vencimientos y términos procesales.</p>
         </div>
-    </div>
-    <div class="page-banner">
-        <div class="page-banner-left">
-            <div class="page-banner-title">Control de Plazos Procesales</div>
-            <div class="page-banner-sub">Monitorea los vencimientos de cada expediente disciplinario activo.</div>
-        </div>
-        <div class="page-banner-right">
-            <span class="pb-badge">{{ $conteos['todos'] }} total</span>
-            <span class="pb-badge green">{{ $conteos['vigente'] }} Vigentes</span>
-            @if($conteos['por_vencer'] > 0)<span class="pb-badge yellow">{{ $conteos['por_vencer'] }} Por vencer</span>@endif
-            @if($conteos['vencido'] > 0)<span class="pb-badge red">{{ $conteos['vencido'] }} Vencidos</span>@endif
+        <div class="proc-head-side">
+            <span class="stat-chip">{{ $conteos['todos'] }} total</span>
+            <span class="stat-chip green">{{ $conteos['vigente'] }} Vigentes</span>
+            @if($conteos['por_vencer'] > 0)<span class="stat-chip yellow">{{ $conteos['por_vencer'] }} Por vencer</span>@endif
+            @if($conteos['vencido'] > 0)<span class="stat-chip red">{{ $conteos['vencido'] }} Vencidos</span>@endif
         </div>
     </div>
 @endsection
 
 @section('styles')
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;600;700&display=swap');
-
 :root {
     --font-main: 'Inter', sans-serif;
-    --font-head: 'Outfit', sans-serif;
+    --font-head: 'Inter', sans-serif;
     --p-primary: #3b82f6;
     --p-dark: #0f172a;
     --p-surface: #fff;
@@ -50,7 +42,7 @@
 
 
 
-.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 24px; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); margin-bottom: 24px; }
 .kpi {
     background: var(--p-surface); border-radius: var(--radius); padding: 24px; box-shadow: var(--p-shadow); border-top: 4px solid #e2e8f0; transition: var(--t-smooth); animation: fadeInUp 0.6s ease-out backwards;
 }
@@ -74,31 +66,43 @@
 
 .table-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--p-shadow); animation: fadeInUp 0.8s ease-out backwards; }
 
-table.plz { width: 100%; border-collapse: separate; border-spacing: 0; }
-table.plz th { font-family: var(--font-head); text-align: left; padding: 16px 24px; color: #64748b; font-size: 12px; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #f1f5f9; background: #f8fafc; }
-table.plz td { padding: 16px 24px; border-bottom: 1px solid #f1f5f9; color: var(--p-dark); font-size: 14px; transition: var(--t-smooth); }
+table.plz { width: 100%; border-collapse: collapse; border-spacing: 0; }
+table.plz th { font-family: var(--font-head); text-align: left; padding: 16px 24px; color: #64748b; font-size: 12px; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; border: 1px solid var(--cth-border); background: #f8fafc; }
+table.plz td { padding: 16px 24px; border: 1px solid var(--cth-border); color: var(--p-dark); font-size: 14px; transition: var(--t-smooth); }
 table.plz tr:hover td { background: #f8fafc; }
-table.plz tr:last-child td { border-bottom: 0; }
 
 .id { font-family: var(--font-head); font-weight: 700; text-decoration: none; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 8px; font-size: 12px; transition: var(--t-smooth); }
 .id:hover { background: #e2e8f0; color: var(--p-dark); }
-.pro { color: var(--p-primary); font-weight: 700; text-decoration: none; font-family: var(--font-head); }
+.pro { color: var(--cth-green); font-weight: 700; text-decoration: none; font-family: var(--font-head); }
 .pro:hover { text-decoration: underline; }
 
 .name { font-weight: 600; color: var(--p-dark); }
-.dias.late { color: #ef4444; font-weight: 700; background: #fef2f2; padding: 4px 8px; border-radius: 6px; }
+.dias {
+    display: inline-block; font-weight: 700; padding: 4px 8px; border-radius: 6px;
+}
+.dias.ok { color: #15803d; background: #f0fdf4; }
+.dias.warn { color: #d97706; background: #fffbeb; }
+.dias.late { color: #ef4444; background: #fef2f2; }
 
 .st { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 12px; white-space: nowrap; }
 .st.vigente { background: #f0fdf4; color: var(--cth-green); }
 .st.vencer { background: #fffbeb; color: #d97706; }
 .st.vencido { background: #fef2f2; color: #dc2626; }
 
+.plz-tipo { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+.plz-tipo select {
+    font-size: 13px; font-weight: 600; color: var(--p-dark); border: 1px solid #e2e8f0;
+    border-radius: 8px; padding: 7px 10px; background: #fff; max-width: 240px;
+}
+.plz-tipo select:focus { outline: none; border-color: #86efac; box-shadow: 0 0 0 3px rgba(34,197,94,0.12); }
+
 .empty { text-align: center; padding: 40px 16px; color: #94a3b8; }
 .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; color: #94a3b8; font-size: 13px; }
 .pager-pages { display: flex; gap: 6px; align-items: center; }
 .pager a, .pager span.current { min-width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; text-decoration: none; color: #64748b; background: #fff; border: 1px solid #e2e8f0; }
 .pager span.current { background: var(--p-primary); border-color: var(--p-primary); color: #fff; font-weight: 700; }
-@media (max-width: 900px) { .kpis { grid-template-columns: 1fr; } .table-card { overflow-x: auto; } }
+@media (max-width: 900px) { .kpis { grid-template-columns: 1fr; } .table-card { overflow-x: auto; } .proc-head { flex-direction: column; } }
+@media (max-width: 1100px) and (min-width: 901px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 </style>
 @endsection
 
@@ -148,14 +152,35 @@ table.plz tr:last-child td { border-bottom: 0; }
                             <a class="pro" href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}">{{ $codigoProceso($plazo->proceso_id) }}</a>
                         </td>
                         <td class="name">{{ $plazo->conductor }}</td>
-                        <td>{{ $plazo->tipo }}</td>
-                        <td>{{ $plazo->vencimiento->format('Y-m-d') }}</td>
-                        <td class="{{ $plazo->dias < 0 ? 'dias late' : '' }}">
-                            @if($plazo->dias < 0)
-                                {{ abs($plazo->dias) }} días vencido
+                        <td>
+                            @if(!empty($plazo->es_descargos))
+                                <form class="plz-tipo" method="POST" action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}">
+                                    @csrf
+                                    @method('PUT')
+                                    @if($filtro !== 'todos')
+                                        <input type="hidden" name="estado" value="{{ $filtro }}">
+                                    @endif
+                                    <select name="descargos_presentacion" onchange="this.form.submit()" aria-label="Presentación de descargos">
+                                        @if($plazo->descargos_presentacion === 'presentado')
+                                            <option value="presentado" selected>Descargos · Presentado</option>
+                                        @endif
+                                        @foreach($opcionesDescargos as $valor => $etiqueta)
+                                            <option value="{{ $valor }}" {{ $plazo->descargos_presentacion === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
+                                        @endforeach
+                                    </select>
+                                </form>
                             @else
-                                {{ $plazo->dias }} días
+                                {{ $plazo->tipo }}
                             @endif
+                        </td>
+                        <td>{{ $plazo->vencimiento->format('Y-m-d') }}</td>
+                        <td>
+                            @php
+                                $diasCls = $plazo->semaforo === 'vigente' ? 'ok' : ($plazo->semaforo === 'por_vencer' ? 'warn' : 'late');
+                            @endphp
+                            <span class="dias {{ $diasCls }}">
+                                {{ $plazo->dias }} día{{ abs((int) $plazo->dias) === 1 ? '' : 's' }}
+                            </span>
                         </td>
                         <td>
                             @if($plazo->semaforo === 'vigente')

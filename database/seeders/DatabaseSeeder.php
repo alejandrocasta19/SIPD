@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Coordinadora de RH',
                 'password' => Hash::make('admin123'),
                 'role' => 'coordinadora',
-                'cargo' => 'Coordinadora',
+                'cargo' => 'Coordinadora de RH',
                 'email_verified_at' => now(),
             ]
         );
@@ -43,7 +43,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'KELLY JOHANNA RODRIGUEZ VARGAS',
                 'password' => Hash::make('admin123'),
                 'role' => 'abogado',
-                'cargo' => 'Asesora Jurídica',
+                'cargo' => 'Equipo de RH',
                 'email_verified_at' => now(),
             ]
         );

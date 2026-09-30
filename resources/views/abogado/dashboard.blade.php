@@ -5,39 +5,29 @@
     $codigo = function ($proceso) {
         return 'PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT);
     };
-    $saludo = $user->role === 'coordinadora' ? 'Bienvenida' : 'Bienvenido';
+    $saludo = 'Bienvenido';
 @endphp
 
 @section('page-header')
     <div class="proc-head">
         <div>
-            <h1>{{ $saludo }}, {{ $user->name }} 👋</h1>
-            <p>Panel de gestión de procesos disciplinarios.</p>
-        </div>
-        <div style="display:flex;gap:10px;">
-            <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
-            @if($user->role === 'coordinadora')
-                <a class="btn-alt" href="{{ route('coordinadora.abogados') }}"><i class="fas fa-users"></i> Equipo</a>
-            @else
-                <a class="btn-alt" href="{{ route('abogado.consultarproceso') }}"><i class="fas fa-folder-open"></i> Procesos</a>
-            @endif
-        </div>
-    </div>
-    <div class="page-banner">
-        <div class="page-banner-left">
-            <div class="page-banner-title">Panel de Gestión — SIPD</div>
-            <div class="page-banner-sub">
+            <h1>{{ $saludo }}, {{ $user->name }}</h1>
+            <p>
                 @if($sinAbogado > 0)
-                    <i class="fas fa-exclamation-triangle" style="color:#fde68a;"></i> {{ $sinAbogado }} proceso{{ $sinAbogado === 1 ? '' : 's' }} sin RH asignado — acción requerida.
+                    {{ $sinAbogado }} proceso{{ $sinAbogado === 1 ? '' : 's' }} sin RH asignado.
                 @else
-                    Todo en orden &middot; Sin procesos sin asignar
+                    Panel de gestión de procesos disciplinarios.
                 @endif
-            </div>
+            </p>
         </div>
-        <div class="page-banner-right">
-            <span class="pb-badge">{{ $total }} total</span>
-            <span class="pb-badge green">{{ $tasaResolucion }}% resolución</span>
-            @if($sinAbogado > 0)<span class="pb-badge yellow">{{ $sinAbogado }} sin RH</span>@endif
+        <div class="proc-head-side">
+            <span class="stat-chip">{{ $total }} total</span>
+            <span class="stat-chip green">{{ $tasaResolucion }}% resolución</span>
+            @if($sinAbogado > 0)<span class="stat-chip yellow">{{ $sinAbogado }} sin RH</span>@endif
+            @if(auth()->user()->puede('registrar_casos'))
+            <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
+            @endif
+            <a class="btn-alt" href="{{ route('abogado.mis-casos') }}"><i class="fas fa-folder-open"></i> Mis casos</a>
         </div>
     </div>
 @endsection
@@ -72,7 +62,7 @@
     
     .pipe small { color: #94a3b8; font-size: 11px; font-weight: 600; }
 
-    .grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: start; }
     
     .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 24px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 24px; }
     .card-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: 700; font-size: 16px; color: #0f172a; }
@@ -129,7 +119,8 @@
     .links a i.right { color: #cbd5e1; font-size: 11px; }
     .empty { color: #94a3b8; font-size: 12px; padding: 8px 0; text-align: center; }
 
-    @media (max-width: 900px) { .pipeline, .grid { grid-template-columns: 1fr; } .proc-head { flex-direction: column; } }
+    @media (max-width: 1100px) { .pipeline { grid-template-columns: 1fr 1fr; } .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .pipeline { grid-template-columns: 1fr; } }
 </style>
 @endsection
 
@@ -137,7 +128,7 @@
 
     <div class="section-head">
         <h3>Pipeline de procesos</h3>
-        <a href="{{ route('abogado.consultarproceso') }}">Ver todos &rarr;</a>
+        <a href="{{ route('abogado.mis-casos') }}">Ver todos &rarr;</a>
     </div>
 
     <section class="pipeline">
@@ -195,7 +186,7 @@
                         <span>
                             @if($proximoVencer)
                                 {{ $codigo($proximoVencer) }}
-                                @if($diasVencer !== null && $diasVencer >= 0)
+                                @if($diasVencer !== null && $diasVencer > 0)
                                     vence en {{ $diasVencer }} día{{ $diasVencer === 1 ? '' : 's' }}
                                 @else
                                     plazo vencido
@@ -240,7 +231,7 @@
             <section class="card">
                 <div class="card-title">
                     <span>Procesos recientes</span>
-                    <a href="{{ route('abogado.consultarproceso') }}">Ver tabla &rarr;</a>
+                    <a href="{{ route('abogado.mis-casos') }}">Ver tabla &rarr;</a>
                 </div>
 
                 @forelse($recientes as $proceso)
@@ -277,9 +268,6 @@
             <section class="card">
                 <div class="card-title">
                     <span>Equipo</span>
-                    @if($user->role === 'coordinadora')
-                        <a href="{{ route('coordinadora.abogados') }}">Ver RH &rarr;</a>
-                    @endif
                 </div>
                 @forelse($cargaAbogados as $abogado)
                     @php
@@ -301,7 +289,7 @@
             <section class="card">
                 <div class="card-title">Mapeo de accesos</div>
                 <div class="links">
-                    <a href="{{ route('abogado.estadistica') }}">
+                    <a href="{{ route('abogado.reportes') }}">
                         <span><i class="fas fa-chart-bar left"></i> Estadísticas integrales</span>
                         <i class="fas fa-chevron-right right"></i>
                     </a>
@@ -309,8 +297,8 @@
                         <span><i class="far fa-clock left"></i> Plazos procesales</span>
                         <i class="fas fa-chevron-right right"></i>
                     </a>
-                    <a href="{{ route('abogado.partes') }}">
-                        <span><i class="fas fa-user-friends left"></i> Personal involucrado</span>
+                    <a href="{{ route('abogado.anexos') }}">
+                        <span><i class="fas fa-file-upload left"></i> Anexos escaneados</span>
                         <i class="fas fa-chevron-right right"></i>
                     </a>
                     <a href="{{ route('abogado.resoluciones') }}">

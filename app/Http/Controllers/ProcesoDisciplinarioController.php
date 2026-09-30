@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\CasoDocumentoEstado;
 use App\Models\ProcesoDisciplinario;
 use Carbon\Carbon;
 use App\Models\User;
@@ -16,11 +17,23 @@ use Throwable;
 
 class ProcesoDisciplinarioController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('permiso:registrar_casos')->only(['create', 'plantillaRegistro', 'store']);
+        $this->middleware('permiso:ver_casos')->only(['index', 'misCasos', 'show', 'workerSearch', 'downloadSourceDocument']);
+        $this->middleware('permiso:editar_casos')->only(['update']);
+        $this->middleware('permiso:eliminar_casos')->only(['destroy']);
+        $this->middleware('permiso:ver_reportes')->only(['reportes', 'reportesData', 'reportesGlobales', 'exportarCasos']);
+        $this->middleware('permiso:ver_reincidencias')->only(['reincidencias']);
+        $this->middleware('permiso:ver_plazos')->only(['plazos', 'actualizarDescargosPresentacion']);
+        $this->middleware('permiso:ver_resoluciones')->only(['resoluciones']);
+    }
+
     private function visibleProcesses()
     {
         $query = ProcesoDisciplinario::query();
 
-        if (!in_array(auth()->user()->role, ['admin', 'coordinadora'], true)) {
+        if (!auth()->user()->esCoordinadora()) {
             $query->where('user_id', auth()->id());
         }
 
@@ -29,7 +42,7 @@ class ProcesoDisciplinarioController extends Controller
 
     private function accessibleProcess($id)
     {
-        return $this->visibleProcesses()->with('user')->findOrFail($id);
+        return $this->visibleProcesses()->with(['user', 'evidencias', 'anexos'])->findOrFail($id);
     }
 
     /**
@@ -59,12 +72,12 @@ class ProcesoDisciplinarioController extends Controller
 
         $diasVencer = null;
         if ($proximoVencer) {
-            $diasVencer = 15 - now()->startOfDay()->diffInDays($proximoVencer->created_at->copy()->startOfDay());
+            $diasVencer = 5 - now()->startOfDay()->diffInDays($proximoVencer->created_at->copy()->startOfDay());
         }
 
         $procesosSinAsignar = (clone $visible)->whereNull('user_id')
             ->latest()
-            ->take(4)
+            ->take($user->esCoordinadora() ? 8 : 4)
             ->get();
 
         $alertaDescargos = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso'])
@@ -75,7 +88,7 @@ class ProcesoDisciplinarioController extends Controller
             ->first();
 
         $alertasActivas = collect([
-            $proximoVencer && $diasVencer !== null && $diasVencer <= 15,
+            $proximoVencer && $diasVencer !== null && $diasVencer <= 5,
             $sinAbogado > 0,
             $alertaDescargos !== null,
         ])->filter()->count();
@@ -86,16 +99,36 @@ class ProcesoDisciplinarioController extends Controller
             ->get();
 
         $cargaAbogados = User::where('role', 'abogado')
-            ->when(!in_array($user->role, ['admin', 'coordinadora'], true), function ($query) use ($user) {
+            ->when(!$user->esCoordinadora(), function ($query) use ($user) {
                 $query->whereKey($user->id);
             })
+            ->with('permisos')
             ->withCount('procesos')
+            ->withCount(['procesos as procesos_abiertos_count' => function ($query) {
+                $query->whereIn('estado', ['Pendiente', 'En Proceso']);
+            }])
             ->orderByDesc('procesos_count')
-            ->take(4)
+            ->take($user->esCoordinadora() ? 12 : 4)
             ->get();
 
-        return view('abogado.dashboard', [
-            'pageTitle' => 'Inicio',
+        $equipoRh = $user->esCoordinadora()
+            ? User::where('role', 'abogado')->orderBy('name')->get()
+            : collect();
+
+        $pendientesVeredicto = (clone $visible)->where('estado', 'En Proceso')
+            ->with('user')
+            ->latest()
+            ->take(8)
+            ->get();
+
+        $solicitudesPendientes = $user->esCoordinadora()
+            ? \App\Models\PermisoSolicitud::with('user')->where('estado', 'pendiente')->latest()->take(6)->get()
+            : collect();
+
+        $vista = $user->esCoordinadora() ? 'coordinadora.dashboard' : 'abogado.dashboard';
+
+        return view($vista, [
+            'pageTitle' => $user->esCoordinadora() ? 'Coordinación de RH' : 'Inicio',
             'user' => $user,
             'pendientes' => $pendientes,
             'enProceso' => $enProceso,
@@ -115,6 +148,9 @@ class ProcesoDisciplinarioController extends Controller
             'alertasActivas' => $alertasActivas,
             'recientes' => $recientes,
             'cargaAbogados' => $cargaAbogados,
+            'equipoRh' => $equipoRh,
+            'pendientesVeredicto' => $pendientesVeredicto,
+            'solicitudesPendientes' => $solicitudesPendientes,
         ]);
     }
 
@@ -123,23 +159,35 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function create(OfficialDocumentService $documents)
     {
-        // En Registro siempre inicia en blanco, salvo si hay 'old' input de alguna validación fallida
-        $oldDis = old('yellow_blocks_disciplinario', []);
-        $oldCom = old('yellow_blocks_comprobacion', []);
-        $oldAct = old('yellow_blocks_acta', []);
+        $tipoInicial = old('tipo_proceso', 'disciplinario');
+        if (!in_array($tipoInicial, CasoDocumentoEstado::TIPOS, true)) {
+            $tipoInicial = 'disciplinario';
+        }
+
+        $oldBlocks = old('yellow_blocks_' . $tipoInicial, []);
 
         return view('abogado.Registro', [
-            'blockDefinitions' => [
-                'disciplinario' => $documents->blockDefinitions('disciplinario'),
-                'comprobacion'  => $documents->blockDefinitions('comprobacion'),
-                'acta'          => $documents->blockDefinitions('acta'),
-            ],
-            'interactiveHtml' => [
-                'disciplinario' => $documents->getInteractiveDocumentHtml('disciplinario', $oldDis),
-                'comprobacion'  => $documents->getInteractiveDocumentHtml('comprobacion', $oldCom),
-                'acta'          => $documents->getInteractiveDocumentHtml('acta', $oldAct),
-            ],
+            'tipoInicial' => $tipoInicial,
+            'interactiveHtml' => $documents->getInteractiveDocumentHtml(
+                $tipoInicial,
+                is_array($oldBlocks) ? $oldBlocks : []
+            ),
             'profileUser' => auth()->user(),
+        ]);
+    }
+
+    public function plantillaRegistro(Request $request, OfficialDocumentService $documents)
+    {
+        $tipo = (string) $request->query('tipo', '');
+        abort_unless(in_array($tipo, CasoDocumentoEstado::TIPOS, true), 404);
+        $oldBlocks = old('yellow_blocks_' . $tipo, []);
+
+        return response()->json([
+            'html' => $documents->getInteractiveDocumentHtml($tipo, is_array($oldBlocks) ? $oldBlocks : []),
+            'tipo' => $tipo,
+            'etiqueta' => CasoDocumentoEstado::etiqueta($tipo),
+            'slot' => CasoDocumentoEstado::slotDe($tipo),
+            'requiereFirmaGerente' => $documents->requiresGerentePrint($tipo),
         ]);
     }
 
@@ -213,7 +261,7 @@ class ProcesoDisciplinarioController extends Controller
         );
 
         return view('abogado.Reincidencias', [
-            'pageTitle'      => 'Módulo de Reincidencias',
+            'pageTitle'      => 'Reincidencias',
             'workersGrouped' => $workersGroupedPaginated,
             'search'         => $search,
             'profileUser'    => auth()->user(),
@@ -269,7 +317,7 @@ class ProcesoDisciplinarioController extends Controller
             ->pluck('modalidad');
 
         return view('abogado.Consultarproceso', [
-            'pageTitle' => $mine ? 'Mis casos' : 'Procesos disciplinarios',
+            'pageTitle' => $mine ? 'Mis casos' : 'Todos los procesos',
             'procesos' => $procesos,
             'conteos' => $conteos,
             'modalidades' => $modalidades,
@@ -311,12 +359,13 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         /** @var \Illuminate\Pagination\LengthAwarePaginator $casos */
-        $casos = (clone $query)->whereIn('estado', ['Pendiente', 'En Proceso'])->latest()->paginate(12);
+        $casos = (clone $query)->whereIn('estado', ['Pendiente', 'En Proceso'])->withCount('anexos')->latest()->paginate(12);
         $casos->withQueryString();
 
         // Historial: cerrados (Sancionado + Archivado)
         $historial = (clone $query)->whereIn('estado', ['Sancionado', 'Archivado'])
             ->with('user')
+            ->withCount('anexos')
             ->latest('updated_at')
             ->get()
             ->map(function ($p) {
@@ -337,6 +386,7 @@ class ProcesoDisciplinarioController extends Controller
                     'fecha_cierre'  => $cierre ? $cierre->format('d/m/Y') : '—',
                     'duracion_dias' => $duracion,
                     'modalidad'     => $p->modalidad,
+                    'anexos'        => (int) $p->anexos_count,
                 ];
             });
 
@@ -346,6 +396,7 @@ class ProcesoDisciplinarioController extends Controller
             'sancionados'=> $historial->where('estado', 'Sancionado')->count(),
             'archivados' => $historial->where('estado', 'Archivado')->count(),
             'prom_dias'  => $historial->whereNotNull('duracion_dias')->avg('duracion_dias'),
+            'anexos'     => $historial->sum('anexos'),
         ];
 
         return view('abogado.Reportes', [
@@ -437,6 +488,7 @@ class ProcesoDisciplinarioController extends Controller
         try {
             $casos = $this->visibleProcesses()
                 ->whereIn('id', $validated['ids'])
+                ->withCount('anexos')
                 ->orderBy('id')
                 ->get();
 
@@ -482,7 +534,7 @@ class ProcesoDisciplinarioController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'tipo_proceso' => 'required|in:disciplinario,comprobacion,acta',
+            'tipo_proceso' => 'required|in:' . implode(',', CasoDocumentoEstado::TIPOS),
             'nombre'       => 'required|string|max:255',
         ]);
 
@@ -512,22 +564,17 @@ class ProcesoDisciplinarioController extends Controller
             }
         }
 
-        // Recuperar bloques por submódulo o array simple
+        $tipo = $validated['tipo_proceso'];
         $yellowBlocksData = [];
-
-        if ($request->has('yellow_blocks_disciplinario')) {
-            $yellowBlocksData['disciplinario'] = array_values($request->input('yellow_blocks_disciplinario', []));
-        }
-        if ($request->has('yellow_blocks_comprobacion')) {
-            $yellowBlocksData['comprobacion'] = array_values($request->input('yellow_blocks_comprobacion', []));
-        }
-        if ($request->has('yellow_blocks_acta')) {
-            $yellowBlocksData['acta'] = array_values($request->input('yellow_blocks_acta', []));
+        $bloquesTipo = $request->input('yellow_blocks_' . $tipo, $request->input('yellow_blocks'));
+        if (is_array($bloquesTipo)) {
+            $yellowBlocksData[$tipo] = array_values($bloquesTipo);
         }
 
-        // Fallback si viene como array genérico yellow_blocks[]
-        if (empty($yellowBlocksData) && $request->has('yellow_blocks')) {
-            $yellowBlocksData[$validated['tipo_proceso']] = array_values($request->input('yellow_blocks', []));
+        $slot = CasoDocumentoEstado::slotDe($tipo);
+        $slots = [];
+        if ($slot) {
+            $slots[$slot] = $tipo;
         }
 
         $proceso = ProcesoDisciplinario::create([
@@ -542,6 +589,7 @@ class ProcesoDisciplinarioController extends Controller
             'descripcion_falta' => $request->descripcion_falta,
             'datos_oficiales'   => [
                 'yellow_blocks' => $yellowBlocksData,
+                'slots' => $slots,
             ],
             'fecha_falta'       => $request->fecha_falta,
             'documento_falta'   => $rutaDocumento,
@@ -557,61 +605,32 @@ class ProcesoDisciplinarioController extends Controller
             \App\Models\CasoEvidencia::create($ev);
         }
 
+        $mensaje = $tipo === 'terminacion'
+            ? 'Proceso registrado. Imprime la terminación para firma del gerente y luego sube el escaneo en Anexos escaneados.'
+            : 'Proceso registrado. Descargando solo el documento que diligenció.';
+
         return redirect()
             ->route('abogado.detalleproceso', $proceso->id)
-            ->with('success', 'Proceso disciplinario registrado correctamente. Descargando el documento oficial...')
-            ->with('autodownload', $validated['tipo_proceso']);
+            ->with('success', $mensaje)
+            ->with('autodownload', $validated['tipo_proceso'])
+            ->with('clear_nuevo_draft', true);
     }
 
     /**
      * Mostrar detalles de un proceso disciplinario
      */
-    public function show($id, OfficialDocumentService $documents)
+    public function show($id)
     {
         $proceso = $this->accessibleProcess($id);
+        $proceso->loadMissing(['documentoEstados', 'anexos.user']);
 
         return view('abogado.Detalleproceso', [
             'proceso' => $proceso,
-            'officialBlockDefinitions' => $documents->blockDefinitions('acta'),
+            'pageTitle' => 'PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT),
+            'equipoRh' => auth()->user()->esCoordinadora()
+                ? User::where('role', 'abogado')->orderBy('name')->get()
+                : collect(),
         ]);
-    }
-
-    public function downloadOfficial($id, string $template, OfficialDocumentService $documents)
-    {
-        try {
-            return $documents->downloadOfficial(
-                $this->accessibleProcess($id),
-                $template,
-                $template === 'acta' ? 'acta-cargos-descargos' : 'apertura-' . $template
-            );
-        } catch (ValidationException $exception) {
-            return back()->withErrors($exception->errors())
-                ->with('error', 'Completa todos los bloques amarillos antes de generar el documento.');
-        } catch (Throwable $exception) {
-            report($exception);
-
-            return back()->with('error', 'No fue posible generar el documento institucional.');
-        }
-    }
-
-    public function saveOfficialBlocks(Request $request, $id, string $template, OfficialDocumentService $documents)
-    {
-        $proceso = $this->accessibleProcess($id);
-        
-        if ($proceso->estado === 'Sancionado') {
-            return redirect()->back()->with('error', 'Acción denegada: Este proceso se encuentra cerrado por Sanción y es inmodificable.');
-        }
-
-        $definitions = $documents->blockDefinitions($template);
-        $validated = $request->validate([
-            'yellow_blocks' => 'required|array|size:' . count($definitions),
-            'yellow_blocks.*' => 'required|string|max:30000',
-        ]);
-        $data = $proceso->datos_oficiales ?: [];
-        $data['yellow_blocks'][$template] = array_values($validated['yellow_blocks']);
-        $proceso->update(['datos_oficiales' => $data]);
-
-        return redirect()->back()->with('success', 'Información institucional guardada correctamente.');
     }
 
     public function downloadSourceDocument($id)
@@ -681,9 +700,16 @@ class ProcesoDisciplinarioController extends Controller
             'observacion' => $request->observacion,
             'descargos' => $request->descargos,
             'decision_final' => $request->decision_final,
-
-            'estado' => $request->estado
         ]);
+
+        if ($request->has('descargos_presentacion')) {
+            $presentacion = ProcesoDisciplinario::parseDescargosPresentacion(
+                $request->input('descargos_presentacion')
+            );
+            if ($presentacion !== []) {
+                $proceso->update($presentacion);
+            }
+        }
 
         return redirect()
             ->back()
@@ -692,33 +718,52 @@ class ProcesoDisciplinarioController extends Controller
 
     public function updateStatus(Request $request, $id)
     {
+        abort_unless(auth()->user()->esCoordinadora(), 403);
+
         $proceso = $this->accessibleProcess($id);
 
-        if ($proceso->estado === 'Sancionado') {
-            return redirect()->back()->with('error', 'Acción denegada: Los procesos sancionados están bloqueados permanentemente.');
+        if (in_array($proceso->estado, ['Sancionado', 'Archivado'], true)) {
+            return redirect()->back()->with('error', 'Este proceso ya tiene veredicto y no admite cambio de estado.');
+        }
+
+        if ($proceso->estado !== 'En Proceso') {
+            return redirect()->back()->with('error', 'El veredicto solo se da cuando el caso está En Proceso.');
         }
 
         $validated = $request->validate([
-            'estado' => 'required|in:Pendiente,En Proceso,Sancionado,Archivado',
+            'estado' => 'required|in:Sancionado,Archivado',
         ]);
 
         $proceso->update(['estado' => $validated['estado']]);
 
-        return redirect()->back()->with('success', 'Estado del proceso modificado rápidamente.');
+        $mensaje = $validated['estado'] === 'Sancionado'
+            ? 'Veredicto registrado. El proceso quedó Sancionado.'
+            : 'Veredicto registrado. El proceso quedó Archivado.';
+
+        return redirect()->back()->with('success', $mensaje);
     }
 
     public function solicitarVeredicto($id)
     {
         $proceso = $this->accessibleProcess($id);
 
-        if ($proceso->estado === 'Sancionado') {
-            return redirect()->back()->with('error', 'Acción denegada: Este proceso ya fue sancionado.');
+        if (in_array($proceso->estado, ['Sancionado', 'Archivado'], true)) {
+            return redirect()->back()->with('error', 'Acción denegada: este proceso ya tiene veredicto.');
         }
 
-        // Se cambia a 'En Proceso' para que el coordinador/admin lo atienda
+        if ($proceso->estado === 'En Proceso') {
+            return redirect()->back()->with('info', 'Este caso ya está En Proceso, pendiente de veredicto.');
+        }
+
+        if (!$proceso->tieneDocumentoGenerado()) {
+            return redirect()->back()->with('error', 'Genera al menos un documento oficial antes de enviar el caso.');
+        }
+
         $proceso->update(['estado' => 'En Proceso']);
 
-        return redirect()->back()->with('success', 'Información enviada. El caso ahora está "En Proceso" y pendiente de veredicto por el coordinador/admin.');
+        \App\Models\CoordinadoraNotificacion::avisarVeredicto($proceso, auth()->user());
+
+        return redirect()->back()->with('success', 'Caso enviado. Ahora está En Proceso y pendiente de veredicto.');
     }
 
     /**
@@ -814,71 +859,6 @@ class ProcesoDisciplinarioController extends Controller
     }
 
     /**
-     * Partes involucradas en los procesos
-     */
-    public function partes(Request $request)
-    {
-        $partes = $this->visibleProcesses()
-            ->latest()
-            ->get()
-            ->map(function ($proceso) {
-                return (object) [
-                    'id' => $proceso->id,
-                    'nombre' => $proceso->nombre,
-                    'cedula' => $proceso->cedula,
-                    'telefono' => $proceso->telefono,
-                    'correo' => null,
-                    'rol' => 'investigado',
-                    'proceso_id' => $proceso->id,
-                    'vinculacion' => $proceso->fecha_falta
-                        ? Carbon::parse($proceso->fecha_falta)
-                        : $proceso->created_at,
-                ];
-            });
-
-        $conteos = [
-            'todos' => $partes->count(),
-            'investigado' => $partes->where('rol', 'investigado')->count(),
-            'quejoso' => $partes->where('rol', 'quejoso')->count(),
-            'testigo' => $partes->where('rol', 'testigo')->count(),
-            'apoderado' => $partes->where('rol', 'apoderado')->count(),
-        ];
-
-        $filtro = $request->get('rol', 'todos');
-        if (in_array($filtro, ['investigado', 'quejoso', 'testigo', 'apoderado'], true)) {
-            $partes = $partes->where('rol', $filtro)->values();
-        }
-
-        if ($request->filled('q')) {
-            $q = mb_strtolower($request->q);
-            $partes = $partes->filter(function ($parte) use ($q) {
-                $codigo = 'pro-' . str_pad($parte->proceso_id, 3, '0', STR_PAD_LEFT);
-                return str_contains(mb_strtolower((string) $parte->nombre), $q)
-                    || str_contains((string) $parte->cedula, $q)
-                    || str_contains($codigo, $q)
-                    || str_contains((string) $parte->proceso_id, $q);
-            })->values();
-        }
-
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = 10;
-        $partesPaginated = new LengthAwarePaginator(
-            $partes->slice(($page - 1) * $perPage, $perPage)->values(),
-            $partes->count(),
-            $perPage,
-            $page,
-            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
-        );
-
-        return view('abogado.partes', [
-            'pageTitle' => 'Partes involucradas',
-            'partes' => $partesPaginated,
-            'conteos' => $conteos,
-            'filtro' => $filtro,
-        ]);
-    }
-
-    /**
      * Plazos y términos procesales
      */
     public function plazos(Request $request)
@@ -900,22 +880,20 @@ class ProcesoDisciplinarioController extends Controller
                     ? $proceso->created_at->copy()->startOfDay()
                     : $hoy->copy();
 
-                $vencimiento = $inicio->copy()->addDays(15);
+                $vencimiento = $inicio->copy()->addDays(5);
                 $dias = $hoy->diffInDays($vencimiento, false);
 
-                if ($dias < 0) {
+                if ($dias <= 0) {
                     $semaforo = 'vencido';
-                } elseif ($dias <= 5) {
+                } elseif ($dias <= 2) {
                     $semaforo = 'por_vencer';
                 } else {
                     $semaforo = 'vigente';
                 }
 
                 $tipo = $tipos[$proceso->estado] ?? 'Descargos';
-                if ($proceso->estado === 'Pendiente' && empty($proceso->descargos)) {
-                    $tipo = 'Descargos';
-                } elseif ($proceso->estado === 'Pendiente') {
-                    $tipo = 'Investigación previa';
+                if ($proceso->estado === 'Pendiente') {
+                    $tipo = $proceso->etiquetaTipoDescargos();
                 } elseif ($proceso->estado === 'En Proceso' && empty($proceso->decision_final)) {
                     $tipo = 'Audiencia';
                 }
@@ -925,6 +903,8 @@ class ProcesoDisciplinarioController extends Controller
                     'proceso_id' => $proceso->id,
                     'conductor' => $proceso->nombre,
                     'tipo' => $tipo,
+                    'es_descargos' => $proceso->estado === 'Pendiente',
+                    'descargos_presentacion' => $proceso->descargosPresentacionValue(),
                     'vencimiento' => $vencimiento,
                     'dias' => $dias,
                     'semaforo' => $semaforo,
@@ -958,7 +938,30 @@ class ProcesoDisciplinarioController extends Controller
             'plazos' => $plazosPaginated,
             'conteos' => $conteos,
             'filtro' => $filtro,
+            'opcionesDescargos' => ProcesoDisciplinario::opcionesDescargosPresentacion(),
         ]);
+    }
+
+    public function actualizarDescargosPresentacion(Request $request, $id)
+    {
+        $proceso = $this->accessibleProcess($id);
+        $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));
+
+        $validated = $request->validate([
+            'descargos_presentacion' => 'required|in:' . $permitidas,
+        ]);
+
+        $presentacion = ProcesoDisciplinario::parseDescargosPresentacion(
+            $validated['descargos_presentacion']
+        );
+
+        if ($presentacion !== []) {
+            $proceso->update($presentacion);
+        }
+
+        return redirect()
+            ->route('abogado.plazos', array_filter($request->only('estado')))
+            ->with('success', 'Presentación de descargos actualizada.');
     }
 
     /**
@@ -966,11 +969,20 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function abogados()
     {
-        $abogados = User::where('role', 'abogado')->orderBy('name')->get();
+        $abogados = User::where('role', 'abogado')
+            ->with('permisos')
+            ->withCount('procesos')
+            ->withCount(['procesos as procesos_abiertos_count' => function ($query) {
+                $query->whereIn('estado', ['Pendiente', 'En Proceso']);
+            }])
+            ->orderBy('name')
+            ->get();
 
         return view('coordinadora.abogados', [
-            'pageTitle' => 'Gestión de RH',
+            'pageTitle' => 'Equipo y permisos',
             'abogados' => $abogados,
+            'catalogoPermisos' => \App\Support\RhPermisos::catalogo(),
+            'duracionesPermiso' => \App\Support\RhPermisos::duracionesHoras(),
         ]);
     }
 
@@ -1037,5 +1049,27 @@ class ProcesoDisciplinarioController extends Controller
         return redirect()
             ->back()
             ->with('success', 'Registro de RH actualizado correctamente');
+    }
+
+    public function asignarProceso(Request $request, $id)
+    {
+        abort_unless(auth()->user()->esCoordinadora(), 403);
+
+        $proceso = $this->accessibleProcess($id);
+        $validated = $request->validate([
+            'user_id' => 'nullable|integer',
+        ]);
+
+        $userId = $validated['user_id'] ?? null;
+        if ($userId === null || $userId === '') {
+            $proceso->update(['user_id' => null]);
+
+            return redirect()->back()->with('success', 'El proceso quedó sin responsable de RH.');
+        }
+
+        $responsable = User::whereKey($userId)->where('role', 'abogado')->firstOrFail();
+        $proceso->update(['user_id' => $responsable->id]);
+
+        return redirect()->back()->with('success', 'Proceso asignado a ' . $responsable->name . '.');
     }
 }

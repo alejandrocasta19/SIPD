@@ -6,6 +6,9 @@ use App\Http\Controllers\ProcesoDisciplinarioController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\ConsultaPublicaController;
 use App\Http\Controllers\DocumentoController;
+use App\Http\Controllers\AnexoController;
+use App\Http\Controllers\AvisoController;
+use App\Http\Controllers\CoordinadoraController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,19 +54,20 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
 
 Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
 
-    Route::get('/abogado/estadistica', [ProcesoDisciplinarioController::class, 'reportes'])
-        ->name('abogado.estadistica');
-
     Route::get('/abogado/reportes', [ProcesoDisciplinarioController::class, 'reportes'])
         ->name('abogado.reportes');
+
+    Route::get('/abogado/estadistica', function () {
+        return redirect()->route('abogado.reportes', request()->query());
+    })->name('abogado.estadistica');
 
     Route::get('/abogado/reportes/datos',
         [ProcesoDisciplinarioController::class, 'reportesData']
     )->name('abogado.reportes.datos');
 
-    Route::get('/abogado/estadisticas/datos',
-        [ProcesoDisciplinarioController::class, 'reportesData']
-    )->name('abogado.estadisticas.datos');
+    Route::get('/abogado/estadisticas/datos', function () {
+        return redirect()->route('abogado.reportes.datos', request()->query());
+    })->name('abogado.estadisticas.datos');
 
     Route::match(['GET', 'POST'], '/abogado/reportes/global/{format}',
         [ProcesoDisciplinarioController::class, 'reportesGlobales']
@@ -82,6 +86,10 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
     Route::get('/abogado/registro',
         [ProcesoDisciplinarioController::class, 'create']
     )->name('abogado.registro');
+
+    Route::get('/abogado/registro/plantilla',
+        [ProcesoDisciplinarioController::class, 'plantillaRegistro']
+    )->name('abogado.registro.plantilla');
 
     Route::post('/abogado/registro',
         [ProcesoDisciplinarioController::class, 'store']
@@ -123,9 +131,33 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
         [ProcesoDisciplinarioController::class, 'plazos']
     )->name('abogado.plazos');
 
-    Route::get('/abogado/partes',
-        [ProcesoDisciplinarioController::class, 'partes']
-    )->name('abogado.partes');
+    Route::put('/abogado/plazos/{id}/descargos',
+        [ProcesoDisciplinarioController::class, 'actualizarDescargosPresentacion']
+    )->name('abogado.plazos.descargos');
+
+    Route::get('/abogado/anexos',
+        [AnexoController::class, 'index']
+    )->name('abogado.anexos');
+
+    Route::post('/abogado/anexos',
+        [AnexoController::class, 'store']
+    )->name('abogado.anexos.store');
+
+    Route::get('/abogado/anexos/{id}/descargar',
+        [AnexoController::class, 'download']
+    )->name('abogado.anexos.download');
+
+    Route::put('/abogado/anexos/{id}/firmar',
+        [AnexoController::class, 'firmar']
+    )->name('abogado.anexos.firmar');
+
+    Route::delete('/abogado/anexos/{id}',
+        [AnexoController::class, 'destroy']
+    )->name('abogado.anexos.destroy');
+
+    Route::get('/abogado/partes', function () {
+        return redirect()->route('abogado.anexos');
+    })->name('abogado.partes');
 
     Route::get('/abogado/resoluciones',
         [ProcesoDisciplinarioController::class, 'resoluciones']
@@ -148,14 +180,6 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
     Route::get('/abogado/detalleproceso/{id}/documento-falta',
         [ProcesoDisciplinarioController::class, 'downloadSourceDocument']
     )->name('abogado.documento-falta');
-
-    Route::get('/abogado/detalleproceso/{id}/oficial/{template}',
-        [ProcesoDisciplinarioController::class, 'downloadOfficial']
-    )->name('abogado.documento.oficial');
-
-    Route::put('/abogado/detalleproceso/{id}/oficial/{template}',
-        [ProcesoDisciplinarioController::class, 'saveOfficialBlocks']
-    )->name('abogado.documento.oficial.guardar');
 
 });
 
@@ -203,6 +227,23 @@ Route::middleware(['auth', 'role:admin,coordinadora'])->group(function () {
     Route::put('/coordinadora/abogados/editar/{id}',
         [ProcesoDisciplinarioController::class, 'editarAbogado'])
         ->name('coordinadora.abogados.editar');
+
+    Route::put('/coordinadora/procesos/{id}/asignar',
+        [ProcesoDisciplinarioController::class, 'asignarProceso'])
+        ->name('coordinadora.asignar');
+
+    Route::get('/coordinadora/veredictos', [CoordinadoraController::class, 'veredictos'])
+        ->name('coordinadora.veredictos');
+    Route::put('/coordinadora/abogados/{id}/permisos', [CoordinadoraController::class, 'guardarPermisos'])
+        ->name('coordinadora.abogados.permisos');
+    Route::get('/coordinadora/solicitudes', [CoordinadoraController::class, 'solicitudes'])
+        ->name('coordinadora.solicitudes');
+    Route::put('/coordinadora/solicitudes/{id}', [CoordinadoraController::class, 'responderSolicitud'])
+        ->name('coordinadora.solicitudes.responder');
+    Route::get('/coordinadora/avisos', [CoordinadoraController::class, 'notificarForm'])
+        ->name('coordinadora.notificar');
+    Route::post('/coordinadora/avisos', [CoordinadoraController::class, 'notificarEquipo'])
+        ->name('coordinadora.notificar.enviar');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -210,6 +251,11 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update');
     Route::get('/perfil/contrasena', [PerfilController::class, 'password'])->name('perfil.password');
     Route::put('/perfil/contrasena', [PerfilController::class, 'updatePassword'])->name('perfil.password.update');
+    Route::get('/notificaciones', [AvisoController::class, 'index'])->name('notificaciones.index');
+    Route::delete('/notificaciones/leidas', [AvisoController::class, 'destroyLeidas'])->name('notificaciones.leidas');
+    Route::get('/notificaciones/{id}', [AvisoController::class, 'leer'])->name('notificaciones.leer');
+    Route::delete('/notificaciones/{id}', [AvisoController::class, 'destroy'])->name('notificaciones.destroy');
+    Route::post('/permisos/solicitar', [AvisoController::class, 'solicitar'])->name('permisos.solicitar');
 });
 
 /*
@@ -231,6 +277,9 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->prefix('document
     // Formulario de diligenciamiento (split-screen)
     Route::get('/{id}/{tipo}/editar', [DocumentoController::class, 'edit'])
         ->name('edit');
+
+    Route::post('/{id}/variante', [DocumentoController::class, 'elegirVariante'])
+        ->name('variante');
 
     // Guardar bloques amarillos
     Route::put('/{id}/{tipo}/guardar', [DocumentoController::class, 'save'])
@@ -255,4 +304,4 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->prefix('document
     // Eliminar evidencia
     Route::delete('/{id}/evidencias/{evidencia}', [DocumentoController::class, 'destroyEvidencia'])
         ->name('evidencias.destroy');
-});
+});

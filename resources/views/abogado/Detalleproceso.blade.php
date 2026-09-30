@@ -1,15 +1,23 @@
 @extends('layouts.master')
 
+@section('page-header')
+    <div class="proc-head">
+        <div>
+            <h1>Detalle del proceso</h1>
+            <p>{{ $proceso->nombre }} · CC {{ $proceso->cedula ?: '—' }}</p>
+        </div>
+    </div>
+@endsection
+
 @section('content')
 
-@if(session('error'))
-    <div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> {{ session('error') }}</div>
-@endif
-
 @if($errors->any())
-    <div class="alert alert-warning">
-        <strong>Información pendiente:</strong>
-        <ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+    <div class="sipd-alert sipd-alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>Información pendiente</strong>
+            <ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+        </div>
     </div>
 @endif
 
@@ -27,8 +35,6 @@
             <div class="card">
 
                 <div class="card-header">
-                    <h3 class="card-title">Detalle del Proceso Disciplinario</h3>
-
                     <div class="card-tools">
 
                         <a href="{{ route('abogado.consultarproceso') }}"
@@ -38,22 +44,23 @@
 
                         </a>
 
+                        @if(auth()->user()->puede('editar_casos'))
                         <button type="button"
                                 class="btn btn-primary"
                                 onclick="habilitarEdicion()">
-
                             <i class="fas fa-edit"></i> Editar Proceso
-
                         </button>
-
                         <button type="submit"
                                 id="btnGuardar"
                                 class="btn btn-success"
                                 style="display:none;">
-
                             <i class="fas fa-save"></i> Guardar Cambios
-
                         </button>
+                        @else
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('editar_casos')">
+                            <i class="fas fa-key"></i> Pedir permiso para editar
+                        </button>
+                        @endif
 
                     </div>
                 </div>
@@ -62,26 +69,27 @@
                     <div class="row mb-3">
                         <div class="col-12">
                             <div class="p-3 bg-white rounded border shadow-sm">
-                                <small class="text-uppercase font-weight-bold text-muted d-block mb-2"><i class="fas fa-route text-primary"></i> Estado y Flujo del Proceso:</small>
-                                <div class="d-flex align-items-center justify-content-between text-center position-relative">
+                                <small class="text-uppercase font-weight-bold text-muted d-block mb-2"><i class="fas fa-route" style="color:var(--cth-green);"></i> Estado y Flujo del Proceso:</small>
+                                <div class="sipd-flujo d-flex align-items-center justify-content-between text-center position-relative">
                                     @php
                                         $e = $proceso->estado;
                                         $fase1 = in_array($e, ['Pendiente', 'En Proceso', 'Sancionado', 'Archivado']);
                                         $fase2 = in_array($e, ['En Proceso', 'Sancionado', 'Archivado']);
                                         $fase3 = in_array($e, ['Sancionado', 'Archivado']);
+                                        $fase3Cls = $e === 'Archivado' ? 'archivado' : 'sancionado';
                                     @endphp
                                     <div class="flex-fill">
-                                        <span class="badge badge-{{ $fase1 ? 'success' : 'secondary' }} p-2 mb-1"><i class="fas fa-check-circle"></i> 1. Apertura / Notificación</span>
+                                        <span class="sipd-estado sipd-estado--pendiente {{ $fase1 && !$fase2 ? 'is-on' : '' }}"><i class="fas fa-check-circle"></i> 1. Apertura / Notificación</span>
                                         <small class="d-block text-muted">Auto Disciplinario o Comprobación</small>
                                     </div>
                                     <i class="fas fa-chevron-right text-muted mx-2"></i>
                                     <div class="flex-fill">
-                                        <span class="badge badge-{{ $fase2 ? 'primary' : 'secondary' }} p-2 mb-1"><i class="{{ $fase2 ? 'fas fa-spinner fa-spin' : 'far fa-circle' }}"></i> 2. Descargos / Pruebas</span>
+                                        <span class="sipd-estado sipd-estado--proceso {{ $fase2 && !$fase3 ? 'is-on' : '' }}"><i class="{{ $fase2 ? 'fas fa-spinner' : 'far fa-circle' }}"></i> 2. Descargos / Pruebas</span>
                                         <small class="d-block text-muted">Acta de Cargos y Descargos</small>
                                     </div>
                                     <i class="fas fa-chevron-right text-muted mx-2"></i>
                                     <div class="flex-fill">
-                                        <span class="badge badge-{{ $fase3 ? ($e == 'Sancionado' ? 'danger' : 'dark') : 'secondary' }} p-2 mb-1"><i class="fas fa-gavel"></i> 3. Fallo / {{ $e == 'Archivado' ? 'Archivo' : 'Sanción' }}</span>
+                                        <span class="sipd-estado sipd-estado--{{ $fase3Cls }} {{ $fase3 ? 'is-on' : '' }}"><i class="fas fa-gavel"></i> 3. Fallo / {{ $e == 'Archivado' ? 'Archivo' : 'Sanción' }}</span>
                                         <small class="d-block text-muted">Resolución Final</small>
                                     </div>
                                 </div>
@@ -98,84 +106,48 @@
                         </a>
                     </div>
                     <p class="text-muted small mb-3">
-                        Los 3 documentos oficiales de este expediente utilizan el formato de plantillas institucionales de Cootranshuila.
+                        Solo se muestra el formato que se usó en cada espacio.
                     </p>
 
                     <div class="row justify-content-center">
-                        @if($proceso->tipo_proceso !== 'comprobacion')
-                        {{-- 1. Apertura Disciplinaria --}}
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border shadow-sm" style="background: linear-gradient(145deg, #ffffff, #f8f9fa); border-radius: 12px; overflow: hidden;">
-                                <div class="card-body p-4 text-center">
-                                    <div class="mb-3">
-                                        <div style="width: 60px; height: 60px; background: rgba(0, 123, 255, 0.1); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
-                                            <i class="fas fa-balance-scale text-primary fa-2x"></i>
+                        @php
+                            $slotCards = [
+                                'apertura' => ['bg' => '#f8f9fa', 'iconBg' => 'rgba(0, 123, 255, 0.1)', 'icon' => 'fas fa-balance-scale text-primary'],
+                                'acta' => ['bg' => '#faf5ff', 'iconBg' => 'rgba(168, 85, 247, 0.1)', 'icon' => 'fas fa-gavel', 'iconStyle' => 'color:#9333ea;'],
+                                'resolucion' => ['bg' => '#fef2f2', 'iconBg' => 'rgba(185, 28, 28, 0.1)', 'icon' => 'fas fa-stamp text-danger'],
+                                'archivo' => ['bg' => '#f8fafc', 'iconBg' => 'rgba(71, 85, 105, 0.12)', 'icon' => 'fas fa-archive text-secondary'],
+                            ];
+                        @endphp
+                        @foreach(\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes)
+                            @php
+                                $tipoSlot = $proceso->varianteDelSlot($slot);
+                                $card = $slotCards[$slot];
+                            @endphp
+                            <div class="col-md-3 mb-3">
+                                <div class="card h-100 border shadow-sm" style="background: linear-gradient(145deg, #ffffff, {{ $card['bg'] }}); border-radius: 12px; overflow: hidden;">
+                                    <div class="card-body p-4 text-center">
+                                        <div class="mb-3">
+                                            <div style="width: 60px; height: 60px; background: {{ $card['iconBg'] }}; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+                                                <i class="{{ $card['icon'] }} fa-2x" @if(!empty($card['iconStyle'])) style="{{ $card['iconStyle'] }}" @endif></i>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <h6 class="font-weight-bold mb-2" style="font-size:14px;">1.1 GA-FT-045 Apertura Proceso Disciplinarios</h6>
-                                    <p class="text-muted small mb-3">Documento principal inicial</p>
-                                    <div class="d-flex justify-content-center gap-2">
-                                        <a href="{{ route('documentos.download', [$proceso->id, 'disciplinario']) }}" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm">
-                                            <i class="fas fa-file-word mr-1"></i> DOCX
-                                        </a>
-                                        <a href="{{ route('documentos.download', [$proceso->id, 'disciplinario']) }}?format=pdf" class="btn btn-sm btn-danger px-3 rounded-pill shadow-sm">
-                                            <i class="fas fa-file-pdf mr-1"></i> PDF
-                                        </a>
+                                        <h6 class="font-weight-bold mb-1" style="font-size:13px;">{{ \App\Models\CasoDocumentoEstado::SLOT_LABELS[$slot] }}</h6>
+                                        <p class="text-muted small mb-3">{{ \App\Models\CasoDocumentoEstado::etiqueta($tipoSlot) }}</p>
+                                        @if($tipoSlot === 'terminacion')
+                                            <p class="text-muted small mb-3">Imprimir para firma del gerente y subir el escaneo en Anexos.</p>
+                                        @endif
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <a href="{{ route('documentos.download', [$proceso->id, $tipoSlot]) }}" class="btn btn-sm px-3 rounded-pill shadow-sm btn-docx">
+                                                <i class="fas fa-file-word mr-1"></i> DOCX
+                                            </a>
+                                            <a href="{{ route('documentos.download', [$proceso->id, $tipoSlot]) }}?format=pdf" class="btn btn-sm btn-danger px-3 rounded-pill shadow-sm">
+                                                <i class="fas fa-file-pdf mr-1"></i> PDF
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        @endif
-
-                        @if($proceso->tipo_proceso !== 'disciplinario')
-                        {{-- 2. Apertura Comprobación --}}
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border shadow-sm" style="background: linear-gradient(145deg, #ffffff, #fefce8); border-radius: 12px; overflow: hidden;">
-                                <div class="card-body p-4 text-center">
-                                    <div class="mb-3">
-                                        <div style="width: 60px; height: 60px; background: rgba(234, 179, 8, 0.15); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
-                                            <i class="fas fa-search text-warning fa-2x"></i>
-                                        </div>
-                                    </div>
-                                    <h6 class="font-weight-bold mb-2" style="font-size:14px;">1.1 GA-FT-045 Apertura Proceso Comprobación</h6>
-                                    <p class="text-muted small mb-3">Ruta de comprobación</p>
-                                    <div class="d-flex justify-content-center gap-2">
-                                        <a href="{{ route('documentos.download', [$proceso->id, 'comprobacion']) }}" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm">
-                                            <i class="fas fa-file-word mr-1"></i> DOCX
-                                        </a>
-                                        <a href="{{ route('documentos.download', [$proceso->id, 'comprobacion']) }}?format=pdf" class="btn btn-sm btn-danger px-3 rounded-pill shadow-sm">
-                                            <i class="fas fa-file-pdf mr-1"></i> PDF
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        @endif
-
-                        @if($proceso->estado !== 'Pendiente' || $proceso->tipo_proceso === 'acta')
-                        {{-- 3. Acta Cargos y Descargos --}}
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border shadow-sm" style="background: linear-gradient(145deg, #ffffff, #faf5ff); border-radius: 12px; overflow: hidden;">
-                                <div class="card-body p-4 text-center">
-                                    <div class="mb-3">
-                                        <div style="width: 60px; height: 60px; background: rgba(168, 85, 247, 0.1); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
-                                            <i class="fas fa-gavel fa-2x" style="color:#9333ea;"></i>
-                                        </div>
-                                    </div>
-                                    <h6 class="font-weight-bold mb-2" style="font-size:14px;">2. Acta de cargos y descargos (grabación)</h6>
-                                    <p class="text-muted small mb-3">Diligencia de descargos</p>
-                                    <div class="d-flex justify-content-center gap-2">
-                                        <a href="{{ route('documentos.download', [$proceso->id, 'acta']) }}" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm">
-                                            <i class="fas fa-file-word mr-1"></i> DOCX
-                                        </a>
-                                        <a href="{{ route('documentos.download', [$proceso->id, 'acta']) }}?format=pdf" class="btn btn-sm btn-danger px-3 rounded-pill shadow-sm">
-                                            <i class="fas fa-file-pdf mr-1"></i> PDF
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        @endif
+                        @endforeach
                     </div>
                 </div>
                 
@@ -339,6 +311,16 @@
                                 </div>
                                 <div class="col-md-4">
                                     <strong>Descargos:</strong>
+                                    <select name="descargos_presentacion"
+                                            class="form-control campo-editable"
+                                            disabled>
+                                        @if($proceso->descargosPresentacionValue() === 'presentado')
+                                            <option value="presentado" selected>Presentado (sin medio)</option>
+                                        @endif
+                                        @foreach(\App\Models\ProcesoDisciplinario::opcionesDescargosPresentacion() as $valor => $etiqueta)
+                                            <option value="{{ $valor }}" {{ $proceso->descargosPresentacionValue() === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
+                                        @endforeach
+                                    </select>
                                     <textarea name="descargos"
                                               class="form-control campo-editable"
                                               rows="3"
@@ -347,36 +329,116 @@
                                 <div class="col-md-5">
                                     <strong>Decisión Final:</strong>
                                     <textarea name="decision_final"
-                                              class="form-control campo-editable decision-text"rows="3"
+                                              class="form-control campo-editable decision-text" rows="3"
                                               readonly>{{ $proceso->decision_final }}</textarea>
-</div>
-                                    <!-- Estado del Proceso -->
-<div class="col-md-5">
-    <strong>Cambiar Estado Rápidamente:</strong>
-    <p class="text-muted small mb-2">Selecciona un estado para actualizar el proceso inmediatamente.</p>
-    <form action="{{ route('abogado.actualizarestado', $proceso->id) }}" method="POST">
-        @csrf
-        @method('PUT')
-        <div class="d-flex gap-2 flex-wrap">
-            <button type="submit" name="estado" value="Pendiente" class="btn btn-sm {{ $proceso->estado == 'Pendiente' ? 'btn-warning text-white' : 'btn-outline-warning text-dark' }} font-weight-bold shadow-sm">
-                Pendiente
-            </button>
-            <button type="submit" name="estado" value="En Proceso" class="btn btn-sm {{ $proceso->estado == 'En Proceso' ? 'btn-primary' : 'btn-outline-primary' }} font-weight-bold shadow-sm">
-                En Proceso
-            </button>
-            <button type="submit" name="estado" value="Sancionado" class="btn btn-sm {{ $proceso->estado == 'Sancionado' ? 'btn-danger' : 'btn-outline-danger' }} font-weight-bold shadow-sm" onclick="return confirm('¿Seguro que deseas sancionar? Esto cerrará el proceso permanentemente y no podrás editarlo después.');">
-                Sancionado
-            </button>
-            <button type="submit" name="estado" value="Archivado" class="btn btn-sm {{ $proceso->estado == 'Archivado' ? 'btn-secondary' : 'btn-outline-secondary' }} font-weight-bold shadow-sm">
-                Archivado
-            </button>
-        </div>
-    </form>
-</div>
+                                </div>
+                                <div class="col-md-5">
+                                    <strong>Estado del proceso:</strong>
+                                    <p class="text-muted small mb-2">
+                                        Pendiente si aún no hay documento generado. Enviar lo pasa a En Proceso. El veredicto lo cierra como Sancionado o Archivado.
+                                    </p>
+                                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                                        <span class="sipd-estado sipd-estado--pendiente {{ $proceso->estado == 'Pendiente' ? 'is-on' : '' }}">
+                                            Pendiente
+                                        </span>
+                                        @if($proceso->puedeEnviarAProceso() && !auth()->user()->esCoordinadora())
+                                            <button type="submit"
+                                                    form="form-enviar-proceso"
+                                                    class="sipd-estado sipd-estado--proceso"
+                                                    data-confirm="El caso pasará a En Proceso y quedará pendiente de veredicto."
+                                                    data-confirm-title="Enviar caso"
+                                                    data-confirm-ok="Enviar"
+                                                    data-confirm-icon="question">
+                                                Enviar
+                                            </button>
+                                        @else
+                                            <span class="sipd-estado sipd-estado--proceso {{ $proceso->estado == 'En Proceso' ? 'is-on' : '' }}">
+                                                En Proceso
+                                            </span>
+                                        @endif
+                                        @if($proceso->estado === 'En Proceso' && auth()->user()->esCoordinadora())
+                                            <button type="submit"
+                                                    form="form-estado-veredicto"
+                                                    name="estado"
+                                                    value="Sancionado"
+                                                    class="sipd-estado sipd-estado--sancionado"
+                                                    data-confirm="Esto cerrará el proceso de forma permanente y ya no se podrá editar."
+                                                    data-confirm-title="Sancionar proceso"
+                                                    data-confirm-ok="Sancionar"
+                                                    data-confirm-danger="1"
+                                                    data-confirm-icon="warning">
+                                                Sancionado
+                                            </button>
+                                            <button type="submit"
+                                                    form="form-estado-veredicto"
+                                                    name="estado"
+                                                    value="Archivado"
+                                                    class="sipd-estado sipd-estado--archivado"
+                                                    data-confirm="El expediente quedará archivado."
+                                                    data-confirm-title="Archivar proceso"
+                                                    data-confirm-ok="Archivar"
+                                                    data-confirm-icon="question">
+                                                Archivado
+                                            </button>
+                                        @else
+                                            <span class="sipd-estado sipd-estado--sancionado {{ $proceso->estado == 'Sancionado' ? 'is-on' : '' }}">
+                                                Sancionado
+                                            </span>
+                                            <span class="sipd-estado sipd-estado--archivado {{ $proceso->estado == 'Archivado' ? 'is-on' : '' }}">
+                                                Archivado
+                                            </span>
+                                            @if($proceso->estado === 'En Proceso')
+                                                <small class="text-muted d-block w-100 mt-1">Pendiente de veredicto de la coordinadora.</small>
+                                            @endif
+                                        @endif
+                                    </div>
+                                    @if(auth()->user()->esCoordinadora())
+                                        <div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
+                                            <label class="mb-0 small text-muted font-weight-bold" for="asignar-rh">Responsable RH</label>
+                                            <select id="asignar-rh" name="user_id" form="form-asignar-rh" class="form-control form-control-sm" style="max-width:260px">
+                                                <option value="">Sin asignar</option>
+                                                @foreach($equipoRh as $rh)
+                                                    <option value="{{ $rh->id }}" {{ (int) $proceso->user_id === (int) $rh->id ? 'selected' : '' }}>{{ $rh->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="submit" form="form-asignar-rh" class="btn btn-sm btn-success">Asignar</button>
+                                        </div>
+                                    @endif
+                                </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <div class="info-box">
+                        <div class="info-header">
+                            <h4><i class="fas fa-file-upload"></i> Anexos del expediente</h4>
+                        </div>
+                        <div class="info-content">
+                            @if($proceso->anexos && $proceso->anexos->count() > 0)
+                                @foreach($proceso->anexos as $anexo)
+                                    <p class="mb-2">
+                                        <a href="{{ route('abogado.anexos.download', $anexo->id) }}">
+                                            <i class="fas fa-paperclip"></i>
+                                            {{ $anexo->titulo ?: $anexo->nombre_original }}
+                                        </a>
+                                        <span class="hub-sub" style="display:inline;margin-left:6px;">
+                                            {{ $anexo->etiquetaTipo() }} · {{ $anexo->etiquetaEstado() }}
+                                            · {{ strtoupper($anexo->extension) }}
+                                        </span>
+                                        @if($anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura)
+                                            · <a href="{{ route('abogado.anexos.download', ['id' => $anexo->id, 'v' => 'firmado']) }}">Firmado</a>
+                                        @endif
+                                    </p>
+                                @endforeach
+                            @else
+                                <p>Aún no hay anexos Word o PDF en este expediente.</p>
+                            @endif
+                            <p class="mb-0">
+                                <a href="{{ route('abogado.anexos') }}">Ir a Anexos escaneados</a>
+                            </p>
+                        </div>
+                    </div>
+
                     <!-- Información Adicional -->
                     <div class="info-box">
                         <div class="info-header">
@@ -408,7 +470,35 @@
     </div>
 </div>
 </form>
+@if($proceso->puedeEnviarAProceso() && !auth()->user()->esCoordinadora())
+<form id="form-enviar-proceso" action="{{ route('abogado.solicitar_veredicto', $proceso->id) }}" method="POST" class="d-none">
+    @csrf
+    @method('PUT')
+</form>
+@endif
+@if($proceso->estado === 'En Proceso' && auth()->user()->esCoordinadora())
+<form id="form-estado-veredicto" action="{{ route('abogado.actualizarestado', $proceso->id) }}" method="POST" class="d-none">
+    @csrf
+    @method('PUT')
+</form>
+@endif
+@if(auth()->user()->esCoordinadora())
+<form id="form-asignar-rh" action="{{ route('coordinadora.asignar', $proceso->id) }}" method="POST" class="d-none">
+    @csrf
+    @method('PUT')
+</form>
+@endif
 <style>
+    .btn-docx {
+        background: #2563eb !important;
+        border: 1px solid #2563eb !important;
+        color: #fff !important;
+    }
+    .btn-docx:hover {
+        background: #1d4ed8 !important;
+        border-color: #1d4ed8 !important;
+        color: #fff !important;
+    }
     .info-box {
         background: #fff;
         border: 1px solid #ddd;
@@ -466,10 +556,13 @@
         background: #fff;
     }
 
-    .campo-editable[readonly] {
+    .campo-editable[readonly],
+    .campo-editable:disabled {
         background: transparent;
         border: none;
         padding-left: 0;
+        appearance: none;
+        -webkit-appearance: none;
     }
     
     .decision-text {
@@ -514,12 +607,11 @@ function habilitarEdicion() {
 @if(session('autodownload'))
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
-        var a = document.createElement('a');
-        a.href = "{{ route('documentos.download', [$proceso->id, session('autodownload')]) }}";
-        a.target = "_blank";
-        document.body.appendChild(a);
-        a.click();
-    }, 1000); // 1 segundo de retraso para que el toast cargue
+        var iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = "{{ route('documentos.download', [$proceso->id, session('autodownload')]) }}";
+        document.body.appendChild(iframe);
+    }, 400);
 });
 @endif
 </script>

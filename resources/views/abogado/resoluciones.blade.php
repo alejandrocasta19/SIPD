@@ -16,31 +16,16 @@
             <h1>Resoluciones</h1>
             <p>Archivo de resoluciones emitidas en procesos disciplinarios.</p>
         </div>
-    </div>
-    <div class="page-banner">
-        <div class="page-banner-left">
-            <div class="page-banner-title">Archivo de Resoluciones</div>
-            <div class="page-banner-sub">Consulta las resoluciones sancionatorias, absolutorias y de archivo emitidas.</div>
-        </div>
-        <div class="page-banner-right">
-            <span class="pb-badge">{{ $conteos['todos'] }} total</span>
-            @if($conteos['sancionatoria'] > 0)<span class="pb-badge red">{{ $conteos['sancionatoria'] }} Sancionatorias</span>@endif
-            @if($conteos['absolutoria'] > 0)<span class="pb-badge green">{{ $conteos['absolutoria'] }} Absolutorias</span>@endif
+        <div class="proc-head-side">
+            <span class="stat-chip">{{ $conteos['todos'] }} total</span>
+            @if($conteos['sancionatoria'] > 0)<span class="stat-chip red">{{ $conteos['sancionatoria'] }} Sancionatorias</span>@endif
+            @if($conteos['absolutoria'] > 0)<span class="stat-chip green">{{ $conteos['absolutoria'] }} Absolutorias</span>@endif
         </div>
     </div>
 @endsection
 
 @section('styles')
 <style>
-
-
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-    .chip { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 7px 12px; background: #fff; color: #64748b; text-decoration: none; font-size: 13px; font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
-    .chip.active { background: #ecfdf5; color: var(--cth-green-text); }
-    .chip i { font-size: 8px; }
-    .chip .n { color: #94a3b8; font-weight: 500; }
-    .chip.active .n { color: var(--cth-green-text); }
-
     .dot-pend { color: #f59e0b; }
     .dot-proc { color: #3b82f6; }
     .dot-sanc { color: #f43f5e; }
@@ -50,9 +35,8 @@
 
     .table-card { background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
     table.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table.proc th { text-align: left; padding: 14px 12px; color: #94a3b8; font-size: 11px; letter-spacing: .06em; font-weight: 700; border-bottom: 1px solid #f1f5f9; white-space: nowrap; text-transform: uppercase; }
-    table.proc td { padding: 14px 12px; border-bottom: 1px solid #f8fafc; color: #334155; vertical-align: middle; }
-    table.proc tr:last-child td { border-bottom: 0; }
+    table.proc th { text-align: left; padding: 14px 12px; color: #94a3b8; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); white-space: nowrap; text-transform: uppercase; }
+    table.proc td { padding: 14px 12px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; }
     table.proc tbody tr:hover { background: #fafbfc; }
 
     .id { color: var(--cth-green); font-weight: 700; text-decoration: none; }
@@ -125,9 +109,9 @@
                         </td>
                         <td>
                             @if($resolucion->firmada)
-                                <span style="color:var(--cth-green);font-weight:600;"><i class="fas fa-check"></i> Firmada</span>
+                                <span class="st"><i class="fas fa-circle dot-green"></i> Firmada</span>
                             @else
-                                <span style="color:#d97706;font-weight:600;">Pendiente firma</span>
+                                <span class="st"><i class="fas fa-circle dot-pend"></i> Pendiente firma</span>
                             @endif
                         </td>
                         <td>{{ $resolucion->expediente }}</td>

@@ -20,6 +20,10 @@ class OfficialDocumentService
         'comprobacion'  => '1.1 GA-FT-045 Formato de apertura Proceso Comprobacion.docx',
         'disciplinario' => '1.1 GA-FT-045 Formato de apertura Proceso Disciplinarios.docx',
         'acta'          => '2. Acta de cargos y descargos (grabacion).docx',
+        'sancion'       => '3. sancion.docx',
+        'llamado'       => '4. llamado de atencion.docx',
+        'terminacion'   => '5. Terminacion por justas causas.docx',
+        'archivo'       => 'Desición de Archivo.docx',
     ];
 
     /**
@@ -203,19 +207,45 @@ class OfficialDocumentService
 
     public function blockDefinitions(string $type): array
     {
-        abort_unless(isset(self::BLOCKS[$type]), 404, 'Tipo de documento no válido');
-        return self::BLOCKS[$type];
+        abort_unless(isset(self::TEMPLATES[$type]), 404, 'Tipo de documento no válido');
+        if (isset(self::BLOCKS[$type])) {
+            return self::BLOCKS[$type];
+        }
+
+        return $this->detectYellowBlocks($type);
     }
 
     public function fieldSections(string $type): array
     {
-        abort_unless(isset(self::SECTIONS[$type]), 404, 'Tipo de documento no válido');
-        return self::SECTIONS[$type];
+        if (isset(self::SECTIONS[$type])) {
+            return self::SECTIONS[$type];
+        }
+
+        $n = count($this->blockDefinitions($type));
+        return [[
+            'titulo' => 'Campos editables del formato',
+            'desc' => 'Completa las casillas amarillas en el mismo orden del documento.',
+            'bloques' => range(0, max(0, $n - 1)),
+        ]];
     }
 
     public function defaultTexts(string $type): array
     {
-        return self::DEFAULT_TEXTS[$type] ?? [];
+        if (isset(self::DEFAULT_TEXTS[$type])) {
+            return self::DEFAULT_TEXTS[$type];
+        }
+
+        return $this->detectYellowBlocks($type);
+    }
+
+    public function requiresGerentePrint(string $type): bool
+    {
+        return $type === 'terminacion';
+    }
+
+    public function templateFilename(string $type): ?string
+    {
+        return self::TEMPLATES[$type] ?? null;
     }
 
 
@@ -271,7 +301,7 @@ class OfficialDocumentService
         ])->deleteFileAfterSend(true);
     }
 
-    public function getInteractiveDocumentHtml(string $tipo, array $currentValues = []): string
+    public function getInteractiveDocumentHtml(string $tipo, array $currentValues = [], ?ProcesoDisciplinario $proceso = null): string
     {
         $filename = self::TEMPLATES[$tipo] ?? null;
         if (!$filename) return "<p>Error: Tipo de documento inválido.</p>";
@@ -286,7 +316,7 @@ class OfficialDocumentService
 
         // Usamos cache para no convertir a HTML en cada recarga
         $fileHash = md5_file($source);
-        $cacheKey = "sipd_interactive_doc_{$tipo}_{$fileHash}";
+        $cacheKey = "sipd_interactive_doc_{$tipo}_{$fileHash}_v7";
 
         $html = Cache::rememberForever($cacheKey, function () use ($source, $tipo) {
             return $this->generateInteractiveHtmlFromDocx($source, $tipo);
@@ -302,7 +332,7 @@ class OfficialDocumentService
             }
         }
 
-        return $html;
+        return $this->fillHeaderInHtml($html, ProcesoDisciplinario::datosEncabezadoDocumento($proceso));
     }
 
     private function generateInteractiveHtmlFromDocx(string $path, string $tipo): string
@@ -323,22 +353,20 @@ class OfficialDocumentService
         $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         $xpath = new DOMXPath($dom);
-        
-        $paragraphs = $xpath->query("//p");
+        $this->compactPhpWordLayout($dom, $xpath);
+
         $yellowIndex = 0;
         $defaults = $this->defaultTexts($tipo);
-        
-        foreach ($paragraphs as $p) {
-            // Sólo operar sobre DOMElement (no sobre DOMNameSpaceNode ni DOMNode base)
+        $containers = $xpath->query('//p|//td|//th|//li|//h1|//h2|//h3|//h4|//h5|//h6');
+
+        foreach ($containers as $p) {
             if (!($p instanceof \DOMElement)) {
                 continue;
             }
 
-            // Lógica para detectar la línea de firma (muchos guiones bajos)
-            if (preg_match('/^_{10,}$/', trim($p->textContent))) {
+            if ($p->tagName === 'p' && preg_match('/^_{10,}$/', trim($p->textContent))) {
                 $p->setAttribute('class', 'sig-zone');
                 $p->setAttribute('style', 'text-align:center; min-height:60px; color:#94a3b8; font-size:12px; cursor:pointer;');
-                // Limpiar el contenido original (los guiones) eliminando nodos hijos
                 while ($p->firstChild) {
                     $p->removeChild($p->firstChild);
                 }
@@ -346,38 +374,177 @@ class OfficialDocumentService
                 $p->appendChild($txt);
             }
 
-            $yellowSpans = $xpath->query(".//span[contains(@style, 'background: yellow') or contains(@style, 'background-color: yellow') or contains(@style, 'background: #FFFF00')]", $p);
-            if ($yellowSpans->length === 0) continue;
-            
-            $originalText = '';
+            $yellowSpans = $xpath->query('.//span', $p);
+            $matched = [];
             foreach ($yellowSpans as $span) {
+                if ($span instanceof \DOMElement && $this->styleLooksYellow($span->getAttribute('style'))) {
+                    $matched[] = $span;
+                }
+            }
+
+            if ($matched === [] && $this->styleLooksYellow($p->getAttribute('style'))) {
+                $matched[] = $p;
+            }
+
+            if ($matched === []) {
+                continue;
+            }
+
+            $originalText = '';
+            foreach ($matched as $span) {
                 $originalText .= $span->textContent;
             }
             $originalText = trim($originalText);
-            $placeholder = !empty($originalText) ? $originalText : ($defaults[$yellowIndex] ?? '');
+            $placeholder = $originalText !== '' ? $originalText : ($defaults[$yellowIndex] ?? '');
 
-            $firstSpan = $yellowSpans->item(0);
-            
-            $textarea = $dom->createElement('textarea');
-            $textarea->setAttribute('name', "yellow_blocks_{$tipo}[{$yellowIndex}]");
-            $textarea->setAttribute('class', "doc-interactive-field js-block-{$tipo}");
-            $textarea->setAttribute('data-index', $yellowIndex);
-            $textarea->setAttribute('placeholder', htmlspecialchars($placeholder));
-            
-            $rows = strlen($placeholder) > 80 ? '4' : '2';
-            $textarea->setAttribute('rows', $rows);
-            // Estilos para que parezca zona interactiva integrada al documento
-            $textarea->setAttribute('style', 'width: 100%; font-family: inherit; font-size: inherit; padding: 6px; border: 1.5px dashed #fbbf24; border-radius: 4px; box-sizing: border-box; background: #fffbeb; transition: all 0.2s; outline: none; margin: 4px 0;');
-            
-            $firstSpan->parentNode->insertBefore($textarea, $firstSpan);
-            
-            foreach ($yellowSpans as $span) {
-                $span->parentNode->removeChild($span);
+            $firstSpan = $matched[0];
+            $inline = $this->yellowFieldIsInline($p, $matched) && mb_strlen($placeholder) <= 22;
+            $textarea = $this->makeYellowTextarea($dom, $tipo, $yellowIndex, $placeholder, $inline);
+
+            if ($firstSpan === $p) {
+                while ($p->firstChild) {
+                    $p->removeChild($p->firstChild);
+                }
+                $p->appendChild($textarea);
+            } else {
+                $firstSpan->parentNode->insertBefore($textarea, $firstSpan);
+                foreach ($matched as $span) {
+                    if ($span->parentNode) {
+                        $span->parentNode->removeChild($span);
+                    }
+                }
             }
             $yellowIndex++;
         }
 
-        return $dom->saveHTML();
+        $expected = count($this->blockDefinitions($tipo));
+        if ($yellowIndex < $expected) {
+            $extra = $dom->createElement('div');
+            $extra->setAttribute('style', 'margin-top:24px;padding:16px;border:1px dashed #fbbf24;background:#fffbeb;');
+            $note = $dom->createElement('p', 'Campos amarillos adicionales del formato (en el mismo orden del documento):');
+            $note->setAttribute('style', 'font-size:12px;font-weight:700;color:#92400e;margin:0 0 10px;');
+            $extra->appendChild($note);
+            for ($i = $yellowIndex; $i < $expected; $i++) {
+                $placeholder = $defaults[$i] ?? ('Campo editable ' . ($i + 1));
+                $extra->appendChild($this->makeYellowTextarea($dom, $tipo, $i, $placeholder));
+            }
+            $dom->appendChild($extra);
+        }
+
+        $this->compactPhpWordLayout($dom, $xpath);
+        $this->prepareHeaderFieldsInHtml($dom, $xpath);
+        $html = $dom->saveHTML();
+        return preg_replace('/^<\?xml[^>]*>/', '', (string) $html) ?: $html;
+    }
+
+    private function compactPhpWordLayout(DOMDocument $dom, DOMXPath $xpath): void
+    {
+        foreach ($xpath->query('//*[@style]') as $el) {
+            if ($el instanceof \DOMElement) {
+                $el->setAttribute('style', $this->normalizeWordCss($el->getAttribute('style')));
+            }
+        }
+
+        foreach ($xpath->query('//p') as $p) {
+            if (!($p instanceof \DOMElement)) {
+                continue;
+            }
+            $text = trim(str_replace("\xc2\xa0", ' ', $p->textContent));
+            $hasWidget = $xpath->query('.//textarea|.//img|.//table', $p)->length > 0;
+            if ($text === '' && !$hasWidget) {
+                $p->setAttribute('style', trim($p->getAttribute('style') . ';margin:0.12em 0;line-height:0.3;min-height:0;font-size:1px;'));
+            }
+        }
+
+        foreach ($xpath->query('//img') as $img) {
+            if (!($img instanceof \DOMElement)) {
+                continue;
+            }
+            $img->setAttribute('style', trim($img->getAttribute('style') . ';max-width:100%;height:auto;max-height:90px;'));
+        }
+    }
+
+    private function normalizeWordCss(string $style): string
+    {
+        return (string) preg_replace_callback(
+            '/(margin(?:-left|-right|-top|-bottom)?|padding(?:-left|-right|-top|-bottom)?|text-indent|width|height|min-height|max-height)\s*:\s*(-?\d+(?:\.\d+)?)(in|pt|px|cm|mm)/i',
+            function (array $m) {
+                $prop = strtolower($m[1]);
+                $val = (float) $m[2];
+                $unit = strtolower($m[3]);
+
+                if ($unit === 'in' && abs($val) > 3) {
+                    $val = $val / 1440;
+                }
+
+                $isBox = str_starts_with($prop, 'margin') || str_starts_with($prop, 'padding') || $prop === 'text-indent';
+                if ($isBox) {
+                    if ($unit === 'in' && abs($val) > 1.25) {
+                        $val = $val >= 0 ? 0.45 : -0.45;
+                    } elseif ($unit === 'pt' && abs($val) > 36) {
+                        $val = $val >= 0 ? 10 : -10;
+                    } elseif ($unit === 'px' && abs($val) > 64) {
+                        $val = $val >= 0 ? 18 : -18;
+                    }
+                }
+
+                if (in_array($prop, ['height', 'min-height'], true) && $unit === 'in' && $val > 2) {
+                    return $prop . ': auto';
+                }
+
+                $fmt = rtrim(rtrim(sprintf('%.4f', $val), '0'), '.');
+                return $m[1] . ': ' . $fmt . $unit;
+            },
+            $style
+        );
+    }
+
+    private function yellowFieldIsInline(\DOMElement $container, array $matched): bool
+    {
+        foreach ($container->childNodes as $child) {
+            if ($child instanceof \DOMElement) {
+                foreach ($matched as $span) {
+                    if ($child === $span || $child->isSameNode($span) || ($span instanceof \DOMNode && $span->parentNode === $child)) {
+                        continue 2;
+                    }
+                }
+            }
+            $text = trim(str_replace("\xc2\xa0", ' ', $child->textContent ?? ''));
+            if ($text !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function styleLooksYellow(string $style): bool
+    {
+        $style = strtolower($style);
+        return str_contains($style, 'yellow')
+            || str_contains($style, '#ffff00')
+            || str_contains($style, 'rgb(255, 255, 0)')
+            || str_contains($style, 'rgb(255,255,0)');
+    }
+
+    private function makeYellowTextarea(DOMDocument $dom, string $tipo, int $index, string $placeholder, bool $inline = false): \DOMElement
+    {
+        $len = mb_strlen($placeholder);
+        $textarea = $dom->createElement('textarea');
+        $textarea->setAttribute('name', "yellow_blocks_{$tipo}[{$index}]");
+        $textarea->setAttribute('data-index', (string) $index);
+        $textarea->setAttribute('placeholder', htmlspecialchars($placeholder));
+        if ($inline) {
+            $ch = max(10, $len + 4);
+            $textarea->setAttribute('class', "doc-interactive-field js-block-{$tipo} js-inline");
+            $textarea->setAttribute('rows', '1');
+            $textarea->setAttribute('style', "display:inline-block;min-width:{$ch}ch;width:{$ch}ch;max-width:100%;vertical-align:baseline;height:2em;min-height:2em;overflow:hidden;resize:none;font-family:inherit;font-size:inherit;line-height:1.35;padding:2px 8px;border:1.5px dashed #fbbf24;border-radius:4px;box-sizing:content-box;background:#fffbeb;outline:none;margin:0 4px;");
+        } else {
+            $textarea->setAttribute('class', "doc-interactive-field js-block-{$tipo} js-autosize");
+            $textarea->setAttribute('rows', $len > 160 ? '4' : ($len > 70 ? '3' : '2'));
+            $textarea->setAttribute('style', 'display:block;width:100%;min-height:2.1em;max-height:none;overflow:auto;resize:vertical;font-family:inherit;font-size:inherit;line-height:1.4;padding:6px 8px;border:1.5px dashed #fbbf24;border-radius:4px;box-sizing:border-box;background:#fffbeb;outline:none;margin:6px 0;');
+        }
+        return $textarea;
     }
 
     // ─── Métodos Privados ──────────────────────────────────────────
@@ -386,6 +553,8 @@ class OfficialDocumentService
      */
     private function buildDocx(ProcesoDisciplinario $proceso, string $template, bool $strictValidation = true): string
     {
+        abort_unless(isset(self::TEMPLATES[$template]), 404, 'Tipo de documento no válido');
+
         $blocks      = $proceso->datos_oficiales['yellow_blocks'][$template] ?? [];
         $definitions = $this->blockDefinitions($template);
 
@@ -418,6 +587,7 @@ class OfficialDocumentService
         $entryName   = 'word/document.xml';
         $originalXml = $zip->getFromName($entryName);
         $updatedXml  = $this->replaceYellowBlocks($originalXml, $blocks);
+        $updatedXml  = $this->fillHeaderInXml($updatedXml, ProcesoDisciplinario::datosEncabezadoDocumento($proceso));
 
         $zip->deleteName($entryName);
         $zip->addFromString($entryName, $updatedXml);
@@ -497,6 +667,221 @@ class OfficialDocumentService
     }
 
     /**
+     * Marca en el HTML interactivo los huecos del encabezado de apertura
+     * (Trabajador, Cargo, CC, Fecha, Radicado) para rellenarlos después del cache.
+     */
+    private function prepareHeaderFieldsInHtml(DOMDocument $dom, DOMXPath $xpath): void
+    {
+        foreach ($xpath->query('//p|//td') as $p) {
+            if (!($p instanceof \DOMElement)) {
+                continue;
+            }
+
+            $plain = trim(preg_replace('/\s+/u', ' ', str_replace("\xc2\xa0", ' ', $p->textContent)) ?? '');
+            if ($plain === '' || !preg_match('/_{5,}|202X|XXX/u', $plain)) {
+                continue;
+            }
+
+            $key = $this->headerKeyFromLabel($plain);
+            if ($key === null) {
+                continue;
+            }
+
+            if ($key === 'radicado') {
+                $this->wrapRadicadoPlaceholder($dom, $p);
+            } else {
+                $this->wrapUnderscoreHeaderField($dom, $p, $key);
+            }
+        }
+    }
+
+    private function headerKeyFromLabel(string $plain): ?string
+    {
+        return match (true) {
+            (bool) preg_match('/^Trabajador \(a\):/u', $plain) => 'nombre',
+            (bool) preg_match('/^Cargo:/u', $plain) => 'cargo',
+            (bool) preg_match('/^CC\.:/u', $plain) => 'cedula',
+            (bool) preg_match('/^Fecha de expedici[oó]n:/u', $plain) => 'fecha',
+            (bool) preg_match('/^Radicado:/u', $plain) => 'radicado',
+            default => null,
+        };
+    }
+
+    private function wrapUnderscoreHeaderField(DOMDocument $dom, \DOMElement $p, string $key): void
+    {
+        foreach ($this->textNodesOf($p) as $textNode) {
+            if (!preg_match('/_{3,}/u', $textNode->nodeValue ?? '')) {
+                continue;
+            }
+            $span = $dom->createElement('span');
+            $span->setAttribute('class', 'doc-header-field');
+            $span->setAttribute('data-header', $key);
+            $span->setAttribute('data-blank', $textNode->nodeValue);
+            $span->appendChild($dom->createTextNode($textNode->nodeValue));
+            $textNode->parentNode?->replaceChild($span, $textNode);
+        }
+    }
+
+    private function wrapRadicadoPlaceholder(DOMDocument $dom, \DOMElement $p): void
+    {
+        $nodes = $this->textNodesOf($p);
+        $combined = '';
+        foreach ($nodes as $node) {
+            $combined .= $node->nodeValue;
+        }
+        if (!str_contains($combined, '202X-XXX')) {
+            return;
+        }
+
+        $span = $dom->createElement('span');
+        $span->setAttribute('class', 'doc-header-field');
+        $span->setAttribute('data-header', 'radicado');
+        $span->setAttribute('data-blank', '202X-XXX-01');
+        $span->appendChild($dom->createTextNode('202X-XXX-01'));
+
+        $inserted = false;
+        foreach ($nodes as $node) {
+            $val = $node->nodeValue ?? '';
+            if (str_contains($val, '202X-XXX-01')) {
+                $node->nodeValue = str_replace('202X-XXX-01', '', $val);
+                $this->insertNodeAfter($span, $node);
+                $inserted = true;
+            } elseif (str_contains($val, '202X-XXX-')) {
+                $node->nodeValue = str_replace('202X-XXX-', '', $val);
+                $this->insertNodeAfter($span, $node);
+                $inserted = true;
+            } elseif ($inserted && trim($val) === '01') {
+                $node->nodeValue = '';
+            }
+        }
+
+        if (!$inserted) {
+            $p->appendChild($span);
+        }
+    }
+
+    private function insertNodeAfter(\DOMNode $newNode, \DOMNode $reference): void
+    {
+        $parent = $reference->parentNode;
+        if (!$parent) {
+            return;
+        }
+        if ($reference->nextSibling) {
+            $parent->insertBefore($newNode, $reference->nextSibling);
+        } else {
+            $parent->appendChild($newNode);
+        }
+    }
+
+    /**
+     * @return array<int, \DOMText>
+     */
+    private function textNodesOf(\DOMNode $node): array
+    {
+        $nodes = [];
+        if ($node instanceof \DOMText) {
+            return [$node];
+        }
+        if (!$node->hasChildNodes()) {
+            return [];
+        }
+        foreach (iterator_to_array($node->childNodes) as $child) {
+            foreach ($this->textNodesOf($child) as $text) {
+                $nodes[] = $text;
+            }
+        }
+        return $nodes;
+    }
+
+    private function fillHeaderInHtml(string $html, array $header): string
+    {
+        foreach (['nombre', 'cargo', 'cedula', 'fecha', 'radicado'] as $key) {
+            if (!array_key_exists($key, $header)) {
+                continue;
+            }
+            $value = trim((string) $header[$key]);
+            if ($value === '' && !in_array($key, ['fecha', 'radicado'], true)) {
+                continue;
+            }
+            $safe = htmlspecialchars($value, ENT_QUOTES | ENT_XML1, 'UTF-8');
+            $updated = preg_replace_callback(
+                '/(<span\b[^>]*\bdata-header="' . preg_quote($key, '/') . '"[^>]*>)(.*?)(<\/span>)/s',
+                static fn (array $m) => $m[1] . $safe . $m[3],
+                $html,
+                1
+            );
+            if (is_string($updated)) {
+                $html = $updated;
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * Rellena Trabajador / Cargo / CC / Fecha / Radicado en el XML de Word.
+     * Se aplica después de los bloques amarillos para no alterar la firma del texto fijo.
+     */
+    private function fillHeaderInXml(string $xml, array $header): string
+    {
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $document->preserveWhiteSpace = true;
+        if (!$document->loadXML($xml, LIBXML_NOERROR | LIBXML_NOWARNING)) {
+            return $xml;
+        }
+
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+
+        foreach ($xpath->query('//w:p') as $paragraph) {
+            $plain = '';
+            foreach ($xpath->query('.//w:t', $paragraph) as $t) {
+                $plain .= $t->textContent;
+            }
+            $plain = trim(preg_replace('/\s+/u', ' ', $plain) ?? '');
+            if ($plain === '' || !preg_match('/_{5,}|202X|XXX/u', $plain)) {
+                continue;
+            }
+
+            $key = $this->headerKeyFromLabel($plain);
+            if ($key === null || !array_key_exists($key, $header)) {
+                continue;
+            }
+
+            $value = trim((string) $header[$key]);
+            if ($value === '' && !in_array($key, ['fecha', 'radicado'], true)) {
+                continue;
+            }
+
+            if ($key === 'radicado') {
+                $first = true;
+                foreach ($xpath->query('.//w:t', $paragraph) as $t) {
+                    $t->nodeValue = $first ? ('Radicado: ' . $value) : '';
+                    $first = false;
+                }
+                continue;
+            }
+
+            foreach ($xpath->query('.//w:t', $paragraph) as $t) {
+                if (!preg_match('/^_+$/u', trim((string) $t->textContent))) {
+                    continue;
+                }
+                $t->nodeValue = $value;
+                if (str_contains($value, ' ')) {
+                    $t->setAttribute('xml:space', 'preserve');
+                }
+            }
+        }
+
+        return $document->saveXML() ?: $xml;
+    }
+
+    public function materializeDocx(ProcesoDisciplinario $proceso, string $template): string
+    {
+        return $this->buildDocx($proceso, $template, true);
+    }
+
+    /**
      * Calcula una firma Hash SHA-256 del texto no variable (no amarillo) del documento.
      */
     private function fixedTextSignature(DOMXPath $xpath): string
@@ -510,6 +895,52 @@ class OfficialDocumentService
             }
         }
         return hash('sha256', implode('|', $parts));
+    }
+
+    private function detectYellowBlocks(string $type): array
+    {
+        $filename = self::TEMPLATES[$type] ?? null;
+        abort_unless($filename, 404, 'Tipo de documento no válido');
+
+        $source = base_path('documentos/' . $filename);
+        if (!is_file($source)) {
+            $source = storage_path('app/plantillas/' . $filename);
+        }
+        abort_unless(is_file($source), 500, "No se encontró la plantilla oficial '{$filename}'.");
+
+        $fileHash = md5_file($source);
+        $cacheKey = "sipd_yellow_labels_{$type}_{$fileHash}";
+
+        return Cache::rememberForever($cacheKey, function () use ($source) {
+            $zip = new ZipArchive();
+            abort_unless($zip->open($source) === true, 500, 'No se pudo abrir la plantilla oficial.');
+            $xml = $zip->getFromName('word/document.xml');
+            $zip->close();
+
+            $document = new DOMDocument('1.0', 'UTF-8');
+            $document->loadXML($xml, LIBXML_NOBLANKS | LIBXML_NOERROR | LIBXML_NOWARNING);
+            $xpath = new DOMXPath($document);
+            $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+
+            $labels = [];
+            foreach ($xpath->query('//w:p') as $paragraph) {
+                $runs = $xpath->query('.//w:r[w:rPr/w:highlight[@w:val="yellow"]]', $paragraph);
+                if ($runs->length === 0) {
+                    continue;
+                }
+                $text = '';
+                foreach ($runs as $run) {
+                    foreach ($xpath->query('.//w:t', $run) as $node) {
+                        $text .= $node->nodeValue;
+                    }
+                }
+                $text = trim($text);
+                $n = count($labels) + 1;
+                $labels[] = $text !== '' ? $text : ('Campo editable ' . $n);
+            }
+
+            return $labels;
+        });
     }
 
     /**

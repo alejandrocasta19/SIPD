@@ -1,7 +1,7 @@
 @extends('layouts.master')
 
 @php
-    $pageTitle = 'Gestión de RH';
+    $pageTitle = 'Equipo de RH';
     $inicialesDe = function ($nombre) {
         return collect(preg_split('/\s+/', trim($nombre)))
             ->filter()
@@ -12,10 +12,10 @@
 @endphp
 
 @section('page-header')
-    <div class="abg-head">
+    <div class="proc-head">
         <div>
-            <h1>Gestión de RH</h1>
-            <p>Administra el catálogo de personal de RH del sistema.</p>
+            <h1>Equipo de RH</h1>
+            <p>Personal operativo que tramita los expedientes disciplinarios.</p>
         </div>
         <button type="button" class="btn-add" id="btnAgregar">
             <i class="fas fa-plus"></i> Agregar RH
@@ -25,43 +25,7 @@
 
 @section('styles')
 <style>
-    .abg-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        margin-bottom: 20px;
-    }
-
-    .abg-head h1 {
-        margin: 0 0 4px;
-        font-size: 28px;
-        font-weight: 700;
-        letter-spacing: -.03em;
-    }
-
-    .abg-head p {
-        margin: 0;
-        color: #94a3b8;
-        font-size: 14px;
-    }
-
-    .btn-add {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: var(--cth-green-bright);
-        color: #fff;
-        border: 0;
-        border-radius: 999px;
-        padding: 11px 18px;
-        font-weight: 700;
-        font-size: 14px;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-
-    .btn-add:hover { filter: brightness(1.05); }
+    button.btn-add { cursor: pointer; border: 0; }
 
     .form-card {
         display: none;
@@ -120,7 +84,7 @@
     .table-card {
         background: #fff;
         border-radius: 18px;
-        overflow: hidden;
+        overflow-x: auto;
         box-shadow: 0 1px 2px rgba(15,23,42,.04);
     }
 
@@ -136,18 +100,16 @@
         font-size: 11px;
         letter-spacing: .06em;
         font-weight: 700;
-        border-bottom: 1px solid #f1f5f9;
+        border: 1px solid var(--cth-border);
     }
 
     table.abg td {
         padding: 16px 18px;
-        border-bottom: 1px solid #f8fafc;
+        border: 1px solid var(--cth-border);
         color: #334155;
         font-size: 14px;
         vertical-align: middle;
     }
-
-    table.abg tr:last-child td { border-bottom: 0; }
 
     .who {
         display: flex;
@@ -155,6 +117,7 @@
         gap: 12px;
         font-weight: 600;
         color: #0f172a;
+        white-space: nowrap;
     }
 
     .ava {
@@ -192,7 +155,25 @@
         border-radius: 8px;
     }
 
-    .acts button:hover { background: #f1f5f9; color: #0f172a; }
+    .acts button.key:hover { background: #eff6ff; color: #2563eb; }
+    .perm-chip { font-size: 12px; color: #475569; }
+    .perm-chip em { font-style: normal; color: #d97706; font-weight: 600; }
+    .perm-lead { margin: 0 0 16px; color: #64748b; font-size: 13px; }
+    .perm-group { margin-bottom: 14px; }
+    .perm-group h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }
+    .perm-row {
+        display: grid;
+        grid-template-columns: 18px minmax(0,1fr) 130px 88px;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 14px;
+    }
+    .perm-row select, .perm-row input[type="number"] {
+        height: 34px; border: 1px solid #e2e8f0; border-radius: 8px; font: inherit; font-size: 12px; padding: 0 8px;
+    }
+    .sipd-dialog.modal-perm { max-width: 680px; }
     .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
 
     .empty {
@@ -259,7 +240,6 @@
     .btn-ok { background: var(--cth-green); color: #fff; }
 
     @media (max-width: 900px) {
-        .abg-head { flex-direction: column; }
         .form-grid { grid-template-columns: 1fr; }
         .table-card { overflow-x: auto; }
     }
@@ -267,16 +247,6 @@
 @endsection
 
 @section('content')
-@if(session('success'))
-<script>
-    Swal.fire({
-        icon: 'success',
-        title: 'Éxito',
-        text: '{{ session('success') }}',
-        confirmButtonColor: '#006837'
-    });
-</script>
-@endif
 
     <div class="form-card" id="formularioContainer">
         <h3>Agregar RH</h3>
@@ -311,8 +281,8 @@
                     <th>NOMBRE</th>
                     <th>CORREO</th>
                     <th>CARGO</th>
-                    <th>ESTADO</th>
-                    <th>FECHA REGISTRO</th>
+                    <th>CARGA</th>
+                    <th>PERMISOS</th>
                     <th>ACCIONES</th>
                 </tr>
             </thead>
@@ -326,19 +296,43 @@
                             </div>
                         </td>
                         <td>{{ $abogado->email }}</td>
-                        <td>{{ $abogado->cargo ?: '—' }}</td>
-                        <td>
-                            <span class="st"><i class="fas fa-circle"></i> Activo</span>
+                        <td>{{ $abogado->cargo ?: 'Equipo de RH' }}</td>
+                        <td>{{ $abogado->procesos_count }} caso{{ $abogado->procesos_count === 1 ? '' : 's' }}
+                            @if(($abogado->procesos_abiertos_count ?? 0) > 0)
+                                · {{ $abogado->procesos_abiertos_count }} abierto{{ $abogado->procesos_abiertos_count === 1 ? '' : 's' }}
+                            @endif
                         </td>
-                        <td>{{ optional($abogado->created_at)->format('Y-m-d') }}</td>
+                        <td>
+                            @php
+                                $vigentes = $abogado->permisos->filter(function ($p) { return $p->estaVigente(); });
+                                $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
+                            @endphp
+                            <span class="perm-chip">
+                                {{ $vigentes->count() }} activo{{ $vigentes->count() === 1 ? '' : 's' }}
+                                @if($temps > 0)
+                                    · <em>{{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }}</em>
+                                @endif
+                            </span>
+                        </td>
                         <td>
                             <div class="acts">
+                                <button type="button" class="key" title="Permisos"
+                                    data-name="{{ $abogado->name }}"
+                                    data-action="{{ route('coordinadora.abogados.permisos', $abogado->id) }}"
+                                    data-permisos='@json($abogado->permisosParaFormulario())'
+                                    onclick="abrirPermisos(this)">
+                                    <i class="fas fa-key"></i>
+                                </button>
                                 <button type="button" title="Editar"
                                     onclick="abrirModalEditar('{{ $abogado->id }}', @json($abogado->name), @json($abogado->email), @json($abogado->cargo))">
                                     <i class="fas fa-pen"></i>
                                 </button>
                                 <form action="{{ route('coordinadora.abogados.eliminar', $abogado->id) }}" method="POST"
-                                      onsubmit="return confirm('¿Deseas eliminar este registro de RH?')">
+                                      data-confirm="Se eliminará este registro de recursos humanos."
+                                      data-confirm-title="Eliminar registro"
+                                      data-confirm-ok="Eliminar"
+                                      data-confirm-danger="1"
+                                      data-confirm-icon="warning">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="danger" title="Eliminar">
@@ -357,8 +351,8 @@
         </table>
     </div>
 
-    <div class="modal-bg" id="modalEditar">
-        <div class="modal">
+    <div class="sipd-dialog-bg" id="modalEditar">
+        <div class="sipd-dialog">
             <h3>Editar RH</h3>
             <form id="formEditar" method="POST">
                 @csrf
@@ -369,9 +363,42 @@
                 <input type="email" name="email" id="editEmail" required>
                 <label>Cargo</label>
                 <input type="text" name="cargo" id="editCargo" required>
-                <div class="modal-actions">
+                <div class="sipd-dialog-actions">
                     <button type="button" class="btn-ghost" onclick="cerrarModal()">Cancelar</button>
                     <button type="submit" class="btn-ok">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="sipd-dialog-bg" id="modalPermisos">
+        <div class="sipd-dialog modal-perm">
+            <h3>Permisos · <span id="permNombre"></span></h3>
+            <p class="perm-lead">Editar y eliminar van por horas: 1, 3, 5 o un valor personalizado.</p>
+            <form id="formPermisos" method="POST">
+                @csrf
+                @method('PUT')
+                @foreach($catalogoPermisos as $grupo)
+                    <div class="perm-group">
+                        <h4>{{ $grupo['label'] }}</h4>
+                        @foreach($grupo['items'] as $clave => $etiqueta)
+                            <label class="perm-row">
+                                <input type="checkbox" name="permisos[]" value="{{ $clave }}">
+                                <span>{{ $etiqueta }}</span>
+                                <select name="duracion[{{ $clave }}]" class="dur-sel">
+                                    <option value="permanente">Permanente</option>
+                                    @foreach($duracionesPermiso as $valor => $texto)
+                                        <option value="{{ $valor }}">{{ $texto }}</option>
+                                    @endforeach
+                                </select>
+                                <input type="number" name="horas[{{ $clave }}]" min="1" max="168" placeholder="Horas" class="hrs-in" style="display:none;">
+                            </label>
+                        @endforeach
+                    </div>
+                @endforeach
+                <div class="sipd-dialog-actions">
+                    <button type="button" class="btn-ghost" onclick="cerrarPermisos()">Cancelar</button>
+                    <button type="submit" class="btn-ok">Guardar permisos</button>
                 </div>
             </form>
         </div>
@@ -396,5 +423,51 @@
     function cerrarModal() {
         document.getElementById('modalEditar').style.display = 'none';
     }
+
+    function abrirPermisos(btn) {
+        var data = {};
+        try { data = JSON.parse(btn.getAttribute('data-permisos') || '{}'); } catch (e) { data = {}; }
+        document.getElementById('permNombre').textContent = btn.getAttribute('data-name') || '';
+        document.getElementById('formPermisos').action = btn.getAttribute('data-action') || '';
+        document.querySelectorAll('#formPermisos input[type="checkbox"]').forEach(function (cb) {
+            var grant = data[cb.value];
+            cb.checked = !!(grant && grant.on);
+            var row = cb.closest('.perm-row');
+            var sel = row.querySelector('.dur-sel');
+            var hrs = row.querySelector('.hrs-in');
+            if (sel) sel.value = grant && grant.duracion ? grant.duracion : 'permanente';
+            if (hrs) {
+                hrs.style.display = sel && sel.value === 'custom' ? '' : 'none';
+                hrs.disabled = !cb.checked || (sel && sel.value !== 'custom');
+            }
+            if (sel) sel.disabled = !cb.checked;
+        });
+        document.getElementById('modalPermisos').style.display = 'flex';
+    }
+
+    function cerrarPermisos() {
+        document.getElementById('modalPermisos').style.display = 'none';
+    }
+
+    document.getElementById('formPermisos').addEventListener('change', function (e) {
+        var row = e.target.closest('.perm-row');
+        if (!row) return;
+        var cb = row.querySelector('input[type="checkbox"]');
+        var sel = row.querySelector('.dur-sel');
+        var hrs = row.querySelector('.hrs-in');
+        if (sel) sel.disabled = !cb.checked;
+        if (hrs) {
+            hrs.style.display = sel && sel.value === 'custom' ? '' : 'none';
+            hrs.disabled = !cb.checked || sel.value !== 'custom';
+        }
+    });
+    document.getElementById('formPermisos').addEventListener('submit', function () {
+        this.querySelectorAll('select, input').forEach(function (el) { el.disabled = false; });
+    });
+    ['modalPermisos', 'modalEditar'].forEach(function (id) {
+        document.getElementById(id).addEventListener('click', function (e) {
+            if (e.target === this) this.style.display = 'none';
+        });
+    });
 </script>
 @endsection

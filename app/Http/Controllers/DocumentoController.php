@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use App\Models\ProcesoDisciplinario;
+use App\Models\CasoAnexo;
 use App\Models\CasoEvidencia;
 use App\Models\CasoDocumentoEstado;
 use App\Services\OfficialDocumentService;
@@ -13,6 +14,14 @@ use Throwable;
 
 class DocumentoController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('permiso:ver_documentos')->only(['hub', 'index', 'edit', 'preview', 'download']);
+        $this->middleware('permiso:editar_documentos')->only(['save', 'elegirVariante']);
+        $this->middleware('permiso:subir_anexos')->only(['storeEvidencia']);
+        $this->middleware('permiso:eliminar_anexos')->only(['destroyEvidencia']);
+    }
+
     // ─────────────────────────────────────────────────────────────
     // HELPERS DE ACCESO
     // ─────────────────────────────────────────────────────────────
@@ -34,11 +43,11 @@ class DocumentoController extends Controller
      */
     private function accessibleCase($id): ProcesoDisciplinario
     {
-        return $this->visibleProcesses()->with(['evidencias.user', 'documentoEstados'])->findOrFail($id);
+        return $this->visibleProcesses()->with(['evidencias.user', 'documentoEstados', 'anexos.user'])->findOrFail($id);
     }
 
     /**
-     * Valida que $tipo sea uno de los tres tipos de documento.
+     * Valida que $tipo sea uno de los documentos oficiales.
      */
     private function assertValidTipo(string $tipo): void
     {
@@ -75,14 +84,14 @@ class DocumentoController extends Controller
         $casos->withQueryString();
 
         return view('documents.hub', [
-            'pageTitle' => 'Docs. Oficiales',
+            'pageTitle' => 'Autos y Actas',
             'casos' => $casos,
         ]);
     }
 
     /**
      * GET /documentos/{id}
-     * Muestra los tres subdocumentos del caso con su estado.
+     * Muestra los cuatro espacios documentales del caso con su estado.
      */
     public function index(int $id)
     {
@@ -112,6 +121,10 @@ class DocumentoController extends Controller
     {
         $this->assertValidTipo($tipo);
         $caso   = $this->accessibleCase($id);
+        $slot   = CasoDocumentoEstado::slotDe($tipo);
+        if ($slot) {
+            $caso->guardarVarianteSlot($slot, $tipo);
+        }
         $estadoDoc = $caso->estadoDocumento($tipo);
 
         $definitions  = $documents->blockDefinitions($tipo);
@@ -123,14 +136,16 @@ class DocumentoController extends Controller
             'pageTitle'    => 'Diligenciar · ' . $this->labelTipo($tipo),
             'caso'         => $caso,
             'tipo'         => $tipo,
+            'slot'         => $slot,
             'labelTipo'    => $this->labelTipo($tipo),
             'estadoDoc'    => $estadoDoc,
             'definitions'  => $definitions,
             'sections'     => $sections,
             'bloques'      => $bloques,
             'defaultTexts' => $defaultTexts,
-            'interactiveHtml' => $documents->getInteractiveDocumentHtml($tipo, $bloques),
+            'interactiveHtml' => $documents->getInteractiveDocumentHtml($tipo, $bloques, $caso),
             'profileUser'  => auth()->user(),
+            'requiereFirmaGerente' => $documents->requiresGerentePrint($tipo),
         ]);
     }
 
@@ -146,31 +161,48 @@ class DocumentoController extends Controller
     {
         $this->assertValidTipo($tipo);
         $caso        = $this->accessibleCase($id);
+        $slot        = CasoDocumentoEstado::slotDe($tipo);
+        if ($slot) {
+            $caso->guardarVarianteSlot($slot, $tipo);
+        }
         $definitions = $documents->blockDefinitions($tipo);
 
-        $validated = $request->validate([
-            'yellow_blocks'   => 'required|array|size:' . count($definitions),
-            'yellow_blocks.*' => 'nullable|string|max:30000',
-        ]);
+        $bloques = $this->bloquesDesdeRequest($request, $tipo, count($definitions));
 
-        // Persistir bloques
         $data = $caso->datos_oficiales ?: [];
-        $data['yellow_blocks'][$tipo] = array_values($validated['yellow_blocks']);
+        $data['yellow_blocks'][$tipo] = $bloques;
         $caso->update(['datos_oficiales' => $data]);
 
-        // Determinar si todos los bloques tienen valor
-        $allFilled = collect($validated['yellow_blocks'])->every(fn($v) => trim((string)$v) !== '');
+        $allFilled = collect($bloques)->every(fn ($v) => trim((string) $v) !== '');
         $nuevoEstado = $allFilled ? 'completo' : 'en_diligenciamiento';
 
-        // Actualizar estado del subdocumento
         $estadoDoc = $caso->estadoDocumento($tipo);
         if ($estadoDoc->estado !== 'generado') {
             $estadoDoc->update(['estado' => $nuevoEstado]);
         }
 
-        return redirect()
-            ->route('documentos.edit', [$id, $tipo])
-            ->with('success', 'Información guardada correctamente.');
+        $redirect = redirect()->route('documentos.edit', [$id, $tipo]);
+        $formato = $request->input('formato');
+
+        if ($allFilled && in_array($formato, ['docx', 'pdf'], true)) {
+            return $redirect
+                ->with('success', $formato === 'pdf'
+                    ? 'Documento guardado. Descargando PDF...'
+                    : 'Documento guardado. Descargando Word...')
+                ->with('autodownload', $tipo)
+                ->with('autodownload_format', $formato);
+        }
+
+        if ($allFilled) {
+            $mensaje = $tipo === 'terminacion'
+                ? 'Documento guardado. Imprímelo para firma del gerente y luego sube el escaneo en Anexos escaneados.'
+                : 'Documento guardado. Usa Word o PDF para descargarlo.';
+            return $redirect->with('success', $mensaje);
+        }
+
+        return $redirect->with('warning', $formato
+            ? 'Completa los campos amarillos para descargar este documento.'
+            : 'Borrador guardado. Completa los campos amarillos para descargar este documento.');
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -218,6 +250,11 @@ class DocumentoController extends Controller
                 'disciplinario' => 'apertura-disciplinario',
                 'comprobacion'  => 'apertura-comprobacion',
                 'acta'          => 'acta-cargos-descargos',
+                'sancion'       => 'sancion',
+                'llamado'       => 'llamado-de-atencion',
+                'terminacion'   => 'terminacion-por-justas-causas',
+                'archivo'       => 'decision-de-archivo',
+                default         => $tipo,
             };
 
             if (request('format') === 'pdf') {
@@ -226,12 +263,17 @@ class DocumentoController extends Controller
                 $response = $documents->downloadOfficial($caso, $tipo, $filename);
             }
 
-            // Actualizar estado
             $estadoDoc = $caso->estadoDocumento($tipo);
             $estadoDoc->update([
                 'estado'      => 'generado',
                 'generado_en' => now(),
             ]);
+
+            if ($tipo === 'terminacion') {
+                $copia = $documents->materializeDocx($caso, $tipo);
+                $this->registrarAnexoTerminacion($caso, $copia);
+                @unlink($copia);
+            }
 
             return $response;
         } catch (ValidationException $e) {
@@ -322,8 +364,8 @@ class DocumentoController extends Controller
         $caso      = $this->accessibleCase($id);
         $evidencia = $caso->evidencias()->findOrFail($evidenciaId);
 
-        $canDelete = in_array(auth()->user()->role, ['admin', 'coordinadora'], true)
-            || $evidencia->user_id === auth()->id();
+        $canDelete = auth()->user()->esCoordinadora()
+            || (auth()->user()->puede('eliminar_anexos') && $evidencia->user_id === auth()->id());
 
         abort_unless($canDelete, 403, 'No tienes permiso para eliminar esta evidencia.');
 
@@ -341,11 +383,66 @@ class DocumentoController extends Controller
 
     private function labelTipo(string $tipo): string
     {
-        return match ($tipo) {
-            'disciplinario' => 'Apertura Proceso Disciplinario',
-            'comprobacion'  => 'Apertura Proceso de Comprobación',
-            'acta'          => 'Acta de Cargos y Descargos',
-            default         => ucfirst($tipo),
-        };
+        return CasoDocumentoEstado::etiqueta($tipo);
+    }
+
+    public function elegirVariante(Request $request, int $id)
+    {
+        $caso = $this->accessibleCase($id);
+        $tipo = $request->validate([
+            'tipo' => 'required|in:' . implode(',', CasoDocumentoEstado::TIPOS),
+        ])['tipo'];
+
+        $slot = CasoDocumentoEstado::slotDe($tipo);
+        abort_unless($slot, 404);
+        $caso->guardarVarianteSlot($slot, $tipo);
+
+        return redirect()->route('documentos.edit', [$id, $tipo]);
+    }
+
+    private function registrarAnexoTerminacion(ProcesoDisciplinario $caso, string $docxPath): void
+    {
+        $existe = $caso->anexos()
+            ->where('tipo', CasoAnexo::TIPO_FIRMA_GERENTE)
+            ->exists();
+        if ($existe || !is_file($docxPath)) {
+            return;
+        }
+
+        $nombre = 'tc_' . $caso->id . '_' . uniqid() . '.docx';
+        $relativa = 'anexos/' . $caso->id . '/' . $nombre;
+        Storage::disk('local')->put($relativa, file_get_contents($docxPath));
+
+        CasoAnexo::create([
+            'caso_id' => $caso->id,
+            'user_id' => auth()->id(),
+            'tipo' => CasoAnexo::TIPO_FIRMA_GERENTE,
+            'estado' => CasoAnexo::ESTADO_PENDIENTE_FIRMA,
+            'titulo' => 'Terminación por justas causas',
+            'nombre_original' => 'terminacion-por-justas-causas.docx',
+            'nombre_almacenado' => $nombre,
+            'extension' => 'docx',
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'tamano' => filesize($docxPath) ?: 0,
+            'ruta_segura' => $relativa,
+        ]);
+    }
+
+    /**
+     * Lee únicamente los bloques del documento que se está diligenciando.
+     */
+    private function bloquesDesdeRequest(Request $request, string $tipo, int $esperados): array
+    {
+        $bloques = $request->input('yellow_blocks');
+        if (!is_array($bloques)) {
+            $bloques = $request->input('yellow_blocks_' . $tipo, []);
+        }
+
+        $bloques = array_values((array) $bloques);
+        while (count($bloques) < $esperados) {
+            $bloques[] = '';
+        }
+
+        return array_slice($bloques, 0, $esperados);
     }
 }

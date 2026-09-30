@@ -1,21 +1,17 @@
 @extends('layouts.master')
 
+@php $pageTitle = 'Reincidencias'; @endphp
+
 @section('page-header')
     <div class="proc-head">
         <div>
-            <h1>Reincidencias Disciplinarias</h1>
+            <h1>Reincidencias</h1>
             <p>Historial consolidado de procesos por trabajador.</p>
         </div>
-        <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
-    </div>
-    <div class="page-banner">
-        <div class="page-banner-left">
-            <div class="page-banner-title">Módulo de Reincidencias</div>
-            <div class="page-banner-sub">Identifica conductores con múctiples procesos disciplinarios activos o cerrados.</div>
-        </div>
-        <div class="page-banner-right">
-            <span class="pb-badge">{{ $workersGrouped->total() }} trabajadores</span>
-            <span class="pb-badge yellow">{{ $workersGrouped->getCollection()->where('es_reincidente', true)->count() }} reincidentes</span>
+        <div class="proc-head-side">
+            <span class="stat-chip">{{ $workersGrouped->total() }} trabajadores</span>
+            <span class="stat-chip yellow">{{ $workersGrouped->getCollection()->where('es_reincidente', true)->count() }} reincidentes</span>
+            <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
         </div>
     </div>
 @endsection
@@ -32,9 +28,8 @@
     .st-normal { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; padding: 6px 12px; border-radius: 999px; background: #f0fdf4; color: var(--cth-green-text); margin-right: 12px; }
 
     table.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table.proc th { text-align: left; padding: 10px 20px; color: #94a3b8; font-size: 11px; letter-spacing: .06em; font-weight: 700; border-bottom: 1px solid #f1f5f9; white-space: nowrap; text-transform: uppercase; }
-    table.proc td { padding: 10px 20px; border-bottom: 1px solid #f8fafc; color: #334155; vertical-align: middle; }
-    table.proc tr:last-child td { border-bottom: 0; }
+    table.proc th { text-align: left; padding: 10px 20px; color: #94a3b8; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); white-space: nowrap; text-transform: uppercase; }
+    table.proc td { padding: 10px 20px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; }
     table.proc tbody tr:hover { background: #fafbfc; }
 
     .id { color: var(--cth-green); font-weight: 700; text-decoration: none; }
@@ -42,9 +37,10 @@
     .st { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
     .st i { font-size: 8px; }
     
+    .dot-pend { color: #f59e0b; }
+    .dot-proc { color: #3b82f6; }
     .dot-sanc { color: #f43f5e; }
     .dot-arch { color: #94a3b8; }
-    .dot-proc { color: #3b82f6; }
 
     .acts { display: flex; gap: 8px; }
     .acts a { width: 30px; height: 30px; border: 0; background: #f1f5f9; color: #64748b; border-radius: 8px; display: grid; place-items: center; text-decoration: none; cursor: pointer; }
@@ -122,12 +118,14 @@
                                 <td>{{ $p->fecha_falta ? \Carbon\Carbon::parse($p->fecha_falta)->format('Y-m-d') : '—' }}</td>
                                 <td class="name">{{ $p->tipo_falta ?: 'Sin tipo' }}</td>
                                 <td>
-                                    @if($p->estado == 'Sancionado')
+                                    @if($p->estado == 'Pendiente')
+                                        <span class="st"><i class="fas fa-circle dot-pend"></i> Pendiente</span>
+                                    @elseif($p->estado == 'En Proceso')
+                                        <span class="st"><i class="fas fa-circle dot-proc"></i> En Proceso</span>
+                                    @elseif($p->estado == 'Sancionado')
                                         <span class="st"><i class="fas fa-circle dot-sanc"></i> Sancionado</span>
-                                    @elseif($p->estado == 'Archivado')
-                                        <span class="st"><i class="fas fa-circle dot-arch"></i> Archivado</span>
                                     @else
-                                        <span class="st"><i class="fas fa-circle dot-proc"></i> {{ $p->estado }}</span>
+                                        <span class="st"><i class="fas fa-circle dot-arch"></i> Archivado</span>
                                     @endif
                                 </td>
                                 <td>

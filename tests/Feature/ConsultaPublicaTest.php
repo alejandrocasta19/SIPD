@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CasoDocumentoEstado;
 use App\Models\CasoEvidencia;
+use App\Models\CasoAnexo;
 use App\Models\ProcesoDisciplinario;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,6 +63,20 @@ class ConsultaPublicaTest extends TestCase
             'ruta_segura' => 'evidencias/oculto.bin',
         ]);
 
+        CasoAnexo::create([
+            'caso_id' => $proceso->id,
+            'user_id' => User::factory()->create()->id,
+            'tipo' => CasoAnexo::TIPO_ARCHIVO_PREVIO,
+            'estado' => CasoAnexo::ESTADO_CARGADO,
+            'titulo' => 'carta-despido-reservada.docx',
+            'nombre_original' => 'carta-despido-reservada.docx',
+            'nombre_almacenado' => 'ax_oculto.docx',
+            'extension' => 'docx',
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'tamano' => 2048,
+            'ruta_segura' => 'anexos/oculto.docx',
+        ]);
+
         $this->from(route('consulta.publica'))
             ->post(route('consulta.publica.buscar'), ['cedula' => '1075123456'])
             ->assertRedirect(route('consulta.publica'));
@@ -76,6 +91,8 @@ class ConsultaPublicaTest extends TestCase
             ->assertSee('Apertura')
             ->assertSee('Descargos')
             ->assertSee('Se incorporó un elemento de prueba al expediente.')
+            ->assertSee('Se incorporó un documento al expediente.')
+            ->assertSee('1.075.123.456')
             ->assertDontSee($secreto)
             ->assertDontSee($descargos)
             ->assertDontSee($decision)
@@ -84,7 +101,8 @@ class ConsultaPublicaTest extends TestCase
             ->assertDontSee('XYZ987')
             ->assertDontSee('3001112233')
             ->assertDontSee('video-interno-camara.mp4')
-            ->assertDontSee('Grabación confidencial');
+            ->assertDontSee('Grabación confidencial')
+            ->assertDontSee('carta-despido-reservada.docx');
     }
 
     /** @test */
@@ -104,5 +122,37 @@ class ConsultaPublicaTest extends TestCase
             ->assertSee('No se encontraron procesos con esa cédula.')
             ->assertDontSee('Conductor Ajeno')
             ->assertDontSee('Hecho reservado de otra persona');
+    }
+
+    /** @test */
+    public function consulta_acepta_cedula_con_puntos()
+    {
+        $proceso = ProcesoDisciplinario::factory()->create([
+            'nombre' => 'Ana Consulta',
+            'cedula' => '1075123456',
+        ]);
+
+        $this->from(route('consulta.publica'))
+            ->post(route('consulta.publica.buscar'), ['cedula' => '1.075.123.456'])
+            ->assertRedirect(route('consulta.publica'));
+
+        $this->get(route('consulta.publica'))
+            ->assertOk()
+            ->assertSee('Ana Consulta')
+            ->assertSee('PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT));
+    }
+
+    /** @test */
+    public function login_muestra_acceso_institucional_y_consulta_publica()
+    {
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('Acceso al sistema')
+            ->assertSee('Consultar mi caso')
+            ->assertSee('Cootranshuila')
+            ->assertSee('Acceso rápido')
+            ->assertSee('Equipo de RH')
+            ->assertSee('Coordinadora de RH')
+            ->assertDontSee('rh@sipd.co');
     }
 }

@@ -1,62 +1,40 @@
 @extends('layouts.master')
 
 @php
-    $pageTitle = $isMisCasos ?? auth()->user()->role === 'abogado'
-        ? 'Mis casos'
-        : 'Procesos disciplinarios';
+    $isMisCasos = $isMisCasos ?? false;
+    $pageTitle = $isMisCasos ? 'Mis casos' : 'Todos los procesos';
     $estadoActual = request('estado', 'todos');
     $codigo = function ($proceso) {
         return 'PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT);
     };
+    $esCoordinadora = auth()->user()->esCoordinadora();
 @endphp
 
 @section('page-header')
     <div class="proc-head">
         <div>
-            <h1>Procesos disciplinarios</h1>
-            <p>{{ $conteos['todos'] }} caso{{ $conteos['todos'] === 1 ? '' : 's' }} visible{{ $conteos['todos'] === 1 ? '' : 's' }} para tu cuenta.</p>
+            <h1>{{ $pageTitle }}</h1>
+            <p>
+                @if($isMisCasos)
+                    {{ $conteos['todos'] }} caso{{ $conteos['todos'] === 1 ? '' : 's' }} asignado{{ $conteos['todos'] === 1 ? '' : 's' }} a tu cuenta.
+                @else
+                    {{ $conteos['todos'] }} expediente{{ $conteos['todos'] === 1 ? '' : 's' }} en el sistema.
+                @endif
+            </p>
         </div>
-        <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
-    </div>
-    <div class="page-banner">
-        <div class="page-banner-left">
-            <div class="page-banner-title">Listado de Procesos</div>
-            <div class="page-banner-sub">Gestiona, filtra y accede a todos los expedientes disciplinarios de tu cuenta.</div>
-        </div>
-        <div class="page-banner-right">
-            <span class="pb-badge">{{ $conteos['todos'] }} total</span>
-            @if($conteos['Pendiente'] > 0)<span class="pb-badge yellow">{{ $conteos['Pendiente'] }} Pendientes</span>@endif
-            @if($conteos['Sancionado'] > 0)<span class="pb-badge red">{{ $conteos['Sancionado'] }} Sancionados</span>@endif
+        <div class="proc-head-side">
+            <span class="stat-chip">{{ $conteos['todos'] }} total</span>
+            @if($conteos['Pendiente'] > 0)<span class="stat-chip yellow">{{ $conteos['Pendiente'] }} Pendientes</span>@endif
+            @if($conteos['Sancionado'] > 0)<span class="stat-chip red">{{ $conteos['Sancionado'] }} Sancionados</span>@endif
+        @if(auth()->user()->puede('registrar_casos'))
+            <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
+        @endif
         </div>
     </div>
 @endsection
 
 @section('styles')
 <style>
-    .proc-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        margin-bottom: 18px;
-    }
-
-    .proc-head h1 {
-        margin: 0 0 4px;
-        font-size: 28px;
-        font-weight: 700;
-        letter-spacing: -.03em;
-    }
-
-    .proc-head p {
-        margin: 0;
-        color: #94a3b8;
-        font-size: 14px;
-    }
-
-    .btn-add { display: inline-flex; align-items: center; gap: 8px; background: var(--cth-green-bright); color: #fff; border-radius: 999px; padding: 11px 18px; font-weight: 700; font-size: 14px; text-decoration: none; white-space: nowrap; }
-    .btn-add:hover { color: #fff; filter: brightness(1.05); }
-
     .chips {
         display: flex;
         flex-wrap: wrap;
@@ -93,7 +71,7 @@
 
     .toolbar {
         display: grid;
-        grid-template-columns: 1fr 220px auto;
+        grid-template-columns: minmax(0,1fr) minmax(140px,220px) auto;
         gap: 12px;
         align-items: center;
         margin-bottom: 16px;
@@ -153,18 +131,17 @@
         font-size: 11px;
         letter-spacing: .06em;
         font-weight: 700;
-        border-bottom: 1px solid #f1f5f9;
+        border: 1px solid var(--cth-border);
         white-space: nowrap;
     }
 
     table.proc td {
         padding: 14px 12px;
-        border-bottom: 1px solid #f8fafc;
+        border: 1px solid var(--cth-border);
         color: #334155;
         vertical-align: middle;
     }
 
-    table.proc tr:last-child td { border-bottom: 0; }
     table.proc tbody tr:hover { background: #fafbfc; }
 
     .id {
@@ -294,6 +271,9 @@
                     <th>MODALIDAD</th>
                     <th>TIPO DE FALTA</th>
                     <th>FECHA FALTA</th>
+                    @if($esCoordinadora)
+                        <th>RH</th>
+                    @endif
                     <th>ESTADO</th>
                     <th>ACCIONES</th>
                 </tr>
@@ -310,6 +290,9 @@
                         <td>{{ $proceso->modalidad ?: '—' }}</td>
                         <td>{{ $proceso->tipo_falta ?: '—' }}</td>
                         <td>{{ $proceso->fecha_falta ? \Carbon\Carbon::parse($proceso->fecha_falta)->format('Y-m-d') : '—' }}</td>
+                        @if($esCoordinadora)
+                            <td>{{ $proceso->user->name ?? 'Sin asignar' }}</td>
+                        @endif
                         <td>
                             @if($proceso->estado == 'Pendiente')
                                 <span class="st"><i class="fas fa-circle dot-pend"></i> Pendiente</span>
@@ -323,23 +306,29 @@
                         </td>
                         <td>
                             <div class="acts">
-                                <a href="{{ route('abogado.detalleproceso', $proceso->id) }}" title="Editar información del proceso">
-                                    <i class="far fa-edit"></i>
+                                <a href="{{ route('abogado.detalleproceso', $proceso->id) }}" title="Ver proceso">
+                                    <i class="far fa-eye"></i>
                                 </a>
+                                @if(auth()->user()->puede('eliminar_casos'))
                                 <form action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST"
-                                      onsubmit="return confirm('¿Deseas eliminar este proceso disciplinario?')">
+                                      data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente."
+                                      data-confirm-title="Eliminar proceso"
+                                      data-confirm-ok="Eliminar"
+                                      data-confirm-danger="1"
+                                      data-confirm-icon="warning">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="danger" title="Eliminar proceso">
                                         <i class="far fa-trash-alt"></i>
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="empty">No hay procesos disciplinarios registrados</td>
+                        <td colspan="{{ $esCoordinadora ? 10 : 9 }}" class="empty">No hay procesos disciplinarios registrados</td>
                     </tr>
                 @endforelse
             </tbody>

@@ -86,9 +86,25 @@
     flex-shrink: 0;
 }
 
-.doc-icon.disciplinario { background: #eff6ff; color: #1d4ed8; }
+.doc-icon.disciplinario,
+.doc-icon.apertura { background: #eff6ff; color: #1d4ed8; }
 .doc-icon.comprobacion  { background: #fff7ed; color: #c2410c; }
 .doc-icon.acta          { background: #fdf4ff; color: #7c3aed; }
+.doc-icon.resolucion,
+.doc-icon.sancion,
+.doc-icon.llamado,
+.doc-icon.terminacion { background: #fef2f2; color: #b91c1c; }
+.doc-icon.archivo { background: #f1f5f9; color: #475569; }
+
+.variant-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.variant-pills a, .variant-pills button {
+    border:1px solid #cbd5e1; background:#f8fafc; color:#334155;
+    border-radius:999px; padding:4px 10px; font-size:11px; font-weight:700;
+    cursor:pointer; text-decoration:none;
+}
+.variant-pills a.active, .variant-pills button.active {
+    background:var(--c-green); color:#fff; border-color:transparent;
+}
 
 .doc-card-title {
     font-size: 15px;
@@ -317,19 +333,19 @@
 </style>
 @endsection
 
+@section('page-header')
+@endsection
+
 @section('content')
 <div class="doc-page">
 
     {{-- ALERTS --}}
-    @if(session('success'))
-        <div class="alert alert-success"><i class="fas fa-check-circle"></i> {{ session('success') }}</div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> {{ session('error') }}</div>
-    @endif
     @if($errors->any())
-        <div class="alert alert-warning">
-            @foreach($errors->all() as $err)<div>· {{ $err }}</div>@endforeach
+        <div class="sipd-alert sipd-alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                @foreach($errors->all() as $err)<div>{{ $err }}</div>@endforeach
+            </div>
         </div>
     @endif
 
@@ -373,94 +389,41 @@
     </h2>
 
     <div class="doc-grid">
-
-        {{-- Apertura Proceso Disciplinario --}}
-        @php $est = $estados['disciplinario']; @endphp
-        <div class="doc-card">
-            <div class="doc-card-header">
-                <div class="doc-icon disciplinario"><i class="fas fa-balance-scale"></i></div>
-                <div>
-                    <div class="doc-card-title">Apertura Proceso Disciplinario</div>
-                    <div class="doc-card-sub">Formato de apertura · 8 campos variables</div>
+        @foreach(\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes)
+            @php
+                $tipoSlot = $caso->varianteDelSlot($slot);
+                $est = $estados[$tipoSlot] ?? $caso->estadoDocumento($tipoSlot);
+            @endphp
+            <div class="doc-card">
+                <div class="doc-card-header">
+                    <div class="doc-icon {{ $slot }}"><i class="fas {{ \App\Models\CasoDocumentoEstado::SLOT_ICONS[$slot] }}"></i></div>
+                    <div>
+                        <div class="doc-card-title">{{ \App\Models\CasoDocumentoEstado::SLOT_LABELS[$slot] }}</div>
+                        <div class="doc-card-sub">{{ \App\Models\CasoDocumentoEstado::etiqueta($tipoSlot) }}</div>
+                    </div>
+                </div>
+                <div class="doc-card-body">
+                    <span class="estado-badge {{ $est->estado }}">
+                        <i class="fas fa-circle" style="font-size:7px;"></i>
+                        {{ $est->etiquetaEstado() }}
+                    </span>
+                    @if($est->generado_en)
+                        <div class="doc-meta" style="margin-top:8px;">Generado: {{ $est->generado_en->format('d/m/Y H:i') }}</div>
+                    @endif
+                    @if($tipoSlot === 'terminacion')
+                        <div class="doc-meta" style="margin-top:10px;">Se imprime para firma del gerente y el escaneo se carga en Anexos escaneados.</div>
+                    @endif
+                </div>
+                <div class="doc-card-footer">
+                    <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" class="btn-doc btn-edit">
+                        <i class="fas fa-edit"></i> Diligenciar
+                    </a>
+                    <a href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}" class="btn-doc btn-download">
+                        <i class="fas fa-file-word"></i> Generar DOCX
+                    </a>
                 </div>
             </div>
-            <div class="doc-card-body">
-                <span class="estado-badge {{ $est->estado }}">
-                    <i class="fas fa-circle" style="font-size:7px;"></i>
-                    {{ $est->etiquetaEstado() }}
-                </span>
-                @if($est->generado_en)
-                    <div class="doc-meta" style="margin-top:8px;">Generado: {{ $est->generado_en->format('d/m/Y H:i') }}</div>
-                @endif
-            </div>
-            <div class="doc-card-footer">
-                <a href="{{ route('documentos.edit', [$caso->id, 'disciplinario']) }}" class="btn-doc btn-edit">
-                    <i class="fas fa-edit"></i> Diligenciar
-                </a>
-                <a href="{{ route('documentos.download', [$caso->id, 'disciplinario']) }}" class="btn-doc btn-download">
-                    <i class="fas fa-file-word"></i> Generar DOCX
-                </a>
-            </div>
-        </div>
-
-        {{-- Apertura Proceso de Comprobación --}}
-        @php $est = $estados['comprobacion']; @endphp
-        <div class="doc-card">
-            <div class="doc-card-header">
-                <div class="doc-icon comprobacion"><i class="fas fa-search"></i></div>
-                <div>
-                    <div class="doc-card-title">Apertura Proceso de Comprobación</div>
-                    <div class="doc-card-sub">Comprobación de justa causa · 25 campos variables</div>
-                </div>
-            </div>
-            <div class="doc-card-body">
-                <span class="estado-badge {{ $est->estado }}">
-                    <i class="fas fa-circle" style="font-size:7px;"></i>
-                    {{ $est->etiquetaEstado() }}
-                </span>
-                @if($est->generado_en)
-                    <div class="doc-meta" style="margin-top:8px;">Generado: {{ $est->generado_en->format('d/m/Y H:i') }}</div>
-                @endif
-            </div>
-            <div class="doc-card-footer">
-                <a href="{{ route('documentos.edit', [$caso->id, 'comprobacion']) }}" class="btn-doc btn-edit">
-                    <i class="fas fa-edit"></i> Diligenciar
-                </a>
-                <a href="{{ route('documentos.download', [$caso->id, 'comprobacion']) }}" class="btn-doc btn-download">
-                    <i class="fas fa-file-word"></i> Generar DOCX
-                </a>
-            </div>
-        </div>
-
-        {{-- Acta de Cargos y Descargos --}}
-        @php $est = $estados['acta']; @endphp
-        <div class="doc-card">
-            <div class="doc-card-header">
-                <div class="doc-icon acta"><i class="fas fa-gavel"></i></div>
-                <div>
-                    <div class="doc-card-title">Acta de Cargos y Descargos</div>
-                    <div class="doc-card-sub">Diligencia de descargos · 9 campos variables</div>
-                </div>
-            </div>
-            <div class="doc-card-body">
-                <span class="estado-badge {{ $est->estado }}">
-                    <i class="fas fa-circle" style="font-size:7px;"></i>
-                    {{ $est->etiquetaEstado() }}
-                </span>
-                @if($est->generado_en)
-                    <div class="doc-meta" style="margin-top:8px;">Generado: {{ $est->generado_en->format('d/m/Y H:i') }}</div>
-                @endif
-            </div>
-            <div class="doc-card-footer">
-                <a href="{{ route('documentos.edit', [$caso->id, 'acta']) }}" class="btn-doc btn-edit">
-                    <i class="fas fa-edit"></i> Diligenciar
-                </a>
-                <a href="{{ route('documentos.download', [$caso->id, 'acta']) }}" class="btn-doc btn-download">
-                    <i class="fas fa-file-word"></i> Generar DOCX
-                </a>
-            </div>
-        </div>
-
+        @endforeach
     </div>
 
     {{-- EVIDENCIAS --}}
@@ -500,7 +463,11 @@
                             @if(in_array(auth()->user()->role, ['admin','coordinadora']) || $ev->user_id === auth()->id())
                                 <form method="POST"
                                       action="{{ route('documentos.evidencias.destroy', [$caso->id, $ev->id]) }}"
-                                      onsubmit="return confirm('¿Eliminar esta evidencia?');">
+                                      data-confirm="La evidencia se eliminará del expediente."
+                                      data-confirm-title="Eliminar evidencia"
+                                      data-confirm-ok="Eliminar"
+                                      data-confirm-danger="1"
+                                      data-confirm-icon="warning">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn-ev btn-ev-delete">
                                         <i class="fas fa-trash"></i>
@@ -528,6 +495,53 @@
                     <i class="fas fa-upload"></i> Cargar evidencia
                 </button>
             </form>
+        </div>
+    </div>
+
+    <div class="ev-section">
+        <h3><i class="fas fa-file-upload" style="color:var(--c-green);"></i> Anexos del expediente</h3>
+        <p class="ev-meta" style="margin:-8px 0 16px;">Word o PDF del caso. La firma del gerente solo aplica a la terminación de contrato.</p>
+
+        @if($caso->anexos->isEmpty())
+            <div class="ev-empty">
+                <i class="fas fa-inbox" style="font-size:32px;opacity:.3;display:block;margin-bottom:8px;"></i>
+                Aún no hay anexos en este expediente.
+            </div>
+        @else
+            <div class="ev-list">
+                @foreach($caso->anexos as $anexo)
+                    <div class="ev-item">
+                        <div class="ev-item-info">
+                            <div class="ev-icon-placeholder"><i class="fas fa-file-word"></i></div>
+                            <div>
+                                <div class="ev-name">{{ $anexo->titulo ?: $anexo->nombre_original }}</div>
+                                <div class="ev-meta">
+                                    {{ $anexo->etiquetaTipo() }} · {{ $anexo->etiquetaEstado() }}
+                                    · {{ strtoupper($anexo->extension) }} · {{ $anexo->tamanoLegible() }}
+                                    <br>Cargado {{ optional($anexo->created_at)->format('d/m/Y') }} por {{ $anexo->user->name ?? '—' }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ev-actions">
+                            <a href="{{ route('abogado.anexos.download', $anexo->id) }}" class="btn-ev btn-ev-download">
+                                <i class="fas fa-download"></i>
+                                {{ $anexo->requiereFirma() ? 'Imprimir' : 'Descargar' }}
+                            </a>
+                            @if($anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura)
+                                <a href="{{ route('abogado.anexos.download', ['id' => $anexo->id, 'v' => 'firmado']) }}" class="btn-ev btn-ev-download">
+                                    <i class="fas fa-file-signature"></i> Firmado
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+        <div class="ev-upload" style="margin-top:16px;">
+            <a href="{{ route('abogado.anexos') }}" class="btn-ev-upload" style="display:inline-flex;text-decoration:none;">
+                <i class="fas fa-upload"></i> Cargar en Anexos escaneados
+            </a>
         </div>
     </div>
 

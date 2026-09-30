@@ -1,5 +1,7 @@
 @extends('layouts.master')
 
+@php $pageTitle = 'Nuevo proceso'; @endphp
+
 @section('styles')
 <style>
 :root {
@@ -9,7 +11,7 @@
 /* ─── Layout principal igual que edit.blade.php ─── */
 .edit-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
     gap: 20px;
     align-items: start;
 }
@@ -230,46 +232,39 @@
 
 .submodule-panel { display: none; }
 .submodule-panel.active { display: block; }
+
+.phpword-document-container { overflow-x: auto; }
+#doc-html-host { overflow-x: hidden; max-width: 850px; }
+#doc-html-host p { margin: 0.28em 0; }
+#doc-html-host img { max-width: 100%; height: auto; max-height: 90px; }
+#doc-html-host table { width: 100% !important; height: auto !important; }
+#doc-html-host td, #doc-html-host th { height: auto !important; }
+#doc-html-host textarea.doc-interactive-field { max-width: 100%; box-sizing: border-box; }
+#doc-html-host textarea.js-inline { height: 2em !important; min-height: 2em !important; overflow: hidden !important; vertical-align: baseline; white-space: nowrap; }
+#doc-html-host .doc-header-field { font-weight: 700; border-bottom: 1px solid #0f172a; padding: 0 4px; }
 </style>
 @endsection
 
 @section('page-header')
     <div class="proc-head">
         <div>
-            <h1>Nuevo Proceso Disciplinario</h1>
-            <p>Registra el expediente y diligencia los 3 documentos oficiales</p>
-        </div>
-    </div>
-    <div class="page-banner">
-        <div class="page-banner-left">
-            <div class="page-banner-title">Nuevo Proceso Disciplinario</div>
-            <div class="page-banner-sub">Completa los datos del trabajador para registrar el expediente &middot; {{ now()->format('d/m/Y') }}</div>
-        </div>
-        <div class="page-banner-right">
-            <span class="pb-badge">Borrador</span>
-            <span class="pb-badge green">Nuevo</span>
+            <h1>Nuevo proceso disciplinario</h1>
+            <p>Completa los datos del trabajador para registrar el expediente · {{ now()->format('d/m/Y') }}</p>
         </div>
     </div>
 @endsection
 
 @section('content')
 
-@if(session('success'))
-    <div class="alert alert-success" style="margin-bottom:16px;">
-        <i class="fas fa-check-circle"></i> {{ session('success') }}
-    </div>
-@endif
-@if(session('error'))
-    <div class="alert alert-warning" style="margin-bottom:16px;">
-        <i class="fas fa-exclamation-triangle"></i> {{ session('error') }}
-    </div>
-@endif
 @if($errors->any())
-    <div class="alert alert-warning" style="margin-bottom:16px;">
-        <strong>Por favor revisa la siguiente información:</strong>
-        <ul style="margin:6px 0 0;padding-left:18px;">
-            @foreach($errors->all() as $err) <li>{{ $err }}</li> @endforeach
-        </ul>
+    <div class="sipd-alert sipd-alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>Revisa la siguiente información</strong>
+            <ul>
+                @foreach($errors->all() as $err) <li>{{ $err }}</li> @endforeach
+            </ul>
+        </div>
     </div>
 @endif
 
@@ -287,13 +282,19 @@
 
 <form action="{{ route('abogado.registro.store') }}" method="POST" enctype="multipart/form-data" id="registro-form">
     @csrf
-    <input type="hidden" name="tipo_proceso" id="tipo_proceso" value="disciplinario">
-
     @php
         $me = $profileUser;
         $iniciales = collect(preg_split('/\s+/', trim($me->name)))->filter()->take(2)
             ->map(fn($p) => strtoupper(substr($p,0,1)))->implode('');
+        $slotsUi = [
+            'apertura' => ['icon' => 'fa-balance-scale', 'label' => '1. Apertura'],
+            'acta' => ['icon' => 'fa-gavel', 'label' => '2. Acta de cargos y descargos'],
+            'resolucion' => ['icon' => 'fa-stamp', 'label' => '3. Sanción / llamado / terminación'],
+            'archivo' => ['icon' => 'fa-archive', 'label' => '4. Decisión de archivo'],
+        ];
+        $slotInicial = \App\Models\CasoDocumentoEstado::slotDe($tipoInicial) ?: 'apertura';
     @endphp
+    <input type="hidden" name="tipo_proceso" id="tipo_proceso" value="{{ $tipoInicial }}">
 
     <div class="panel-card" style="margin-bottom: 24px;">
         <div class="panel-head">
@@ -346,72 +347,316 @@
         </div>
     </div>
 
-    {{-- PESTAÑAS DE SUBMÓDULOS --}}
+    {{-- PESTAÑAS DE DOCUMENTOS --}}
     <div class="sub-tab-bar">
-        <button type="button" id="tab-disciplinario" class="sub-tab-btn active" onclick="selectSubmodule('disciplinario')">
-            <i class="fas fa-balance-scale"></i> 1. Apertura Disciplinaria
-        </button>
-        <button type="button" id="tab-comprobacion" class="sub-tab-btn" onclick="selectSubmodule('comprobacion')">
-            <i class="fas fa-search"></i> 2. Apertura Comprobación
-        </button>
-        <button type="button" id="tab-acta" class="sub-tab-btn" onclick="selectSubmodule('acta')">
-            <i class="fas fa-gavel"></i> 3. Acta Cargos y Descargos
-        </button>
+        @foreach($slotsUi as $slot => $meta)
+            <button type="button" id="tab-{{ $slot }}" class="sub-tab-btn {{ $slot === $slotInicial ? 'active' : '' }}" onclick="selectSlot('{{ $slot }}')">
+                <i class="fas {{ $meta['icon'] }}"></i> {{ $meta['label'] }}
+            </button>
+        @endforeach
     </div>
 
-    {{-- INTERACTIVE DOCUMENT VIEWS --}}
-    @foreach(['disciplinario', 'comprobacion', 'acta'] as $tipoDoc)
-    <div class="submodule-panel {{ $tipoDoc === 'disciplinario' ? 'active' : '' }}" id="submodule-form-{{ $tipoDoc }}" {!! $tipoDoc !== 'disciplinario' ? 'style="display:none;"' : '' !!}>
-        <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
-            <div class="panel-head" style="background:#f8fafc;">
-                <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento Interactivo Oficial</h3>
-                <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son editables</div>
-            </div>
-            
-            {{-- Toolbar superior dentro del documento --}}
-            <div style="padding: 18px 24px; border-bottom: 1px solid var(--c-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: #fff;">
-                <div class="resp-strip" style="margin-bottom:0; flex:1; min-width: 250px;">
-                    <div class="resp-ava">{{ $iniciales }}</div>
-                    <div class="resp-info">
-                        <b>{{ $me->name }}</b>
-                        <span>{{ $me->cargo ?: ucfirst($me->role) }} · {{ now()->format('d/m/Y') }}</span>
-                    </div>
-                    </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <label class="btn-toolbar" style="background:#f1f5f9; color:#334155; cursor:pointer; font-weight:700;">
-                            <i class="fas fa-signature"></i> Subir Firma
-                            <input type="file" name="firmas_digitales[{{ $tipoDoc }}]" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
-                        </label>
-                        <button type="submit" class="btn-toolbar btn-save">
-                            <i class="fas fa-check-circle"></i> Registrar Caso y Generar DOCX
-                        </button>
-                    </div>
-                </div>
+    <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
+        <div class="panel-head" style="background:#f8fafc;">
+            <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento interactivo oficial</h3>
+            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son editables y no tienen límite de caracteres.</div>
+        </div>
 
-            {{-- Área del documento renderizado en HTML --}}
-            <div class="phpword-document-container" style="background: #e2e8f0; padding: 40px 20px; overflow-x: auto;">
-                <div style="background: #ffffff; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 40px; border-radius: 4px; border: 1px solid #ccc; font-family: 'Arial', sans-serif;">
-                    {!! $interactiveHtml[$tipoDoc] !!}
+        <div id="variant-bar" style="padding:14px 24px; border-bottom:1px solid var(--c-border); display:none; gap:8px; flex-wrap:wrap; align-items:center; background:#fff;">
+            <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Usar formato</span>
+            <div id="variant-options" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        </div>
+
+        <div id="terminacion-hint" class="sipd-alert sipd-alert-warning" style="display:none;margin:16px 24px 0;">
+            <i class="fas fa-print"></i>
+            <div>Este formato se llena y queda registrado igual que los demás. Después hay que imprimirlo para firma del gerente y subir el escaneo en Anexos escaneados.</div>
+        </div>
+
+        <div style="padding: 18px 24px; border-bottom: 1px solid var(--c-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: #fff;">
+            <div class="resp-strip" style="margin-bottom:0; flex:1; min-width: 250px;">
+                <div class="resp-ava">{{ $iniciales }}</div>
+                <div class="resp-info">
+                    <b>{{ $me->name }}</b>
+                    <span>{{ $me->cargo ?: ucfirst($me->role) }} · {{ now()->format('d/m/Y') }}</span>
                 </div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <label class="btn-toolbar" style="background:#f1f5f9; color:#334155; cursor:pointer; font-weight:700;">
+                    <i class="fas fa-signature"></i> Subir firma
+                    <input type="file" id="firma-registro" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
+                </label>
+                <button type="submit" class="btn-toolbar btn-save">
+                    <i class="fas fa-file-word"></i> Registrar y descargar este documento
+                </button>
+            </div>
+        </div>
+
+        <div class="phpword-document-container" style="background: #e2e8f0; padding: 24px 16px; overflow-x: auto;">
+            <div id="doc-html-host" style="background: #ffffff; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 28px 32px; border-radius: 4px; border: 1px solid #ccc; font-family: 'Arial', sans-serif;">
+                {!! $interactiveHtml !!}
             </div>
         </div>
     </div>
-    @endforeach
 
 </form>
 
 <script>
-window.selectSubmodule = function(tipo) {
-    document.getElementById('tipo_proceso').value = tipo;
-    document.querySelectorAll('.sub-tab-btn').forEach(function(b){ b.classList.remove('active'); });
-    var tab = document.getElementById('tab-' + tipo);
-    if(tab) tab.classList.add('active');
-    document.querySelectorAll('.submodule-panel').forEach(function(p){
-        p.classList.remove('active');
-        p.style.display = 'none';
+var SLOT_VARIANTES = @json(\App\Models\CasoDocumentoEstado::SLOTS);
+var SLOT_ETIQUETAS = @json(\App\Models\CasoDocumentoEstado::ETIQUETAS);
+var PLANTILLA_URL = @json(route('abogado.registro.plantilla'));
+var TIPO_SERVIDOR = @json($tipoInicial);
+var hadValidationError = @json($errors->any());
+var currentSlot = @json($slotInicial);
+var currentTipo = @json($tipoInicial);
+var plantillaCache = {};
+var DRAFT_KEY = 'sipd_nuevo_proceso';
+var persistTimer;
+
+function emptyDraft() {
+    return { slot: 'apertura', tipo: 'disciplinario', fields: {}, yellow: {} };
+}
+
+function readDraft() {
+    try {
+        var raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return emptyDraft();
+        var d = JSON.parse(raw);
+        if (!d || typeof d !== 'object') return emptyDraft();
+        d.fields = d.fields && typeof d.fields === 'object' ? d.fields : {};
+        d.yellow = d.yellow && typeof d.yellow === 'object' ? d.yellow : {};
+        return d;
+    } catch (e) {
+        return emptyDraft();
+    }
+}
+
+function writeDraft(d) {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e) {}
+}
+
+function slotOf(tipo) {
+    var slots = SLOT_VARIANTES || {};
+    for (var s in slots) {
+        if (Object.prototype.hasOwnProperty.call(slots, s) && slots[s].indexOf(tipo) !== -1) {
+            return s;
+        }
+    }
+    return 'apertura';
+}
+
+function isValidTipo(tipo) {
+    return !!(SLOT_ETIQUETAS && SLOT_ETIQUETAS[tipo]);
+}
+
+function generalFieldNodes() {
+    return document.querySelectorAll('#registro-form input:not([type="file"]):not([type="hidden"]), #registro-form textarea, #registro-form select');
+}
+
+function isYellowField(el) {
+    return !!(el && el.name && el.name.indexOf('yellow_blocks_') === 0);
+}
+
+function collectGeneralFields() {
+    var fields = {};
+    generalFieldNodes().forEach(function(el) {
+        if (el.name && !isYellowField(el) && el.id !== 'worker-search') {
+            fields[el.name] = el.value;
+        }
     });
-    var panel = document.getElementById('submodule-form-' + tipo);
-    if(panel){ panel.classList.add('active'); panel.style.display = 'block'; }
+    return fields;
+}
+
+function applyGeneralFields(fields) {
+    if (!fields) return;
+    generalFieldNodes().forEach(function(el) {
+        if (el.name && !isYellowField(el) && Object.prototype.hasOwnProperty.call(fields, el.name)) {
+            el.value = fields[el.name];
+        }
+    });
+}
+
+function yellowIndex(el) {
+    if (!el || !el.name) return null;
+    var m = el.name.match(/\[(\d+)\]/);
+    return m ? m[1] : null;
+}
+
+function collectYellow() {
+    var values = {};
+    document.querySelectorAll('#doc-html-host textarea[name^="yellow_blocks_"], #doc-html-host input[name^="yellow_blocks_"]').forEach(function(el) {
+        var idx = yellowIndex(el);
+        if (idx !== null) values[idx] = el.value;
+    });
+    return values;
+}
+
+function applyYellow(values) {
+    if (!values) return;
+    document.querySelectorAll('#doc-html-host textarea[name^="yellow_blocks_"], #doc-html-host input[name^="yellow_blocks_"]').forEach(function(el) {
+        var idx = yellowIndex(el);
+        if (idx !== null && Object.prototype.hasOwnProperty.call(values, idx)) {
+            el.value = values[idx];
+        }
+    });
+}
+
+function hostMatchesTipo(tipo) {
+    return !!document.querySelector('#doc-html-host [name^="yellow_blocks_' + tipo + '"]');
+}
+
+function persistDraft() {
+    var d = readDraft();
+    d.slot = currentSlot;
+    d.tipo = currentTipo;
+    d.fields = Object.assign({}, d.fields || {}, collectGeneralFields());
+    d.yellow = d.yellow || {};
+    if (hostMatchesTipo(currentTipo)) {
+        d.yellow[currentTipo] = collectYellow();
+    }
+    writeDraft(d);
+}
+
+function persistDraftSoon() {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(persistDraft, 150);
+}
+
+function migrateLegacyKeys(d) {
+    ['nombre', 'cedula', 'modalidad', 'telefono', 'fecha_falta', 'tipo_falta', 'descripcion_falta'].forEach(function(name) {
+        try {
+            var old = localStorage.getItem('sipd_nuevo_' + name);
+            if (old !== null && (d.fields[name] == null || d.fields[name] === '')) {
+                d.fields[name] = old;
+            }
+            localStorage.removeItem('sipd_nuevo_' + name);
+        } catch (e) {}
+    });
+}
+
+function bindYellowPersist(root) {
+    (root || document).querySelectorAll('#doc-html-host textarea[name^="yellow_blocks_"], #doc-html-host input[name^="yellow_blocks_"]').forEach(function(el) {
+        if (el.dataset.draftBound) return;
+        el.dataset.draftBound = '1';
+        el.addEventListener('input', persistDraftSoon);
+    });
+}
+
+function hydratePlantilla(tipo) {
+    var host = document.getElementById('doc-html-host');
+    applyYellow((readDraft().yellow || {})[tipo]);
+    autosizeTextareas(host);
+    bindYellowPersist(host);
+    syncDocHeader();
+    persistDraft();
+}
+
+function syncDocHeader() {
+    var map = {
+        nombre: ((document.getElementById('inp-nombre') || {}).value || '').trim(),
+        cargo: ((document.getElementById('inp-cargo') || {}).value || '').trim(),
+        cedula: ((document.getElementById('inp-cedula') || {}).value || '').trim()
+    };
+    document.querySelectorAll('#doc-html-host [data-header]').forEach(function(el) {
+        var key = el.getAttribute('data-header');
+        if (!Object.prototype.hasOwnProperty.call(map, key)) return;
+        var blank = el.getAttribute('data-blank') || '';
+        el.textContent = map[key] || blank;
+    });
+}
+
+function setActiveTab(slot) {
+    document.querySelectorAll('.sub-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    var tab = document.getElementById('tab-' + slot);
+    if (tab) tab.classList.add('active');
+}
+
+function autosizeTextareas(root) {
+    (root || document).querySelectorAll('textarea.js-autosize, textarea[name^="yellow_blocks_"]').forEach(function(el) {
+        el.removeAttribute('maxlength');
+        if (el.classList.contains('js-inline')) {
+            var fit = function() {
+                var text = (el.value || el.placeholder || '').length;
+                el.style.width = Math.max(10, text + 4) + 'ch';
+            };
+            el.addEventListener('input', fit);
+            fit();
+            return;
+        }
+        el.style.display = 'block';
+        el.style.width = '100%';
+        el.style.overflow = 'hidden';
+        el.style.resize = 'vertical';
+        var grow = function() {
+            el.style.height = 'auto';
+            el.style.height = Math.max(el.scrollHeight, 34) + 'px';
+        };
+        el.addEventListener('input', grow);
+        grow();
+    });
+}
+
+function renderVariantBar(slot) {
+    var bar = document.getElementById('variant-bar');
+    var host = document.getElementById('variant-options');
+    var variantes = SLOT_VARIANTES[slot] || [];
+    if (variantes.length < 2) {
+        bar.style.display = 'none';
+        host.innerHTML = '';
+        return;
+    }
+    bar.style.display = 'flex';
+    host.innerHTML = '';
+    variantes.forEach(function(tipo) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-toolbar' + (tipo === currentTipo ? ' btn-save' : '');
+        btn.style.background = tipo === currentTipo ? '' : '#f1f5f9';
+        btn.style.color = tipo === currentTipo ? '' : '#334155';
+        btn.textContent = SLOT_ETIQUETAS[tipo] || tipo;
+        btn.addEventListener('click', function() { loadPlantilla(tipo, slot); });
+        host.appendChild(btn);
+    });
+}
+
+function syncTipoHidden(tipo) {
+    currentTipo = tipo;
+    document.getElementById('tipo_proceso').value = tipo;
+    var hint = document.getElementById('terminacion-hint');
+    if (hint) hint.style.display = tipo === 'terminacion' ? 'flex' : 'none';
+}
+
+function loadPlantilla(tipo, slot) {
+    persistDraft();
+    if (slot) currentSlot = slot;
+    syncTipoHidden(tipo);
+    renderVariantBar(currentSlot);
+    var host = document.getElementById('doc-html-host');
+    if (plantillaCache[tipo] && plantillaCache[tipo] !== true) {
+        host.innerHTML = plantillaCache[tipo];
+        hydratePlantilla(tipo);
+        return;
+    }
+    host.innerHTML = '<p style="color:#64748b;text-align:center;padding:40px 0;">Cargando formato…</p>';
+    fetch(PLANTILLA_URL + '?tipo=' + encodeURIComponent(tipo), { headers: { Accept: 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            plantillaCache[tipo] = data.html || '';
+            if (currentTipo !== tipo) return;
+            host.innerHTML = plantillaCache[tipo];
+            hydratePlantilla(tipo);
+        })
+        .catch(function() {
+            host.innerHTML = '<p style="color:#b91c1c;text-align:center;padding:40px 0;">No se pudo cargar el formato.</p>';
+        });
+}
+
+window.selectSlot = function(slot) {
+    persistDraft();
+    currentSlot = slot;
+    setActiveTab(slot);
+    var variantes = SLOT_VARIANTES[slot] || [];
+    var tipo = variantes.indexOf(currentTipo) !== -1 ? currentTipo : variantes[0];
+    loadPlantilla(tipo, slot);
 };
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -434,7 +679,9 @@ document.addEventListener('DOMContentLoaded', function () {
             : 'Completa los datos del trabajador para registrar el expediente · {{ now()->format("d/m/Y") }}';
     }
 
-    if(inp_nombre) inp_nombre.addEventListener('input', updateBar);
+    if(inp_nombre) inp_nombre.addEventListener('input', function() { updateBar(); syncDocHeader(); });
+    if(inp_cedula) inp_cedula.addEventListener('input', function() { updateBar(); syncDocHeader(); });
+    if(inp_cargo)  inp_cargo.addEventListener('input', function() { updateBar(); syncDocHeader(); });
     if(workerSrch) {
         workerSrch.addEventListener('input', function() {
             clearTimeout(timer);
@@ -456,6 +703,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 var tel = document.querySelector('[name="telefono"]');
                                 if(tel) { tel.value = w.telefono||''; tel.dispatchEvent(new Event('input')); }
                                 updateBar();
+                                syncDocHeader();
                                 workerRes.innerHTML = '<small style="color:var(--cth-green-text);display:block;margin-top:4px;">✓ Datos autocompletados.</small>';
                             });
                             workerRes.appendChild(btn);
@@ -465,51 +713,60 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Persistencia LocalStorage
-    var formFields = document.querySelectorAll('#registro-form input:not([type="file"]):not([type="hidden"]), #registro-form textarea, #registro-form select');
+    var draft = readDraft();
+    migrateLegacyKeys(draft);
+    writeDraft(draft);
 
-    // Restaurar
-    formFields.forEach(function(field) {
-        if(field.name) {
-            var saved = localStorage.getItem('sipd_nuevo_' + field.name);
-            if(saved !== null) {
-                field.value = saved;
-            }
+    if (!hadValidationError) {
+        applyGeneralFields(draft.fields);
+        if (isValidTipo(draft.tipo)) {
+            currentTipo = draft.tipo;
+            currentSlot = (draft.slot && SLOT_VARIANTES[draft.slot]) ? draft.slot : slotOf(draft.tipo);
+        }
+    }
+
+    updateBar();
+    setActiveTab(currentSlot);
+    syncTipoHidden(currentTipo);
+
+    var hostInicial = document.getElementById('doc-html-host');
+    plantillaCache[TIPO_SERVIDOR] = hostInicial ? hostInicial.innerHTML : '';
+
+    if (currentTipo === TIPO_SERVIDOR) {
+        hydratePlantilla(currentTipo);
+        renderVariantBar(currentSlot);
+    } else {
+        loadPlantilla(currentTipo, currentSlot);
+    }
+
+    generalFieldNodes().forEach(function(field) {
+        if (field.name && !isYellowField(field) && field.id !== 'worker-search') {
+            field.addEventListener('input', persistDraftSoon);
+            field.addEventListener('change', persistDraftSoon);
         }
     });
 
-    updateBar();
+    window.addEventListener('pagehide', persistDraft);
+    window.addEventListener('beforeunload', persistDraft);
 
-    // Guardar al teclear
-    formFields.forEach(function(field) {
-        field.addEventListener('input', function() {
-            if(field.name) {
-                localStorage.setItem('sipd_nuevo_' + field.name, field.value);
+    document.getElementById('registro-form').addEventListener('submit', function() {
+        persistDraft();
+        var tipoActivo = document.getElementById('tipo_proceso').value;
+        document.querySelectorAll('#doc-html-host textarea, #doc-html-host input').forEach(function(el) {
+            if (el.name && el.name.indexOf('yellow_blocks_') === 0 && el.name.indexOf('yellow_blocks_' + tipoActivo) !== 0) {
+                el.disabled = true;
             }
         });
     });
-
-    // Limpiar al enviar
-    document.getElementById('registro-form').addEventListener('submit', function() {
-        formFields.forEach(function(field) {
-            if(field.name) localStorage.removeItem('sipd_nuevo_' + field.name);
-        });
-    });
-
-    selectSubmodule('disciplinario');
 });
 
 function previewFirma(input) {
     if (input.files && input.files[0]) {
         var reader = new FileReader();
         reader.onload = function(e) {
-            // Find signature zone inside the CURRENT active panel
-            var panel = input.closest('.submodule-panel');
-            if(panel) {
-                panel.querySelectorAll('.sig-zone').forEach(function(z) {
-                    z.innerHTML = '<img src="' + e.target.result + '" style="max-height:80px; display:block; margin:0 auto; margin-bottom: 5px;">';
-                });
-            }
+            document.querySelectorAll('#doc-html-host .sig-zone').forEach(function(z) {
+                z.innerHTML = '<img src="' + e.target.result + '" style="max-height:80px; display:block; margin:0 auto; margin-bottom: 5px;">';
+            });
         };
         reader.readAsDataURL(input.files[0]);
     }

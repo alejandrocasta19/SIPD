@@ -10,7 +10,7 @@
 @section('styles')
 <style>
     .pf-head { margin-bottom: 20px; }
-    .pf-head h1 { margin: 0 0 4px; font-size: 28px; font-weight: 700; }
+    .pf-head h1 { margin: 0 0 4px; font-size: var(--sipd-title); font-weight: 700; }
     .pf-head p { margin: 0; color: #94a3b8; }
 
     .pf-card {
@@ -54,11 +54,6 @@
 @endsection
 
 @section('content')
-@if(session('success'))
-<script>
-    Swal.fire({ icon: 'success', title: 'Éxito', text: '{{ session('success') }}', confirmButtonColor: '#006837' });
-</script>
-@endif
 
     <div class="pf-card">
         <form method="POST" action="{{ route('perfil.password.update') }}">

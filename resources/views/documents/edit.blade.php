@@ -21,40 +21,67 @@
 .resp-ava { width: 38px; height: 38px; border-radius: 50%; background: var(--c-green-dk); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
 .resp-info b { display: block; font-size: 13px; color: #0f172a; }
 .resp-info span { font-size: 11px; color: var(--cth-green-text); }
-.btn-toolbar { display: inline-flex; align-items: center; gap: 7px; padding: 10px 18px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 700; border: none; cursor: pointer; text-decoration: none; transition: opacity .2s, transform .1s; }
+.btn-toolbar { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 700; border: none; cursor: pointer; text-decoration: none; transition: opacity .2s, transform .1s; }
 .btn-toolbar:hover { opacity: .88; transform: translateY(-1px); }
+.btn-ghost { background:#f1f5f9; color:#334155; }
+.btn-save { background: var(--c-green); color: #fff; }
+.dl-pair { display:inline-flex; gap:8px; }
+.btn-dl {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: 0 1px 2px rgba(15,23,42,.12);
+    transition: transform .12s ease, filter .12s ease;
+}
+.btn-dl:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.btn-dl-word { background: #1d4ed8; }
+.btn-dl-pdf { background: #e24b3a; }
 .doc-interactive-field:focus {
     background-color: #fff !important;
     border-color: var(--c-green) !important;
     box-shadow: 0 0 0 3px rgba(34,197,94,.2) !important;
 }
+.phpword-document-container { overflow-x: auto; }
+.phpword-document-container > div { overflow-x: hidden; max-width: 850px; }
+.phpword-document-container p { margin: 0.28em 0; }
+.phpword-document-container img { max-width: 100%; height: auto; max-height: 90px; }
+.phpword-document-container table { width: 100% !important; height: auto !important; }
+.phpword-document-container textarea.doc-interactive-field { max-width: 100%; box-sizing: border-box; }
+.phpword-document-container textarea.js-inline { height: 2em !important; min-height: 2em !important; overflow: hidden !important; vertical-align: baseline; white-space: nowrap; }
+.phpword-document-container .doc-header-field { font-weight: 700; border-bottom: 1px solid #0f172a; padding: 0 4px; }
 </style>
 @endsection
 
 @section('page-header')
-<div class="sipd-header">
-    <div class="sipd-header-title">
-        <h1 class="sipd-page-title" style="margin:0;">{{ $pageTitle }}</h1>
-        <p style="color:#64748b;font-size:13px;margin:4px 0 0;">
-            Expediente de {{ $caso->nombre }} (CC: {{ $caso->cedula }})
-        </p>
+    <div class="proc-head">
+        <div>
+            <h1>{{ $pageTitle }}</h1>
+            <p>Expediente de {{ $caso->nombre }} (CC: {{ $caso->cedula }})</p>
+        </div>
     </div>
-</div>
 @endsection
 
 @section('content')
 
-@if(session('success'))
-    <div class="alert alert-success" style="margin-bottom:16px;">
-        <i class="fas fa-check-circle"></i> {{ session('success') }}
-    </div>
-@endif
 @if($errors->any())
-    <div class="alert alert-warning" style="margin-bottom:16px;">
-        <strong>Por favor revisa la siguiente información:</strong>
-        <ul style="margin:6px 0 0;padding-left:18px;">
-            @foreach($errors->all() as $err) <li>{{ $err }}</li> @endforeach
-        </ul>
+    <div class="sipd-alert sipd-alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>Revisa la siguiente información</strong>
+            <ul>
+                @foreach($errors->all() as $err) <li>{{ $err }}</li> @endforeach
+            </ul>
+        </div>
     </div>
 @endif
 
@@ -86,8 +113,28 @@
     <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
         <div class="panel-head" style="background:#f8fafc;">
             <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento Interactivo Oficial</h3>
-            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son editables</div>
+            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son editables y no tienen límite de caracteres.</div>
         </div>
+
+        @if(!empty($slot) && \App\Models\CasoDocumentoEstado::slotTieneOpciones($slot))
+            <div style="padding:14px 24px; border-bottom:1px solid var(--c-border); display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:#fff;">
+                <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Usar formato</span>
+                @foreach(\App\Models\CasoDocumentoEstado::variantesDe($slot) as $variante)
+                    <a href="{{ route('documentos.edit', [$caso->id, $variante]) }}"
+                       class="btn-toolbar {{ $variante === $tipo ? 'btn-save' : 'btn-ghost' }}"
+                       style="text-decoration:none;">
+                        {{ \App\Models\CasoDocumentoEstado::etiqueta($variante) }}
+                    </a>
+                @endforeach
+            </div>
+        @endif
+
+        @if(!empty($requiereFirmaGerente))
+            <div class="sipd-alert sipd-alert-warning" style="margin:16px 24px 0;">
+                <i class="fas fa-print"></i>
+                <div>Este formato se llena y queda registrado igual que los demás. Después hay que imprimirlo para firma del gerente y subir el escaneo en Anexos escaneados.</div>
+            </div>
+        @endif
         
         {{-- Toolbar superior --}}
         <div style="padding: 18px 24px; border-bottom: 1px solid var(--c-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: #fff;">
@@ -98,26 +145,31 @@
                     <span>{{ $me->cargo ?: ucfirst($me->role) }} · {{ now()->format('d/m/Y') }}</span>
                 </div>
             </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <label class="btn-toolbar" style="background:#f1f5f9; color:#334155; cursor:pointer; font-weight:700;">
-                    <i class="fas fa-signature"></i> Subir Firma
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <label class="btn-toolbar btn-ghost" style="cursor:pointer;">
+                    <i class="fas fa-signature"></i> Firma
                     <input type="file" name="firma_digital" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
                 </label>
-                <a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="btn-toolbar btn-back" style="text-decoration:none;"><i class="fas fa-arrow-left"></i> Volver al Caso</a>
-                <button type="submit" class="btn-toolbar btn-save" style="background: var(--c-green); color: #fff;">
-                    <i class="fas fa-check-circle"></i> Guardar Cambios
+                <a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="btn-toolbar btn-ghost" style="text-decoration:none;">
+                    <i class="fas fa-arrow-left"></i> Volver
+                </a>
+                <button type="submit" class="btn-toolbar btn-ghost" title="Guarda el avance sin descargar el archivo">
+                    <i class="fas fa-save"></i> Guardar borrador
                 </button>
-                @if($estadoDoc->estado === 'completo')
-                    <a href="{{ route('documentos.download', [$caso->id, $tipo, Str::slug($labelTipo)]) }}" class="btn-toolbar btn-dl-docx" style="background: #1d4ed8; color: #fff; text-decoration:none;">
-                        <i class="fas fa-file-word"></i> Descargar DOCX Oficial
-                    </a>
-                @endif
+                <div class="dl-pair">
+                    <button type="submit" name="formato" value="docx" class="btn-dl btn-dl-word" title="Guardar y descargar Word">
+                        <i class="fas fa-file-word"></i> Word
+                    </button>
+                    <button type="submit" name="formato" value="pdf" class="btn-dl btn-dl-pdf" title="Guardar y descargar PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </button>
+                </div>
             </div>
         </div>
 
         {{-- Área del documento --}}
-        <div class="phpword-document-container" style="background: #e2e8f0; padding: 40px 20px; overflow-x: auto;">
-            <div style="background: #ffffff; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 50px; border-radius: 4px; border: 1px solid #ccc; font-family: 'Arial', sans-serif;">
+        <div class="phpword-document-container" style="background: #e2e8f0; padding: 24px 16px; overflow-x: auto;">
+            <div style="background: #ffffff; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 28px 32px; border-radius: 4px; border: 1px solid #ccc; font-family: 'Arial', sans-serif;">
                 {!! $interactiveHtml !!}
             </div>
         </div>
@@ -125,6 +177,31 @@
 </form>
 
 <script>
+function autosizeTextareas(root) {
+    (root || document).querySelectorAll('textarea.js-autosize, textarea[name^="yellow_blocks_"], textarea[name^="yellow_blocks"]').forEach(function(el) {
+        el.removeAttribute('maxlength');
+        if (el.classList.contains('js-inline')) {
+            var fit = function() {
+                var text = (el.value || el.placeholder || '').length;
+                el.style.width = Math.max(10, text + 4) + 'ch';
+            };
+            el.addEventListener('input', fit);
+            fit();
+            return;
+        }
+        el.style.display = 'block';
+        el.style.width = '100%';
+        el.style.overflow = 'hidden';
+        el.style.resize = 'vertical';
+        var grow = function() {
+            el.style.height = 'auto';
+            el.style.height = Math.max(el.scrollHeight, 34) + 'px';
+        };
+        el.addEventListener('input', grow);
+        grow();
+    });
+}
+
 function previewFirma(input) {
     if (input.files && input.files[0]) {
         var reader = new FileReader();
@@ -136,5 +213,22 @@ function previewFirma(input) {
         reader.readAsDataURL(input.files[0]);
     }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    autosizeTextareas(document);
+});
+
+@if(session('autodownload'))
+document.addEventListener('DOMContentLoaded', function () {
+    var url = "{{ route('documentos.download', [$caso->id, session('autodownload')]) }}";
+    @if(session('autodownload_format') === 'pdf')
+    url += '?format=pdf';
+    @endif
+    var iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+});
+@endif
 </script>
 @endsection

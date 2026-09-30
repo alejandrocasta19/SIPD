@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CasoAnexo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -26,9 +27,13 @@ class ReportService
             })
             ->all();
 
+        $periodSql = $filtered->getConnection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m')";
+
         $monthlyRows = (clone $filtered)
-            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') AS period, estado, COUNT(*) AS total")
-            ->groupBy(DB::raw("DATE_FORMAT(created_at, '%Y-%m')"), 'estado')
+            ->selectRaw("{$periodSql} AS period, estado, COUNT(*) AS total")
+            ->groupBy(DB::raw($periodSql), 'estado')
             ->orderBy('period')
             ->get();
 
@@ -42,25 +47,20 @@ class ReportService
         if ($periodStart && $periodEnd) {
             foreach (CarbonPeriod::create($periodStart, '1 month', $periodEnd) as $month) {
                 $period = $month->format('Y-m');
+                $stateTotals = $monthlyByPeriod[$period] ?? [];
                 $monthly[] = [
                     'period' => $period,
-                    'states' => $monthlyByPeriod[$period] ?? [],
+                    'states' => $stateTotals,
+                    'total' => array_sum($stateTotals),
                 ];
             }
         }
 
-        $pendingFaults = (clone $filtered)
-            ->where('estado', 'Pendiente')
-            ->selectRaw("COALESCE(NULLIF(tipo_falta, ''), 'Sin tipo de falta') AS tipo_falta, COUNT(*) AS total")
-            ->groupBy(DB::raw("COALESCE(NULLIF(tipo_falta, ''), 'Sin tipo de falta')"))
-            ->orderByDesc('total')
-            ->limit(12)
-            ->get()
-            ->map(function ($row) {
-                return ['label' => (string) $row->tipo_falta, 'total' => (int) $row->total];
-            })
-            ->values()
-            ->all();
+        $faults = $this->groupedCounts(
+            $filtered,
+            "COALESCE(NULLIF(tipo_falta, ''), 'Sin tipo de falta')",
+            'tipo_falta'
+        );
 
         return [
             'from' => $from,
@@ -68,7 +68,73 @@ class ReportService
             'total' => array_sum($states),
             'states' => $states,
             'monthly' => $monthly,
-            'pending_faults' => $pendingFaults,
+            'pending_faults' => $faults,
+            'by_modalidad' => $this->groupedCounts(
+                $filtered,
+                "COALESCE(NULLIF(modalidad, ''), 'Sin cargo')",
+                'modalidad'
+            ),
+            'reincidencias' => $this->reincidenciaStats($filtered),
+            'anexos' => $this->anexoStats($filtered),
+        ];
+    }
+
+    private function groupedCounts(Builder $filtered, string $expr, string $alias): array
+    {
+        return (clone $filtered)
+            ->selectRaw("{$expr} AS {$alias}, COUNT(*) AS total")
+            ->groupBy(DB::raw($expr))
+            ->orderByDesc('total')
+            ->limit(40)
+            ->get()
+            ->map(function ($row) use ($alias) {
+                return ['label' => (string) $row->{$alias}, 'total' => (int) $row->total];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function reincidenciaStats(Builder $filtered): array
+    {
+        $porCedula = (clone $filtered)
+            ->whereNotNull('cedula')
+            ->where('cedula', '!=', '')
+            ->selectRaw('cedula, COUNT(*) AS total')
+            ->groupBy('cedula')
+            ->pluck('total');
+
+        return [
+            'primera_vez' => (int) $porCedula->filter(fn ($n) => (int) $n === 1)->count(),
+            'reincidentes' => (int) $porCedula->filter(fn ($n) => (int) $n > 1)->count(),
+        ];
+    }
+
+    private function anexoStats(Builder $filtered): array
+    {
+        $base = CasoAnexo::query()->whereIn(
+            'caso_id',
+            (clone $filtered)->select('disciplinario.id')
+        );
+
+        $porTipo = (clone $base)
+            ->select('tipo', DB::raw('COUNT(*) AS total'))
+            ->groupBy('tipo')
+            ->pluck('total', 'tipo');
+
+        $porEstado = (clone $base)
+            ->select('estado', DB::raw('COUNT(*) AS total'))
+            ->groupBy('estado')
+            ->pluck('total', 'estado');
+
+        $archivoPrevio = (int) ($porTipo[CasoAnexo::TIPO_ARCHIVO_PREVIO] ?? 0);
+        $pendiente = (int) ($porEstado[CasoAnexo::ESTADO_PENDIENTE_FIRMA] ?? 0);
+        $firmado = (int) ($porEstado[CasoAnexo::ESTADO_FIRMADO] ?? 0);
+
+        return [
+            'total' => (clone $base)->count(),
+            'archivo_previo' => $archivoPrevio,
+            'pendiente_firma' => $pendiente,
+            'firmado' => $firmado,
         ];
     }
 
@@ -102,7 +168,18 @@ class ReportService
         $section->addText('Total de casos: ' . $data['total'], ['bold' => true]);
         $section->addTextBreak();
         $this->addWordRows($section, 'Distribucion por estado', $data['states']);
-        $this->addWordRows($section, 'Casos pendientes por tipo de falta', collect($data['pending_faults'])->pluck('total', 'label')->all());
+        $this->addWordRows($section, 'Anexos del expediente', [
+            'Total' => $data['anexos']['total'] ?? 0,
+            'Archivo previo' => $data['anexos']['archivo_previo'] ?? 0,
+            'Pendiente de firma' => $data['anexos']['pendiente_firma'] ?? 0,
+            'Firmados' => $data['anexos']['firmado'] ?? 0,
+        ]);
+        $this->addWordRows($section, 'Casos por cargo', collect($data['by_modalidad'] ?? [])->pluck('total', 'label')->all());
+        $this->addWordRows($section, 'Tipos de falta', collect($data['pending_faults'])->pluck('total', 'label')->all());
+        $this->addWordRows($section, 'Reincidencias', [
+            'Primera vez' => $data['reincidencias']['primera_vez'] ?? 0,
+            'Reincidentes' => $data['reincidencias']['reincidentes'] ?? 0,
+        ]);
         $section->addTextBreak();
         $section->addText('Casos registrados por mes', ['bold' => true]);
         foreach ($data['monthly'] as $month) {
@@ -145,12 +222,38 @@ class ReportService
         }
 
         $faults = $spreadsheet->createSheet();
-        $faults->setTitle('Faltas pendientes');
+        $faults->setTitle('Tipos de falta');
         $faults->fromArray([['Tipo de falta', 'Cantidad']], null, 'A1');
         $row = 2;
         foreach ($data['pending_faults'] as $fault) {
             $faults->fromArray([[$fault['label'], $fault['total']]], null, 'A' . $row++);
         }
+
+        $cargos = $spreadsheet->createSheet();
+        $cargos->setTitle('Por cargo');
+        $cargos->fromArray([['Cargo', 'Cantidad']], null, 'A1');
+        $row = 2;
+        foreach ($data['by_modalidad'] ?? [] as $rowData) {
+            $cargos->fromArray([[$rowData['label'], $rowData['total']]], null, 'A' . $row++);
+        }
+
+        $reinc = $spreadsheet->createSheet();
+        $reinc->setTitle('Reincidencias');
+        $reinc->fromArray([
+            ['Concepto', 'Cantidad'],
+            ['Primera vez', $data['reincidencias']['primera_vez'] ?? 0],
+            ['Reincidentes', $data['reincidencias']['reincidentes'] ?? 0],
+        ], null, 'A1');
+
+        $anexos = $spreadsheet->createSheet();
+        $anexos->setTitle('Anexos');
+        $anexos->fromArray([
+            ['Concepto', 'Cantidad'],
+            ['Total', $data['anexos']['total'] ?? 0],
+            ['Archivo previo', $data['anexos']['archivo_previo'] ?? 0],
+            ['Pendiente de firma', $data['anexos']['pendiente_firma'] ?? 0],
+            ['Firmados', $data['anexos']['firmado'] ?? 0],
+        ], null, 'A1');
 
         return $this->downloadSpreadsheet($spreadsheet, 'reporte-global-sipd.xlsx');
     }
@@ -172,7 +275,7 @@ class ReportService
         foreach ($cases as $case) {
             $section->addText('PRO-' . str_pad($case->id, 3, '0', STR_PAD_LEFT) . ' - ' . $case->nombre, ['bold' => true]);
             $section->addText('Cedula: ' . ($case->cedula ?: 'Pendiente') . ' | Placa: ' . ($case->placa ?: 'Pendiente') . ' | Estado: ' . $case->estado);
-            $section->addText('Tipo de falta: ' . ($case->tipo_falta ?: 'No especificada'));
+            $section->addText('Tipo de falta: ' . ($case->tipo_falta ?: 'No especificada') . ' | Anexos: ' . (int) ($case->anexos_count ?? 0));
             $section->addTextBreak();
         }
 
@@ -189,7 +292,7 @@ class ReportService
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Casos');
-        $sheet->fromArray([['Proceso', 'Conductor', 'Cedula', 'Placa', 'Tipo de falta', 'Estado', 'Fecha', 'Modalidad']], null, 'A1');
+        $sheet->fromArray([['Proceso', 'Conductor', 'Cedula', 'Placa', 'Tipo de falta', 'Estado', 'Fecha', 'Modalidad', 'Anexos']], null, 'A1');
         $row = 2;
         foreach ($cases as $case) {
             $sheet->fromArray([[
@@ -201,6 +304,7 @@ class ReportService
                 $case->estado,
                 $case->created_at ? $case->created_at->format('Y-m-d') : null,
                 $case->modalidad,
+                (int) ($case->anexos_count ?? 0),
             ]], null, 'A' . $row++);
         }
 

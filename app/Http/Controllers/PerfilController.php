@@ -20,6 +20,11 @@ class PerfilController extends Controller
     public function update(Request $request)
     {
         $user = auth()->user();
+        if (!$user->esCoordinadora() && !$user->puede('editar_perfil')) {
+            return back()
+                ->with('open_profile', true)
+                ->with('error', 'Pide permiso a la coordinadora para editar tu perfil.');
+        }
 
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],

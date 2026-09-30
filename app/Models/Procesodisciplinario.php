@@ -35,6 +35,8 @@ class ProcesoDisciplinario extends Model
         'documento_falta',
         'observacion',
         'descargos',
+        'descargos_forma',
+        'descargos_medio',
         'decision_final',
 
         // ESTADO DEL PROCESO
@@ -48,6 +50,82 @@ class ProcesoDisciplinario extends Model
         'fecha_falta' => 'date',
         'datos_oficiales' => 'array',
     ];
+
+    public const DESCARGOS_MEDIOS = [
+        'whatsapp' => 'WhatsApp',
+        'correo' => 'Correo',
+        'telefono' => 'Teléfono',
+        'videollamada' => 'Videollamada',
+        'otro' => 'Otro medio',
+    ];
+
+    public static function opcionesDescargosPresentacion(): array
+    {
+        $opciones = [
+            'no_presento' => 'Descargos · No presentó',
+            'presencial' => 'Descargos · Presencial',
+        ];
+
+        foreach (self::DESCARGOS_MEDIOS as $clave => $etiqueta) {
+            $opciones['virtual_' . $clave] = 'Descargos · Virtual · ' . $etiqueta;
+        }
+
+        return $opciones;
+    }
+
+    public static function parseDescargosPresentacion(?string $value): array
+    {
+        $value = (string) $value;
+
+        if ($value === '' || $value === 'presentado') {
+            return [];
+        }
+
+        if ($value === 'presencial') {
+            return ['descargos_forma' => 'presencial', 'descargos_medio' => null];
+        }
+
+        if ($value === 'virtual' || str_starts_with($value, 'virtual_')) {
+            $medio = $value === 'virtual' ? null : substr($value, 8);
+            if ($medio !== null && !array_key_exists($medio, self::DESCARGOS_MEDIOS)) {
+                $medio = null;
+            }
+
+            return ['descargos_forma' => 'virtual', 'descargos_medio' => $medio];
+        }
+
+        return ['descargos_forma' => 'no_presento', 'descargos_medio' => null];
+    }
+
+    public function descargosPresentacionValue(): string
+    {
+        if ($this->descargos_forma === 'presencial') {
+            return 'presencial';
+        }
+
+        if ($this->descargos_forma === 'virtual') {
+            return ($this->descargos_medio && array_key_exists($this->descargos_medio, self::DESCARGOS_MEDIOS))
+                ? 'virtual_' . $this->descargos_medio
+                : 'virtual_whatsapp';
+        }
+
+        if ($this->descargos_forma === 'no_presento') {
+            return 'no_presento';
+        }
+
+        return filled($this->descargos) ? 'presentado' : 'no_presento';
+    }
+
+    public function etiquetaTipoDescargos(): string
+    {
+        if ($this->descargosPresentacionValue() === 'presentado') {
+            return 'Descargos · Presentado';
+        }
+
+        $opciones = self::opcionesDescargosPresentacion();
+
+        return $opciones[$this->descargosPresentacionValue()] ?? 'Descargos · No presentó';
+    }
 
     /**
      * RELACIÓN:
@@ -66,6 +144,11 @@ class ProcesoDisciplinario extends Model
         return $this->hasMany(CasoEvidencia::class, 'caso_id')->latest();
     }
 
+    public function anexos()
+    {
+        return $this->hasMany(CasoAnexo::class, 'caso_id')->latest();
+    }
+
     /**
      * RELACIÓN: estados de cada subdocumento
      */
@@ -76,7 +159,6 @@ class ProcesoDisciplinario extends Model
 
     /**
      * Obtiene (o crea) el estado del subdocumento indicado.
-     * @param string $tipo disciplinario|comprobacion|acta
      */
     public function estadoDocumento(string $tipo): CasoDocumentoEstado
     {
@@ -87,13 +169,132 @@ class ProcesoDisciplinario extends Model
             );
     }
 
+    public function varianteDelSlot(string $slot): string
+    {
+        $opciones = CasoDocumentoEstado::variantesDe($slot);
+        $fallback = $opciones[0] ?? 'disciplinario';
+        $saved = $this->datos_oficiales['slots'][$slot] ?? null;
+        if (is_string($saved) && in_array($saved, $opciones, true)) {
+            return $saved;
+        }
+
+        $estados = $this->relationLoaded('documentoEstados')
+            ? $this->documentoEstados
+            : $this->documentoEstados()->get();
+
+        foreach ($opciones as $tipo) {
+            $est = $estados->firstWhere('tipo_documento', $tipo);
+            if ($est && $est->estado !== 'no_iniciado') {
+                return $tipo;
+            }
+        }
+
+        if ($slot === 'apertura' && in_array((string) $this->tipo_proceso, $opciones, true)) {
+            return $this->tipo_proceso;
+        }
+
+        return $fallback;
+    }
+
+    public function guardarVarianteSlot(string $slot, string $tipo): void
+    {
+        $opciones = CasoDocumentoEstado::variantesDe($slot);
+        abort_unless(in_array($tipo, $opciones, true), 404);
+
+        $data = $this->datos_oficiales ?: [];
+        $data['slots'][$slot] = $tipo;
+        $this->update(['datos_oficiales' => $data]);
+    }
+
+    public function estadoDelSlot(string $slot): CasoDocumentoEstado
+    {
+        return $this->estadoDocumento($this->varianteDelSlot($slot));
+    }
+
     /**
      * Número legible del expediente (ej. 2026-001)
      */
     public function numeroExpediente(): string
     {
         $anio = optional($this->created_at)->format('Y') ?: date('Y');
-        return $anio . '-' . str_pad($this->id, 3, '0', STR_PAD_LEFT);
+        return $anio . '-' . str_pad((string) $this->id, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Radicado del documento de apertura (ej. 2026-031-01).
+     * Continúa la numeración real del expediente; no reinicia en 1.
+     */
+    public function numeroRadicado(): string
+    {
+        return $this->numeroExpediente() . '-01';
+    }
+
+    public static function siguienteId(): int
+    {
+        return max(1, (int) static::query()->max('id') + 1);
+    }
+
+    public static function fechaExpedicion(): string
+    {
+        return now()->format('d/m/Y');
+    }
+
+    public static function normalizarCedula(?string $cedula): string
+    {
+        return preg_replace('/\D+/', '', (string) $cedula) ?? '';
+    }
+
+    public static function formatearCedula(?string $cedula): string
+    {
+        $digits = self::normalizarCedula($cedula);
+        if ($digits === '') {
+            return '';
+        }
+
+        return preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $digits) ?? $digits;
+    }
+
+    public function scopePorCedula($query, string $cedula)
+    {
+        $digits = self::normalizarCedula($cedula);
+        if ($digits === '') {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $query->where(function ($inner) use ($digits) {
+            $inner->where('cedula', $digits)
+                ->orWhereRaw(
+                    "REPLACE(REPLACE(REPLACE(REPLACE(cedula, '.', ''), ',', ''), '-', ''), ' ', '') = ?",
+                    [$digits]
+                );
+        });
+    }
+
+    /**
+     * Encabezado de apertura: trabajador, cargo, cédula, fecha y radicado.
+     * Si el caso aún no existe, deja nombre/cargo/cédula vacíos y anticipa el siguiente radicado.
+     */
+    public static function datosEncabezadoDocumento(?self $proceso = null): array
+    {
+        if ($proceso && $proceso->exists) {
+            return [
+                'nombre'   => trim((string) $proceso->nombre),
+                'cargo'    => trim((string) ($proceso->modalidad ?: '')),
+                'cedula'   => trim((string) ($proceso->cedula ?: '')),
+                'fecha'    => self::fechaExpedicion(),
+                'radicado' => $proceso->numeroRadicado(),
+            ];
+        }
+
+        $siguiente = self::siguienteId();
+
+        return [
+            'nombre'   => '',
+            'cargo'    => '',
+            'cedula'   => '',
+            'fecha'    => self::fechaExpedicion(),
+            'radicado' => date('Y') . '-' . str_pad((string) $siguiente, 3, '0', STR_PAD_LEFT) . '-01',
+        ];
     }
 
     public function codigoProceso(): string
@@ -106,8 +307,38 @@ class ProcesoDisciplinario extends Model
         return match ($this->tipo_proceso) {
             'comprobacion' => 'Proceso de comprobación',
             'acta' => 'Acta de cargos y descargos',
+            'sancion' => 'Sanción',
+            'llamado' => 'Llamado de atención',
+            'terminacion' => 'Terminación por justas causas',
+            'archivo' => 'Decisión de archivo',
             default => 'Proceso disciplinario',
         };
+    }
+
+    public function listoParaVeredicto(): bool
+    {
+        return $this->puedeEnviarAProceso();
+    }
+
+    public function tieneDocumentoGenerado(): bool
+    {
+        $estados = $this->relationLoaded('documentoEstados')
+            ? $this->documentoEstados
+            : $this->documentoEstados()->get();
+
+        return $estados->contains(fn ($doc) => ($doc->estado ?? '') === 'generado');
+    }
+
+    /**
+     * Pendiente + al menos un documento generado → se puede enviar a En Proceso.
+     */
+    public function puedeEnviarAProceso(): bool
+    {
+        if ($this->estado !== 'Pendiente') {
+            return false;
+        }
+
+        return $this->tieneDocumentoGenerado();
     }
 
     /**
@@ -121,12 +352,9 @@ class ProcesoDisciplinario extends Model
 
         $docsByTipo = $docs->keyBy('tipo_documento');
 
-        $aperturaGenerada = collect(['disciplinario', 'comprobacion'])->contains(
-            function (string $tipo) use ($docsByTipo) {
-                $doc = $docsByTipo->get($tipo);
-                return $doc && in_array($doc->estado, ['completo', 'generado'], true);
-            }
-        );
+        $aperturaTipo = $this->varianteDelSlot('apertura');
+        $apertura = $docsByTipo->get($aperturaTipo);
+        $aperturaGenerada = $apertura && in_array($apertura->estado, ['completo', 'generado'], true);
 
         $acta = $docsByTipo->get('acta');
         $actaHecha = $acta && in_array($acta->estado, ['completo', 'generado'], true);
@@ -178,18 +406,14 @@ class ProcesoDisciplinario extends Model
             'actual' => false,
         ]);
 
-        foreach (['disciplinario', 'comprobacion', 'acta'] as $tipo) {
+        foreach (CasoDocumentoEstado::TIPOS as $tipo) {
             $doc = $docsByTipo->get($tipo);
             if (!$doc) {
                 continue;
             }
 
             $fechaDoc = $doc->generado_en ?: $doc->updated_at;
-            $etiqueta = match ($tipo) {
-                'comprobacion' => 'auto de apertura del proceso de comprobación',
-                'acta' => 'acta de cargos y descargos',
-                default => 'auto de apertura del proceso disciplinario',
-            };
+            $etiqueta = CasoDocumentoEstado::etiqueta($tipo);
 
             if (in_array($doc->estado, ['completo', 'generado'], true)) {
                 $eventos->push([
@@ -235,6 +459,25 @@ class ProcesoDisciplinario extends Model
                 'detalle' => $nEvidencias === 1
                     ? 'Se incorporó un elemento de prueba al expediente.'
                     : 'Se incorporaron ' . $nEvidencias . ' elementos de prueba al expediente.',
+                'actual' => false,
+            ]);
+        }
+
+        $nAnexos = $this->anexos_count
+            ?? ($this->relationLoaded('anexos') ? $this->anexos->count() : $this->anexos()->count());
+
+        if ($nAnexos > 0) {
+            $fechaAnexo = $this->relationLoaded('anexos')
+                ? $this->anexos->min('created_at')
+                : $this->anexos()->min('created_at');
+
+            $eventos->push([
+                'orden' => optional($fechaAnexo)->timestamp ?? 3,
+                'fecha' => $this->fechaPublica($fechaAnexo),
+                'titulo' => 'Documentación del expediente',
+                'detalle' => $nAnexos === 1
+                    ? 'Se incorporó un documento al expediente.'
+                    : 'Se incorporaron ' . $nAnexos . ' documentos al expediente.',
                 'actual' => false,
             ]);
         }

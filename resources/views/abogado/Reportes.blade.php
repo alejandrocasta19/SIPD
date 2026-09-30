@@ -3,11 +3,7 @@
 @section('styles')
 <style>
     /* ── HEADER ──────────────────────────────────── */
-    .rp-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
-    .rp-head h1 { margin:0; font-size:20px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px; }
-    .rp-head p  { margin:2px 0 0; color:#64748b; font-size:12px; }
-
-    /* ── BUTTONS ─────────────────────────────────── */
+    .rp-actions { display:flex; gap:6px; flex-wrap:wrap; }
     .rbtn { border:0; border-radius:7px; padding:7px 12px; font-weight:700; font-size:11px; cursor:pointer; text-decoration:none; display:inline-flex; gap:5px; align-items:center; transition:opacity .15s; }
     .rbtn:hover { opacity:.82; }
     .rbtn.g   { background:var(--cth-green-text); color:#fff; }
@@ -24,18 +20,39 @@
     .rp-error  { display:none; background:#fef2f2; color:#b91c1c; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; }
 
     /* ── KPI CARDS ───────────────────────────────── */
-    .kpi-row   { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
-    .kpi-card  { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; }
+    .kpi-row   { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .kpi-card  { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; min-width:0; }
     .kpi-card small  { color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; display:block; }
     .kpi-card strong { font-size:22px; font-weight:800; color:#0f172a; display:block; margin-top:2px; line-height:1; }
 
     /* ── CHARTS ──────────────────────────────────── */
-    .charts-wrap { display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px; margin-bottom:16px; }
-    .ch-card     { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; }
+    .charts-wrap { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3, minmax(0,1fr)); gap:10px; margin-bottom:16px; }
+    .ch-card     { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; min-width:0; }
     .ch-card h3  { margin:0 0 1px; font-size:12px; font-weight:700; color:#0f172a; }
     .ch-card p   { color:#64748b; font-size:10px; margin:0 0 8px; }
     .ch-wrap     { position:relative; height:160px; }
+    .ch-wrap.ch-rank { height:auto; min-height:160px; }
     .ch-empty    { display:none; color:#94a3b8; text-align:center; padding:40px 8px; font-size:12px; }
+    .ch-head     { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .top-more    { border:0; background:#f1f5f9; color:#334155; border-radius:7px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer; display:none; white-space:nowrap; }
+    .top-more:hover { background:#e2e8f0; }
+    .top-list    { list-style:none; margin:0; padding:0; }
+    .top-list li { padding:6px 0; border-bottom:1px solid #f1f5f9; }
+    .top-list li:last-child { border-bottom:0; }
+    .top-row     { display:flex; align-items:center; gap:8px; }
+    .top-rank    { width:18px; height:18px; border-radius:50%; background:#f1f5f9; color:#475569; font-size:9px; font-weight:800; display:grid; place-items:center; flex-shrink:0; }
+    .top-name    { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#0f172a; font-size:12px; font-weight:600; }
+    .top-n       { font-weight:800; color:#0f172a; font-size:12px; flex-shrink:0; }
+    .top-bar     { height:3px; background:#e2e8f0; border-radius:999px; margin-top:4px; }
+    .top-bar > span { display:block; height:100%; border-radius:999px; }
+    .hist-kpis   { grid-template-columns:repeat(5, minmax(0,1fr)); }
+
+    .rp-pop { display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:80; place-items:center; padding:16px; }
+    .rp-pop.open { display:grid; }
+    .rp-pop-box { background:#fff; border-radius:12px; width:min(440px,100%); max-height:80vh; overflow:auto; padding:16px 18px; box-shadow:0 20px 40px rgba(15,23,42,.18); }
+    .rp-pop-box h3 { margin:0; font-size:14px; font-weight:800; color:#0f172a; }
+    .rp-pop-box p { margin:2px 0 12px; color:#64748b; font-size:12px; }
+    .rp-pop-close { border:0; background:#f1f5f9; color:#334155; border-radius:8px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; margin-top:12px; width:100%; }
 
     /* ── DIVIDER ─────────────────────────────────── */
     .sec-div { display:flex; align-items:center; gap:10px; margin:16px 0 12px; }
@@ -52,9 +69,8 @@
     .case-tbl { background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:auto; }
     .case-tbl table { width:100%; min-width:720px; border-collapse:collapse; font-size:11.5px; }
     .case-tbl thead tr { background:#f8fafc; }
-    .case-tbl th { padding:6px 9px; border-bottom:1px solid #e2e8f0; text-align:left; color:#64748b; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
-    .case-tbl td { padding:5px 9px; border-bottom:1px solid #f1f5f9; color:#334155; vertical-align:middle; }
-    .case-tbl tr:last-child td { border-bottom:none; }
+    .case-tbl th { padding:6px 9px; border:1px solid var(--cth-border); text-align:left; color:#64748b; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+    .case-tbl td { padding:5px 9px; border:1px solid var(--cth-border); color:#334155; vertical-align:middle; }
     .case-tbl tr:hover td { background:#f8fafc; }
     .proc-lnk { color:var(--cth-green-text); font-weight:700; text-decoration:none; font-size:10.5px; font-family:monospace; }
     .case-tbl td b { font-weight:600; color:#0f172a; }
@@ -70,41 +86,47 @@
     .sb.sancionado { background:#fef2f2; color:#b91c1c; border-color:#fca5a5; }
     .sb.archivado  { background:#f1f5f9; color:#334155; border-color:#e2e8f0; }
 
+    @media (max-width:1200px) {
+        .charts-wrap { grid-template-columns:1fr 1fr; }
+        .charts-wrap .ch-card:first-child { grid-column: 1 / -1; }
+        .hist-kpis { grid-template-columns:repeat(3, minmax(0,1fr)); }
+    }
     @media (max-width:900px) {
-        .rp-head { flex-direction:column; align-items:flex-start; }
-        .kpi-row { grid-template-columns:repeat(2,1fr); }
+        .kpi-row { grid-template-columns:repeat(2, minmax(0,1fr)); }
         .charts-wrap { grid-template-columns:1fr; }
+        .charts-wrap .ch-card:first-child { grid-column: auto; }
+        .hist-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
     }
     @media (max-width:560px) {
-        .kpi-row { grid-template-columns:1fr 1fr; }
         .rf { width:100%; min-width:100%; }
     }
 </style>
 @endsection
 
-@section('content')
+@section('page-header')
+    <div class="proc-head">
+        <div>
+            <h1>Estadísticas y reportes</h1>
+            <p>Panorama de procesos disciplinarios y de los anexos Word o PDF del expediente.</p>
+        </div>
+        <div class="proc-head-side rp-actions">
+            <form method="POST" action="{{ route('abogado.reportes.global', 'pdf') }}" class="export-form">
+                @csrf<input type="hidden" name="desde"><input type="hidden" name="hasta"><input type="hidden" name="q">
+                <button class="rbtn pdf" type="submit"><i class="fas fa-file-pdf"></i> PDF</button>
+            </form>
+            <form method="POST" action="{{ route('abogado.reportes.global', 'word') }}" class="export-form">
+                @csrf<input type="hidden" name="desde"><input type="hidden" name="hasta"><input type="hidden" name="q">
+                <button class="rbtn doc" type="submit"><i class="fas fa-file-word"></i> Word</button>
+            </form>
+            <form method="POST" action="{{ route('abogado.reportes.global', 'excel') }}" class="export-form">
+                @csrf<input type="hidden" name="desde"><input type="hidden" name="hasta"><input type="hidden" name="q">
+                <button class="rbtn xls" type="submit"><i class="fas fa-file-excel"></i> Excel</button>
+            </form>
+        </div>
+    </div>
+@endsection
 
-{{-- HEADER --}}
-<div class="rp-head">
-    <div>
-        <h1><i class="fas fa-chart-bar" style="color:var(--cth-green-text);"></i> Estadísticas y Reportes</h1>
-        <p>Panorama global de los procesos disciplinarios activos, archivados y finalizados.</p>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <form method="POST" action="{{ route('abogado.reportes.global', 'pdf') }}" class="export-form">
-            @csrf<input type="hidden" name="desde"><input type="hidden" name="hasta"><input type="hidden" name="q">
-            <button class="rbtn pdf" type="submit"><i class="fas fa-file-pdf"></i> PDF</button>
-        </form>
-        <form method="POST" action="{{ route('abogado.reportes.global', 'word') }}" class="export-form">
-            @csrf<input type="hidden" name="desde"><input type="hidden" name="hasta"><input type="hidden" name="q">
-            <button class="rbtn doc" type="submit"><i class="fas fa-file-word"></i> Word</button>
-        </form>
-        <form method="POST" action="{{ route('abogado.reportes.global', 'excel') }}" class="export-form">
-            @csrf<input type="hidden" name="desde"><input type="hidden" name="hasta"><input type="hidden" name="q">
-            <button class="rbtn xls" type="submit"><i class="fas fa-file-excel"></i> Excel</button>
-        </form>
-    </div>
-</div>
+@section('content')
 
 {{-- FILTROS --}}
 <form class="rp-filters" method="GET" action="{{ route('abogado.reportes') }}" id="report-filters">
@@ -124,28 +146,53 @@
     <div class="kpi-card"><small>En proceso</small><strong id="card-proceso">0</strong></div>
     <div class="kpi-card"><small>Finalizados</small><strong id="card-finalizados">0</strong></div>
 </div>
+<div class="kpi-row">
+    <div class="kpi-card" style="border-left:3px solid var(--cth-green-text);"><small>Anexos</small><strong id="card-anexos">0</strong></div>
+    <div class="kpi-card"><small>Archivo previo</small><strong id="card-anexos-previo">0</strong></div>
+    <div class="kpi-card" style="border-left:3px solid #d97706;"><small>Pendiente firma</small><strong id="card-anexos-pendiente">0</strong></div>
+    <div class="kpi-card" style="border-left:3px solid var(--cth-green-bright);"><small>Firmados</small><strong id="card-anexos-firmado">0</strong></div>
+</div>
 
-{{-- CHARTS (3 en una fila) --}}
+{{-- CHARTS --}}
 <div class="charts-wrap">
     <div class="ch-card">
-        <h3>Casos por mes</h3><p>Distribución mensual por estado.</p>
+        <h3>Casos por mes</h3><p>Volumen registrado en el período.</p>
         <div class="ch-wrap" id="monthly-wrap">
             <canvas id="monthly-chart"></canvas>
             <div class="ch-empty">Sin datos para el período.</div>
         </div>
     </div>
     <div class="ch-card">
-        <h3>Por estado</h3><p>Proporción del período.</p>
-        <div class="ch-wrap" id="state-wrap">
-            <canvas id="state-chart"></canvas>
-            <div class="ch-empty">Sin estados.</div>
+        <div class="ch-head">
+            <div>
+                <h3>Cargo del trabajador</h3>
+                <p>Top 5 oficios con más procesos (conductor, taquillero…).</p>
+            </div>
+            <button type="button" class="top-more" id="cargo-more">Ver más</button>
+        </div>
+        <div class="ch-wrap ch-rank" id="cargo-wrap">
+            <ol class="top-list" id="cargo-list"></ol>
+            <div class="ch-empty">Sin cargos registrados.</div>
         </div>
     </div>
     <div class="ch-card">
-        <h3>Faltas activas</h3><p>Tipos con más procesos abiertos.</p>
-        <div class="ch-wrap" id="fault-wrap">
-            <canvas id="fault-chart"></canvas>
+        <div class="ch-head">
+            <div>
+                <h3>Tipo de falta</h3>
+                <p>Top 5 faltas con más casos en el período.</p>
+            </div>
+            <button type="button" class="top-more" id="fault-more">Ver más</button>
+        </div>
+        <div class="ch-wrap ch-rank" id="fault-wrap">
+            <ol class="top-list" id="fault-list"></ol>
             <div class="ch-empty">Sin faltas.</div>
+        </div>
+    </div>
+    <div class="ch-card">
+        <h3>Reincidencias</h3><p>Trabajadores con un caso o con varios.</p>
+        <div class="ch-wrap" id="reinc-wrap">
+            <canvas id="reinc-chart"></canvas>
+            <div class="ch-empty">Sin cédulas para comparar.</div>
         </div>
     </div>
 </div>
@@ -183,6 +230,7 @@
                     <th>Estado</th>
                     <th>Fecha</th>
                     <th>Modalidad</th>
+                    <th>Anexos</th>
                     <th style="text-align:right;">Acción</th>
                 </tr>
             </thead>
@@ -198,10 +246,11 @@
                     <td><span class="sb {{ strtolower(str_replace(' ', '-', $caso->estado)) }}">{{ $caso->estado }}</span></td>
                     <td>{{ $caso->created_at ? $caso->created_at->format('d/m/Y') : '—' }}</td>
                     <td>{{ $caso->modalidad ?: '—' }}</td>
+                    <td style="text-align:center;">{{ $caso->anexos_count ?: '—' }}</td>
                     <td style="text-align:right;"><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="act-lnk"><i class="fas fa-eye"></i> Ver</a></td>
                 </tr>
             @empty
-                <tr><td class="empty-c" colspan="10"><i class="fas fa-search" style="display:block;font-size:18px;margin-bottom:6px;opacity:.35;"></i>No hay casos que coincidan.</td></tr>
+                <tr><td class="empty-c" colspan="11"><i class="fas fa-search" style="display:block;font-size:18px;margin-bottom:6px;opacity:.35;"></i>No hay casos que coincidan.</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -224,7 +273,7 @@
 </div>
 
 {{-- Mini KPIs del historial --}}
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+<div class="kpi-row hist-kpis">
     <div class="kpi-card" style="border-left:3px solid var(--cth-green-text);">
         <small>Total cerrados</small>
         <strong style="font-size:20px;">{{ $hStats['total'] }}</strong>
@@ -243,6 +292,10 @@
             {{ $hStats['prom_dias'] ? round($hStats['prom_dias']).' días' : '—' }}
         </strong>
     </div>
+    <div class="kpi-card" style="border-left:3px solid var(--cth-green-bright);">
+        <small>Anexos</small>
+        <strong style="font-size:20px;">{{ $hStats['anexos'] ?: '—' }}</strong>
+    </div>
 </div>
 
 {{-- Tabla historial --}}
@@ -260,6 +313,7 @@
                 <th>Apertura</th>
                 <th>Cierre</th>
                 <th>Duración</th>
+                <th>Anexos</th>
                 <th>Decisión / Observación</th>
                 <th style="text-align:right;">Ver</th>
             </tr>
@@ -280,13 +334,14 @@
                 <td style="white-space:nowrap;">{{ $h->fecha_cierre }}</td>
                 <td style="text-align:center;">
                     @if($h->duracion_dias !== null)
-                        <span style="font-weight:700;color:{{ $h->duracion_dias > 30 ? '#b91c1c' : 'var(--cth-green-text)' }};">
+                        <span class="dias {{ $h->duracion_dias > 30 ? 'late' : 'ok' }}">
                             {{ $h->duracion_dias }}d
                         </span>
                     @else
                         —
                     @endif
                 </td>
+                <td style="text-align:center;">{{ $h->anexos ?: '—' }}</td>
                 <td style="max-width:220px;color:#475569;font-size:11px;">
                     {{ $h->decision ? Str::limit($h->decision, 80) : '—' }}
                 </td>
@@ -298,7 +353,7 @@
             </tr>
         @empty
             <tr>
-                <td class="empty-c" colspan="12">
+                <td class="empty-c" colspan="13">
                     <i class="fas fa-archive" style="display:block;font-size:18px;margin-bottom:6px;opacity:.35;"></i>
                     No hay casos archivados ni sancionados aún.
                 </td>
@@ -306,6 +361,15 @@
         @endforelse
         </tbody>
     </table>
+</div>
+
+<div class="rp-pop" id="rank-pop" role="dialog" aria-modal="true">
+    <div class="rp-pop-box">
+        <h3 id="rank-pop-title"></h3>
+        <p id="rank-pop-sub"></p>
+        <ol class="top-list" id="rank-pop-list"></ol>
+        <button type="button" class="rp-pop-close" id="rank-pop-close">Cerrar</button>
+    </div>
 </div>
 
 @endsection
@@ -328,62 +392,123 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function showEmpty(id, empty) {
         var w = document.getElementById(id);
-        w.querySelector('canvas').style.display    = empty ? 'none'  : 'block';
+        var canvas = w.querySelector('canvas');
+        if (canvas) canvas.style.display = empty ? 'none' : 'block';
         w.querySelector('.ch-empty').style.display = empty ? 'block' : 'none';
     }
 
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+
+    function rankItemsHtml(items, color) {
+        var max = 1;
+        items.forEach(function (it) { if (it.total > max) max = it.total; });
+        return items.map(function (it, i) {
+            var pct = Math.max(6, Math.round((it.total / max) * 100));
+            return '<li><div class="top-row"><span class="top-rank">' + (i + 1) + '</span>'
+                + '<span class="top-name" title="' + esc(it.label) + '">' + esc(it.label) + '</span>'
+                + '<span class="top-n">' + it.total + '</span></div>'
+                + '<div class="top-bar"><span style="width:' + pct + '%;background:' + color + ';"></span></div></li>';
+        }).join('');
+    }
+
+    function renderTopList(listId, emptyWrapId, btnId, items, color, modalTitle, modalSub) {
+        var list = document.getElementById(listId);
+        var btn = document.getElementById(btnId);
+        var all = items || [];
+        list.innerHTML = rankItemsHtml(all.slice(0, 5), color);
+        list.style.display = all.length ? 'block' : 'none';
+        showEmpty(emptyWrapId, !all.length);
+        if (!btn) return;
+        btn.style.display = all.length > 5 ? 'inline-flex' : 'none';
+        btn.onclick = function () { openRankPop(modalTitle, modalSub, all, color); };
+    }
+
+    var pop = document.getElementById('rank-pop');
+    function openRankPop(title, sub, items, color) {
+        document.getElementById('rank-pop-title').textContent = title;
+        document.getElementById('rank-pop-sub').textContent = sub;
+        document.getElementById('rank-pop-list').innerHTML = rankItemsHtml(items, color);
+        pop.classList.add('open');
+    }
+    function closeRankPop() { pop.classList.remove('open'); }
+    document.getElementById('rank-pop-close').addEventListener('click', closeRankPop);
+    pop.addEventListener('click', function (e) { if (e.target === pop) closeRankPop(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRankPop(); });
+
     function renderReport(data) {
-        var states = Object.keys(data.states || {});
-        var values = states.map(function(s){ return data.states[s]; });
-        var finals = states.filter(function(s){ return ['Sancionado','Archivado'].indexOf(s)>-1; });
+        var states = data.states || {};
+        var finals = Object.keys(states).filter(function(s){ return ['Sancionado','Archivado'].indexOf(s)>-1; });
 
         document.getElementById('card-total').textContent      = data.total||0;
-        document.getElementById('card-pendientes').textContent = data.states.Pendiente||0;
-        document.getElementById('card-proceso').textContent    = data.states['En Proceso']||0;
-        document.getElementById('card-finalizados').textContent= finals.reduce(function(s,k){return s+data.states[k];},0);
+        document.getElementById('card-pendientes').textContent = states.Pendiente||0;
+        document.getElementById('card-proceso').textContent    = states['En Proceso']||0;
+        document.getElementById('card-finalizados').textContent= finals.reduce(function(s,k){return s+(states[k]||0);},0);
+        var anexos = data.anexos || {};
+        document.getElementById('card-anexos').textContent = anexos.total||0;
+        document.getElementById('card-anexos-previo').textContent = anexos.archivo_previo||0;
+        document.getElementById('card-anexos-pendiente').textContent = anexos.pendiente_firma||0;
+        document.getElementById('card-anexos-firmado').textContent = anexos.firmado||0;
 
-        /* bar mensual */
+        /* línea mensual: solo volumen, el estado ya está en las tarjetas */
         if (charts.m) charts.m.destroy();
         var mLab = (data.monthly||[]).map(function(m){
             return new Intl.DateTimeFormat('es-CO',{month:'short',year:'2-digit'}).format(new Date(m.period+'-01T00:00:00'));
         });
+        var mVals = (data.monthly||[]).map(function(m){
+            return typeof m.total === 'number' ? m.total : Object.keys(m.states||{}).reduce(function(s,k){return s+(m.states[k]||0);},0);
+        });
         charts.m = new Chart(document.getElementById('monthly-chart'),{
-            type:'bar',
-            data:{ labels:mLab, datasets: states.map(function(s,i){
-                return { label:s, data:(data.monthly||[]).map(function(m){return m.states[s]||0;}), backgroundColor:colors[i%colors.length], borderRadius:3 };
-            })},
+            type:'line',
+            data:{ labels:mLab, datasets:[{
+                label:'Casos', data:mVals,
+                borderColor:colors[0], backgroundColor:'rgba(22,163,74,.12)',
+                fill:true, tension:.3, pointRadius:3, pointBackgroundColor:colors[0]
+            }]},
             options:{ responsive:true, maintainAspectRatio:false,
-                interaction:{mode:'index',intersect:false},
-                plugins:{legend:{labels:{boxWidth:10,font:{size:9}}}},
+                plugins:{legend:{display:false}},
                 scales:{x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, ticks:{precision:0,font:{size:9}}}} }
         });
-        showEmpty('monthly-wrap', !mLab.length||!states.length);
+        showEmpty('monthly-wrap', !mLab.length);
 
-        /* doughnut */
-        if (charts.s) charts.s.destroy();
-        charts.s = new Chart(document.getElementById('state-chart'),{
-            type:'doughnut',
-            data:{ labels:states, datasets:[{ data:values, backgroundColor:states.map(function(_,i){return colors[i%colors.length];}), borderWidth:1 }] },
-            options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
-                plugins:{ legend:{position:'bottom',labels:{boxWidth:9,font:{size:9}}},
-                    tooltip:{callbacks:{label:function(ctx){
-                        var t=ctx.dataset.data.reduce(function(a,b){return a+b;},0);
-                        return ctx.label+': '+ctx.raw+' ('+(t?((ctx.raw/t)*100).toFixed(1):0)+'%)';
-                    }}} } }
-        });
-        showEmpty('state-wrap', !states.length);
+        renderTopList(
+            'cargo-list', 'cargo-wrap', 'cargo-more',
+            data.by_modalidad || [],
+            '#2563eb',
+            'Cargo del trabajador',
+            'Todos los oficios con procesos en el período.'
+        );
+        renderTopList(
+            'fault-list', 'fault-wrap', 'fault-more',
+            data.pending_faults || [],
+            '#f59e0b',
+            'Tipo de falta',
+            'Todas las faltas registradas en el período.'
+        );
 
-        /* bar faltas */
-        if (charts.f) charts.f.destroy();
-        var faults = data.pending_faults||[];
-        charts.f = new Chart(document.getElementById('fault-chart'),{
-            type:'bar',
-            data:{ labels:faults.map(function(f){return f.label;}), datasets:[{ label:'Pendientes', data:faults.map(function(f){return f.total;}), backgroundColor:'#f59e0b', borderRadius:3 }] },
-            options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-                plugins:{legend:{display:false}},
-                scales:{x:{beginAtZero:true,ticks:{precision:0,font:{size:9}}}, y:{ticks:{font:{size:9}}}} }
-        });
-        showEmpty('fault-wrap', !faults.length);
+        /* doughnut reincidencias */
+        if (charts.r) charts.r.destroy();
+        var reinc = data.reincidencias || {};
+        var reincSlices = [
+            { label: 'Primera vez', value: reinc.primera_vez||0, color: colors[0] },
+            { label: 'Reincidentes', value: reinc.reincidentes||0, color: '#dc2626' }
+        ].filter(function (s) { return s.value > 0; });
+        if (reincSlices.length) {
+            charts.r = new Chart(document.getElementById('reinc-chart'),{
+                type:'doughnut',
+                data:{ labels:reincSlices.map(function(s){return s.label;}), datasets:[{ data:reincSlices.map(function(s){return s.value;}), backgroundColor:reincSlices.map(function(s){return s.color;}), borderWidth:1 }] },
+                options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
+                    plugins:{ legend:{position:'bottom',labels:{boxWidth:9,font:{size:9}}},
+                        tooltip:{callbacks:{label:function(ctx){
+                            var t=ctx.dataset.data.reduce(function(a,b){return a+b;},0);
+                            return ctx.label+': '+ctx.raw+' ('+(t?((ctx.raw/t)*100).toFixed(1):0)+'%)';
+                        }}} } }
+            });
+        }
+        showEmpty('reinc-wrap', !reincSlices.length);
     }
 
     function loadStats() {
@@ -402,7 +527,13 @@ document.addEventListener('DOMContentLoaded', function () {
     all.addEventListener('change', function(){ chks.forEach(function(c){c.checked=all.checked;}); });
     form.querySelectorAll('[data-format]').forEach(function(btn){
         btn.addEventListener('click',function(e){
-            if(!document.querySelectorAll('.case-check:checked').length){e.preventDefault();alert('Selecciona al menos un caso.');return;}
+            if(!document.querySelectorAll('.case-check:checked').length){
+                e.preventDefault();
+                if (window.SIPD) {
+                    SIPD.toast({ icon: 'warning', title: 'Selecciona casos', text: 'Marca al menos un caso para exportar.' });
+                }
+                return;
+            }
             form.action=@json(url('/abogado/reportes/casos'))+'/'+btn.dataset.format;
         });
     });
