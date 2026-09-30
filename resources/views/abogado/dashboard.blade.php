@@ -8,345 +8,142 @@
     $saludo = $user->role === 'coordinadora' ? 'Bienvenida' : 'Bienvenido';
 @endphp
 
+@section('page-header')
+    <div class="proc-head">
+        <div>
+            <h1>{{ $saludo }}, {{ $user->name }} 👋</h1>
+            <p>Panel de gestión de procesos disciplinarios.</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
+            @if($user->role === 'coordinadora')
+                <a class="btn-alt" href="{{ route('coordinadora.abogados') }}"><i class="fas fa-users"></i> Equipo</a>
+            @else
+                <a class="btn-alt" href="{{ route('abogado.consultarproceso') }}"><i class="fas fa-folder-open"></i> Procesos</a>
+            @endif
+        </div>
+    </div>
+    <div class="page-banner">
+        <div class="page-banner-left">
+            <div class="page-banner-title">Panel de Gestión — SIPD</div>
+            <div class="page-banner-sub">
+                @if($sinAbogado > 0)
+                    <i class="fas fa-exclamation-triangle" style="color:#fde68a;"></i> {{ $sinAbogado }} proceso{{ $sinAbogado === 1 ? '' : 's' }} sin RH asignado — acción requerida.
+                @else
+                    Todo en orden &middot; Sin procesos sin asignar
+                @endif
+            </div>
+        </div>
+        <div class="page-banner-right">
+            <span class="pb-badge">{{ $total }} total</span>
+            <span class="pb-badge green">{{ $tasaResolucion }}% resolución</span>
+            @if($sinAbogado > 0)<span class="pb-badge yellow">{{ $sinAbogado }} sin RH</span>@endif
+        </div>
+    </div>
+@endsection
+
 @section('styles')
 <style>
-    .hero {
-        background: #0f3d2e;
-        color: #fff;
-        border-radius: 22px;
-        padding: 28px 32px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 20px;
-        margin-bottom: 28px;
+    .section-head { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; }
+    .section-head h3 { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
+    .section-head a { color: var(--cth-green); font-size: 13px; font-weight: 600; text-decoration: none; }
+
+    .pipeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .pipe { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 20px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+    .pipe-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    
+    .pipe-ico { 
+        width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 14px; 
     }
+    .pipe-ico.y { background: #fef3c7; color: #d97706; }
+    .pipe-ico.b { background: #eff6ff; color: #2563eb; }
+    .pipe-ico.r { background: #fff1f2; color: #e11d48; }
+    .pipe-ico.g { background: #f8fafc; color: #64748b; }
 
-    .hero-kicker {
-        font-size: 12px;
-        letter-spacing: .12em;
-        color: #86efac;
-        font-weight: 700;
-        margin-bottom: 10px;
-    }
-
-    .hero h2 {
-        margin: 0 0 10px;
-        font-size: 32px;
-        font-weight: 700;
-        letter-spacing: -.03em;
-    }
-
-    .hero p {
-        margin: 0;
-        color: #d1fae5;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-
-    .btn-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        border-radius: 999px;
-        padding: 11px 18px;
-        font-size: 14px;
-        font-weight: 700;
-        text-decoration: none;
-    }
-
-    .btn-pill.green { background: #22c55e; color: #fff; }
-    .btn-pill.dark { background: #14532d; color: #fff; }
-    .btn-pill:hover { color: #fff; filter: brightness(1.06); }
-
-    .section-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin: 0 0 14px;
-    }
-
-    .section-head h3 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 700;
-    }
-
-    .section-head a {
-        color: #16a34a;
-        font-size: 14px;
-        font-weight: 600;
-        text-decoration: none;
-    }
-
-    .pipeline {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
-        margin-bottom: 22px;
-    }
-
-    .pipe {
-        background: #fff;
-        border-radius: 18px;
-        padding: 18px 18px 16px;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-    }
-
-    .pipe-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 18px;
-    }
-
-    .pipe-ico {
-        width: 36px;
-        height: 36px;
-        border-radius: 12px;
-        background: #f8fafc;
-        display: grid;
-        place-items: center;
-        color: #64748b;
-    }
-
-    .pipe-num { font-size: 28px; font-weight: 700; }
-
-    .pipe-title { font-weight: 600; margin-bottom: 10px; }
-
-    .bar {
-        height: 4px;
-        background: #eef2f7;
-        border-radius: 999px;
-        overflow: hidden;
-        margin-bottom: 8px;
-    }
-
+    .pipe-num { font-size: 24px; font-weight: 700; color: #0f172a; }
+    .pipe-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 10px; }
+    
+    .bar { height: 4px; background: #f1f5f9; border-radius: 999px; overflow: hidden; margin-bottom: 8px; }
     .bar > span { display: block; height: 100%; border-radius: 999px; }
     .bar.yellow > span { background: #f59e0b; }
     .bar.blue > span { background: #3b82f6; }
-    .bar.rose > span { background: #f43f5e; }
+    .bar.rose > span { background: #e11d48; }
     .bar.gray > span { background: #94a3b8; }
+    
+    .pipe small { color: #94a3b8; font-size: 11px; font-weight: 600; }
 
-    .pipe small { color: #94a3b8; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+    
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 24px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 24px; }
+    .card-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: 700; font-size: 16px; color: #0f172a; }
+    .card-title a { color: var(--cth-green); font-size: 13px; font-weight: 600; text-decoration: none; }
+    
+    .chip { background: #fff1f2; color: #e11d48; border-radius: 8px; font-size: 11px; font-weight: 700; padding: 4px 10px; }
 
-    .grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.7fr) minmax(280px, .85fr);
-        gap: 16px;
-        align-items: start;
-    }
-
-    .card {
-        background: #fff;
-        border-radius: 18px;
-        padding: 18px 18px 16px;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-        margin-bottom: 16px;
-    }
-
-    .card.tint { background: #fffbeb; }
-
-    .card-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 14px;
-        font-weight: 700;
-    }
-
-    .chip {
-        background: #fff1f2;
-        color: #e11d48;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
-        padding: 4px 10px;
-    }
-
-    .alert {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        border-radius: 14px;
-        padding: 14px 16px;
-        margin-bottom: 10px;
-    }
-
+    .alert { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
     .alert:last-child { margin-bottom: 0; }
-    .alert b { display: block; font-size: 14px; }
-    .alert span { color: #64748b; font-size: 13px; }
-    .alert a { color: #334155; font-size: 13px; font-weight: 700; text-decoration: none; }
+    .alert b { display: block; font-size: 13px; color: #0f172a; font-weight: 600; margin-bottom: 2px; }
+    .alert span { color: #475569; font-size: 12px; }
+    .alert a { color: var(--cth-green); font-size: 12px; font-weight: 700; text-decoration: none; }
+    
     .alert.pink { background: #fff1f2; }
     .alert.yellow { background: #fffbeb; }
     .alert.green { background: #f0fdf4; }
 
-    .row-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 0;
-        border-bottom: 1px solid #f1f5f9;
-        text-decoration: none;
-        color: inherit;
-    }
-
-    .card.tint .row-item { border-bottom-color: #fde68a; }
-
-    .row-item:last-child { border-bottom: 0; padding-bottom: 0; }
-
-    .dot {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        display: grid;
-        place-items: center;
-        font-size: 11px;
-        font-weight: 700;
-        flex-shrink: 0;
-    }
-
-    .dot.soft { background: #fff; border: 1px solid #e2e8f0; color: #94a3b8; }
-    .dot.ok { background: #dcfce7; color: #166534; }
-
+    .row-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f1f5f9; text-decoration: none; transition: background .2s; }
+    .row-item:hover { background: #fafbfc; }
+    .row-item:last-child { border-bottom: 0; }
+    
+    .dot { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .dot.soft { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+    .dot.ok { background: #f0fdf4; color: var(--cth-green-text); border: 1px solid #bbf7d0; }
+    
     .row-main { flex: 1; min-width: 0; }
-    .row-main b { display: block; font-size: 14px; }
-    .row-main small { color: #94a3b8; font-size: 12px; }
-    .code { color: #94a3b8; font-size: 12px; margin-right: 6px; }
+    .row-main b { display: block; font-size: 14px; font-weight: 600; color: #0f172a; margin-bottom: 2px; }
+    .row-main b .code { color: var(--cth-green); font-size: 11px; margin-right: 6px; }
+    .row-main small { color: #64748b; font-size: 12px; }
+    
+    .status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+    .status.pend { background: #fffbeb; color: #d97706; }
+    .status.proc { background: #eff6ff; color: #2563eb; }
+    .status.sanc { background: #fff1f2; color: #e11d48; }
+    .status.arch { background: #f8fafc; color: #475569; }
+    
+    .meta { color: #94a3b8; font-size: 12px; margin-right: 12px; }
 
-    .status {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        color: #64748b;
-        font-size: 13px;
-        white-space: nowrap;
-    }
-
-    .status i { font-size: 8px; }
-    .status.pend i { color: #f59e0b; }
-    .status.proc i { color: #3b82f6; }
-    .status.sanc i { color: #f43f5e; }
-    .status.arch i { color: #94a3b8; }
-
-    .meta { color: #94a3b8; font-size: 13px; margin-right: 10px; white-space: nowrap; }
-
-    .cta {
-        display: block;
-        text-align: center;
-        background: #fbbf24;
-        color: #0f172a;
-        border-radius: 12px;
-        padding: 12px;
-        font-weight: 700;
-        text-decoration: none;
-        margin-top: 8px;
-    }
-
-    .cta:hover { color: #0f172a; }
-
-    .stat {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 0;
-        color: #475569;
-        font-size: 14px;
-    }
-
+    .stat { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; color: #475569; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+    .stat:last-child { border-bottom: 0; }
     .stat b { color: #0f172a; }
 
-    .team {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 0;
-    }
+    .team { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+    .team:last-child { border-bottom: 0; }
+    .team .ava { width: 32px; height: 32px; border-radius: 50%; background: #f0fdf4; color: var(--cth-green-text); display: grid; place-items: center; font-size: 11px; font-weight: 700; border: 1px solid #bbf7d0; }
+    .team b { display: block; font-size: 13px; color: #0f172a; }
+    .team small { color: #64748b; font-size: 11px; }
+    .team .n { margin-left: auto; font-size: 12px; color: #64748b; font-weight: 600; }
 
-    .team .ava {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        background: #ecfdf5;
-        color: #166534;
-        display: grid;
-        place-items: center;
-        font-size: 11px;
-        font-weight: 700;
-    }
-
-    .team b { display: block; font-size: 14px; }
-    .team small { color: #94a3b8; font-size: 12px; }
-    .team .n { margin-left: auto; font-size: 13px; color: #64748b; }
-
-    .links a {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 0;
-        color: #334155;
-        text-decoration: none;
-        font-size: 14px;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
+    .links a { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; color: #334155; text-decoration: none; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
     .links a:last-child { border-bottom: 0; }
-    .links a i.left { color: #22c55e; width: 18px; }
     .links a span { display: flex; align-items: center; gap: 10px; }
+    .links a i.left { color: var(--cth-green); width: 14px; }
+    .links a i.right { color: #cbd5e1; font-size: 11px; }
+    .empty { color: #94a3b8; font-size: 12px; padding: 8px 0; text-align: center; }
 
-    .empty { color: #94a3b8; font-size: 13px; padding: 8px 0; }
-
-    @media (max-width: 980px) {
-        .pipeline, .grid { grid-template-columns: 1fr; }
-        .hero { flex-direction: column; align-items: flex-start; }
-    }
+    @media (max-width: 900px) { .pipeline, .grid { grid-template-columns: 1fr; } .proc-head { flex-direction: column; } }
 </style>
 @endsection
 
 @section('content')
-    <section class="hero">
-        <div>
-            <div class="hero-kicker">PANEL DE GESTIÓN</div>
-            <h2>{{ $saludo }}, {{ $user->name }} 👋</h2>
-            <p>
-                <i class="fas fa-exclamation-triangle"></i>
-                @if($sinAbogado > 0)
-                    {{ $sinAbogado }} proceso{{ $sinAbogado === 1 ? '' : 's' }} sin RH asignado — acción requerida.
-                @else
-                    No hay procesos sin RH asignado.
-                @endif
-            </p>
-        </div>
-        <div class="hero-actions">
-            <a class="btn-pill green" href="{{ route('abogado.registro') }}">
-                <i class="fas fa-plus"></i> Registrar proceso
-            </a>
-            @if($user->role === 'coordinadora')
-                <a class="btn-pill dark" href="{{ route('coordinadora.abogados') }}">
-                    <i class="fas fa-users"></i> Equipo
-                </a>
-            @else
-                <a class="btn-pill dark" href="{{ route('abogado.consultarproceso') }}">
-                    <i class="fas fa-folder-open"></i> Procesos
-                </a>
-            @endif
-        </div>
-    </section>
 
     <div class="section-head">
         <h3>Pipeline de procesos</h3>
-        <a href="{{ route('abogado.consultarproceso') }}">Ver todos →</a>
+        <a href="{{ route('abogado.consultarproceso') }}">Ver todos &rarr;</a>
     </div>
 
     <section class="pipeline">
         <article class="pipe">
             <div class="pipe-top">
-                <div class="pipe-ico"><i class="far fa-hourglass"></i></div>
+                <div class="pipe-ico y"><i class="far fa-hourglass"></i></div>
                 <div class="pipe-num">{{ $pendientes }}</div>
             </div>
             <div class="pipe-title">Pendiente</div>
@@ -355,7 +152,7 @@
         </article>
         <article class="pipe">
             <div class="pipe-top">
-                <div class="pipe-ico"><i class="fas fa-spinner"></i></div>
+                <div class="pipe-ico b"><i class="fas fa-spinner"></i></div>
                 <div class="pipe-num">{{ $enProceso }}</div>
             </div>
             <div class="pipe-title">En proceso</div>
@@ -364,7 +161,7 @@
         </article>
         <article class="pipe">
             <div class="pipe-top">
-                <div class="pipe-ico"><i class="far fa-times-circle"></i></div>
+                <div class="pipe-ico r"><i class="far fa-times-circle"></i></div>
                 <div class="pipe-num">{{ $sancionados }}</div>
             </div>
             <div class="pipe-title">Sancionado</div>
@@ -373,7 +170,7 @@
         </article>
         <article class="pipe">
             <div class="pipe-top">
-                <div class="pipe-ico"><i class="far fa-folder"></i></div>
+                <div class="pipe-ico g"><i class="far fa-folder"></i></div>
                 <div class="pipe-num">{{ $archivados }}</div>
             </div>
             <div class="pipe-title">Archivado</div>
@@ -386,8 +183,10 @@
         <div>
             <section class="card">
                 <div class="card-title">
-                    <span><i class="far fa-bell"></i> Alertas del sistema</span>
-                    <span class="chip">{{ $alertasActivas }} activa{{ $alertasActivas === 1 ? '' : 's' }}</span>
+                    <span><i class="far fa-bell" style="color:#94a3b8;margin-right:6px;"></i> Alertas del sistema</span>
+                    @if($alertasActivas > 0)
+                        <span class="chip">{{ $alertasActivas }} ACTIVA{{ $alertasActivas === 1 ? '' : 'S' }}</span>
+                    @endif
                 </div>
 
                 <div class="alert pink">
@@ -402,25 +201,25 @@
                                     plazo vencido
                                 @endif
                             @else
-                                No hay vencimientos próximos
+                                Ninguno
                             @endif
                         </span>
                     </div>
-                    <a href="{{ route('abogado.plazos') }}">Revisar</a>
+                    <a href="{{ route('abogado.plazos') }}">Ver &rarr;</a>
                 </div>
 
                 <div class="alert yellow">
                     <div>
-                        <b><i class="far fa-user"></i> Sin RH</b>
+                        <b><i class="far fa-user"></i> Sin responsable (RH)</b>
                         <span>
                             @if($procesosSinAsignar->isNotEmpty())
-                                {{ $procesosSinAsignar->map($codigo)->implode(', ') }} sin asignar
+                                {{ $procesosSinAsignar->map($codigo)->implode(', ') }}
                             @else
-                                Todos los procesos tienen responsable
+                                Todos asignados
                             @endif
                         </span>
                     </div>
-                    <a href="{{ route('abogado.consultarproceso') }}">Revisar</a>
+                    <a href="{{ route('abogado.consultarproceso') }}">Ver &rarr;</a>
                 </div>
 
                 <div class="alert green">
@@ -428,41 +227,20 @@
                         <b><i class="far fa-file-alt"></i> Descargos pendientes</b>
                         <span>
                             @if($alertaDescargos)
-                                {{ $codigo($alertaDescargos) }} espera respuesta del conductor
+                                {{ $codigo($alertaDescargos) }}
                             @else
-                                No hay descargos pendientes
+                                Todo al día
                             @endif
                         </span>
                     </div>
-                    <a href="{{ route('abogado.consultarproceso') }}">Revisar</a>
+                    <a href="{{ route('abogado.consultarproceso') }}">Ver &rarr;</a>
                 </div>
-            </section>
-
-            <section class="card tint">
-                <div class="card-title">Procesos sin RH asignado</div>
-
-                @forelse($procesosSinAsignar as $proceso)
-                    <a class="row-item" href="{{ route('abogado.detalleproceso', $proceso->id) }}">
-                        <span class="dot soft">{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</span>
-                        <div class="row-main">
-                            <b><span class="code">{{ $codigo($proceso) }}</span> {{ $proceso->nombre }}</b>
-                            <small>{{ $proceso->tipo_falta ?: 'Sin tipo de falta' }}</small>
-                        </div>
-                        <span class="status pend"><i class="fas fa-circle"></i> {{ $proceso->estado }}</span>
-                    </a>
-                @empty
-                    <div class="empty">No hay procesos sin RH.</div>
-                @endforelse
-
-                @if($user->role === 'coordinadora')
-                    <a class="cta" href="{{ route('coordinadora.abogados') }}">Ir a gestión de RH →</a>
-                @endif
             </section>
 
             <section class="card">
                 <div class="card-title">
                     <span>Procesos recientes</span>
-                    <a href="{{ route('abogado.consultarproceso') }}" style="color:#16a34a;font-size:14px;font-weight:600;text-decoration:none;">Ver todos →</a>
+                    <a href="{{ route('abogado.consultarproceso') }}">Ver tabla &rarr;</a>
                 </div>
 
                 @forelse($recientes as $proceso)
@@ -470,16 +248,16 @@
                         <span class="dot ok">{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</span>
                         <div class="row-main">
                             <b>{{ $proceso->nombre }}</b>
-                            <small>{{ $proceso->tipo_falta ?: 'Sin tipo de falta' }}</small>
+                            <small>{{ $proceso->tipo_falta ?: 'Pendiente tipificar' }}</small>
                         </div>
-                        <span class="meta">{{ $proceso->user->name ?? 'Sin asignar' }}</span>
+                        <span class="meta">{{ $proceso->user->name ?? '—' }}</span>
                         <span class="status
                             @if($proceso->estado == 'Pendiente') pend
                             @elseif($proceso->estado == 'En Proceso') proc
                             @elseif($proceso->estado == 'Sancionado') sanc
                             @else arch
                             @endif">
-                            <i class="fas fa-circle"></i> {{ $proceso->estado }}
+                            <i class="fas fa-circle" style="font-size:6px;"></i> {{ $proceso->estado }}
                         </span>
                     </a>
                 @empty
@@ -490,17 +268,17 @@
 
         <div>
             <section class="card">
-                <div class="card-title">Resumen del sistema</div>
+                <div class="card-title">Resumen</div>
                 <div class="stat"><span><i class="far fa-file-alt"></i> Total registrados</span><b>{{ $total }}</b></div>
-                <div class="stat"><span><i class="fas fa-exclamation-triangle"></i> Sin RH</span><b>{{ $sinAbogado }}</b></div>
-                <div class="stat"><span><i class="far fa-check-circle"></i> Tasa resolución</span><b>{{ $tasaResolucion }}%</b></div>
+                <div class="stat"><span><i class="fas fa-exclamation-triangle"></i> Sin asignar</span><b>{{ $sinAbogado }}</b></div>
+                <div class="stat"><span><i class="far fa-check-circle"></i> Resolución</span><b>{{ $tasaResolucion }}%</b></div>
             </section>
 
             <section class="card">
                 <div class="card-title">
-                    <span>Carga del equipo</span>
+                    <span>Equipo</span>
                     @if($user->role === 'coordinadora')
-                        <a href="{{ route('coordinadora.abogados') }}" style="color:#16a34a;font-size:13px;font-weight:600;text-decoration:none;">Gestionar</a>
+                        <a href="{{ route('coordinadora.abogados') }}">Ver RH &rarr;</a>
                     @endif
                 </div>
                 @forelse($cargaAbogados as $abogado)
@@ -513,31 +291,31 @@
                             <b>{{ $abogado->name }}</b>
                             <small>{{ $abogado->cargo ?: 'RH' }}</small>
                         </div>
-                        <div class="n">{{ $abogado->procesos_count }} caso{{ $abogado->procesos_count === 1 ? '' : 's' }}</div>
+                        <div class="n">{{ $abogado->procesos_count }}</div>
                     </div>
                 @empty
-                    <div class="empty">No hay personal de RH registrado.</div>
+                    <div class="empty">Sin personal de RH.</div>
                 @endforelse
             </section>
 
             <section class="card">
-                <div class="card-title">Accesos directos</div>
+                <div class="card-title">Mapeo de accesos</div>
                 <div class="links">
                     <a href="{{ route('abogado.estadistica') }}">
-                        <span><i class="fas fa-chart-bar left"></i> Estadísticas del sistema</span>
-                        <i class="fas fa-chevron-right"></i>
+                        <span><i class="fas fa-chart-bar left"></i> Estadísticas integrales</span>
+                        <i class="fas fa-chevron-right right"></i>
                     </a>
                     <a href="{{ route('abogado.plazos') }}">
-                        <span><i class="far fa-clock left"></i> Plazos y vencimientos</span>
-                        <i class="fas fa-chevron-right"></i>
+                        <span><i class="far fa-clock left"></i> Plazos procesales</span>
+                        <i class="fas fa-chevron-right right"></i>
                     </a>
                     <a href="{{ route('abogado.partes') }}">
-                        <span><i class="fas fa-user-friends left"></i> Partes involucradas</span>
-                        <i class="fas fa-chevron-right"></i>
+                        <span><i class="fas fa-user-friends left"></i> Personal involucrado</span>
+                        <i class="fas fa-chevron-right right"></i>
                     </a>
                     <a href="{{ route('abogado.resoluciones') }}">
-                        <span><i class="far fa-file-alt left"></i> Resoluciones emitidas</span>
-                        <i class="fas fa-chevron-right"></i>
+                        <span><i class="far fa-file-alt left"></i> Archivo de resoluciones</span>
+                        <i class="fas fa-chevron-right right"></i>
                     </a>
                 </div>
             </section>
