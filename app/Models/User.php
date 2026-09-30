@@ -25,6 +25,7 @@ class User extends Authenticatable
         'cargo',
         'telefono',
         'cedula',
+        'firma_path',
         'fecha_ingreso',
     ];
 

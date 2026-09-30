@@ -7,24 +7,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=2">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=9">
 </head>
-<body>
+<body class="consulta-page">
     <div class="consulta-hero">
         <div class="consulta-inner">
-            <div class="brand" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:28px;">
-                <a class="guest-brand" href="{{ route('login') }}">
-                    <div class="guest-brand-mark">C</div>
-                    <div>
+            <div class="consulta-top">
+                <a class="consulta-brand" href="{{ route('login') }}">
+                    <img src="{{ rtrim(request()->root(), '/') }}/images/logo-cootranshuila-claro.png" alt="Cootranshuila">
+                    <span>
                         <strong>SIPD</strong>
-                        <small>Cootranshuila</small>
-                    </div>
+                        <small>Sistema de procesos disciplinarios</small>
+                    </span>
                 </a>
-                <a class="back" href="{{ route('login') }}" style="color:#e8f5ee;text-decoration:none;font-size:14px;">← Volver al acceso</a>
+                <a class="consulta-back" href="{{ route('login') }}">← Volver al acceso</a>
             </div>
             <div class="guest-badge">ACCESO PÚBLICO</div>
-            <h1 style="margin:0 0 8px;font-size:34px;letter-spacing:-.03em;">Consultar mi caso</h1>
-            <p style="color:rgba(255,255,255,.78);margin:0;line-height:1.6;">Ingresa tu cédula para ver el estado de tus procesos disciplinarios.</p>
+            <h1>Consultar mi caso</h1>
+            <p>Ingresa tu cédula para ver el avance del trámite. Esta consulta no muestra documentos, pruebas ni detalles reservados del expediente.</p>
         </div>
     </div>
 
@@ -39,32 +39,62 @@
                         <div class="guest-error">{{ $message }}</div>
                     @enderror
                 </div>
-                <button type="submit" class="btn-submit" style="width:auto;padding:0 22px;height:44px;">Consultar</button>
+                <button type="submit" class="btn-submit consulta-submit">Consultar</button>
             </form>
         </div>
 
         @if(!empty($consultado))
-            @forelse($procesos as $proceso)
-                <div class="consulta-card">
-                    <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;">
-                        <div style="color:var(--cth-green);font-weight:700;">PRO-{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</div>
-                        <div style="font-weight:600;font-size:13px;">{{ $proceso->estado }}</div>
+            @forelse($seguimientos as $caso)
+                <article class="consulta-card consulta-result">
+                    <div class="consulta-result-top">
+                        <div>
+                            <div class="consulta-code">{{ $caso['codigo'] }}</div>
+                            <div class="consulta-exp">Expediente {{ $caso['expediente'] }}</div>
+                        </div>
+                        <div class="consulta-estado consulta-estado--{{ $caso['estado_clase'] }}">{{ $caso['estado'] }}</div>
                     </div>
-                    <div style="color:var(--cth-muted);font-size:14px;line-height:1.6;">
-                        <div><strong style="color:var(--cth-ink);">{{ $proceso->nombre }}</strong></div>
-                        <div>Tipo de falta: {{ $proceso->tipo_falta ?: '—' }}</div>
-                        <div>Fecha: {{ $proceso->fecha_falta ?: '—' }}</div>
-                        @if($proceso->descripcion_falta)
-                            <div>{{ $proceso->descripcion_falta }}</div>
-                        @endif
-                        @if($proceso->decision_final)
-                            <div>Decisión: {{ $proceso->decision_final }}</div>
-                        @endif
+
+                    <div class="consulta-meta">
+                        <div class="consulta-name">{{ $caso['nombre'] }}</div>
+                        <div>{{ $caso['tipo'] }}@if(!empty($caso['abierto_el'])) · Abierto el {{ $caso['abierto_el']['texto'] }}@endif</div>
                     </div>
-                </div>
+
+                    <p class="consulta-status-msg">{{ $caso['mensaje'] }}</p>
+
+                    <ol class="consulta-steps" aria-label="Avance del trámite">
+                        @foreach($caso['etapas'] as $etapa)
+                            <li class="consulta-step consulta-step--{{ $etapa['estado'] }}">
+                                <span class="consulta-step-dot" aria-hidden="true"></span>
+                                <strong>{{ $etapa['titulo'] }}</strong>
+                                <small>{{ $etapa['detalle'] }}</small>
+                            </li>
+                        @endforeach
+                    </ol>
+
+                    <div class="consulta-timeline-wrap">
+                        <h2>Línea de tiempo</h2>
+                        <ol class="consulta-timeline">
+                            @foreach($caso['linea_tiempo'] as $evento)
+                                <li class="{{ !empty($evento['actual']) ? 'is-current' : '' }}">
+                                    <div class="consulta-timeline-date">
+                                        {{ $evento['fecha']['texto'] ?? 'En curso' }}
+                                    </div>
+                                    <div class="consulta-timeline-body">
+                                        <strong>{{ $evento['titulo'] }}</strong>
+                                        <p>{{ $evento['detalle'] }}</p>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </div>
+                </article>
             @empty
-                <div class="consulta-card" style="color:var(--cth-muted);">No se encontraron procesos con esa cédula.</div>
+                <div class="consulta-card consulta-empty">No se encontraron procesos con esa cédula.</div>
             @endforelse
+
+            @if($seguimientos->isNotEmpty())
+                <p class="consulta-privacy">Solo se muestra el estado del trámite y las actuaciones ya realizadas. No se publican faltas, descargos, decisiones ni archivos del caso.</p>
+            @endif
         @endif
     </div>
 </body>

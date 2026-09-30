@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Services\ReportService;
 use App\Services\OfficialDocumentService;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Throwable;
 
 class ProcesoDisciplinarioController extends Controller
@@ -201,9 +202,19 @@ class ProcesoDisciplinarioController extends Controller
             ];
         })->sortByDesc('total_casos')->values();
 
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 10;
+        $workersGroupedPaginated = new LengthAwarePaginator(
+            $workersGrouped->slice(($page - 1) * $perPage, $perPage)->values(),
+            $workersGrouped->count(),
+            $perPage,
+            $page,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
+        );
+
         return view('abogado.Reincidencias', [
             'pageTitle'      => 'Módulo de Reincidencias',
-            'workersGrouped' => $workersGrouped,
+            'workersGrouped' => $workersGroupedPaginated,
             'search'         => $search,
             'profileUser'    => auth()->user(),
         ]);
@@ -291,7 +302,7 @@ class ProcesoDisciplinarioController extends Controller
                     ->orWhere('tipo_falta', 'like', '%' . $q . '%');
             });
         }
-        
+
         if ($request->filled('desde')) {
             $query->where('created_at', '>=', $request->desde . ' 00:00:00');
         }
@@ -300,12 +311,48 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         /** @var \Illuminate\Pagination\LengthAwarePaginator $casos */
-        $casos = $query->latest()->paginate(15);
+        $casos = (clone $query)->whereIn('estado', ['Pendiente', 'En Proceso'])->latest()->paginate(12);
         $casos->withQueryString();
+
+        // Historial: cerrados (Sancionado + Archivado)
+        $historial = (clone $query)->whereIn('estado', ['Sancionado', 'Archivado'])
+            ->with('user')
+            ->latest('updated_at')
+            ->get()
+            ->map(function ($p) {
+                $inicio  = $p->created_at;
+                $cierre  = $p->updated_at ?? $p->created_at;
+                $duracion = $inicio ? (int) $inicio->diffInDays($cierre) : null;
+
+                return (object) [
+                    'id'            => $p->id,
+                    'nombre'        => $p->nombre,
+                    'cedula'        => $p->cedula,
+                    'placa'         => $p->placa,
+                    'tipo_falta'    => $p->tipo_falta,
+                    'estado'        => $p->estado,
+                    'decision'      => $p->decision_final,
+                    'abogado'       => optional($p->user)->name ?? 'Sin asignar',
+                    'fecha_inicio'  => $inicio ? $inicio->format('d/m/Y') : '—',
+                    'fecha_cierre'  => $cierre ? $cierre->format('d/m/Y') : '—',
+                    'duracion_dias' => $duracion,
+                    'modalidad'     => $p->modalidad,
+                ];
+            });
+
+        // Stats rápidas del historial
+        $hStats = [
+            'total'      => $historial->count(),
+            'sancionados'=> $historial->where('estado', 'Sancionado')->count(),
+            'archivados' => $historial->where('estado', 'Archivado')->count(),
+            'prom_dias'  => $historial->whereNotNull('duracion_dias')->avg('duracion_dias'),
+        ];
 
         return view('abogado.Reportes', [
             'pageTitle' => 'Estadísticas y reportes',
-            'casos' => $casos,
+            'casos'     => $casos,
+            'historial' => $historial,
+            'hStats'    => $hStats,
         ]);
     }
 
@@ -440,11 +487,29 @@ class ProcesoDisciplinarioController extends Controller
         ]);
 
         $rutaDocumento = null;
+        $evidenciasToSave = [];
         if ($request->hasFile('documento_falta')) {
-            $archivo = $request->file('documento_falta');
-            $ext = strtolower($archivo->getClientOriginalExtension());
-            abort_unless(in_array($ext, ['pdf', 'jpg', 'jpeg', 'png'], true), 422, 'Formato de archivo no permitido. Solo se aceptan PDF, JPG, JPEG o PNG.');
-            $rutaDocumento = $archivo->store('documentos', 'public');
+            $archivos = $request->file('documento_falta');
+            if (!is_array($archivos)) $archivos = [$archivos];
+
+            foreach ($archivos as $archivo) {
+                $ext = strtolower($archivo->getClientOriginalExtension());
+                abort_unless(in_array($ext, ['pdf', 'jpg', 'jpeg', 'png'], true), 422, 'Formato de archivo no permitido. Solo se aceptan PDF, JPG, JPEG o PNG.');
+                
+                $ruta = $archivo->store('documentos', 'public');
+                if (!$rutaDocumento) $rutaDocumento = $ruta;
+                
+                $evidenciasToSave[] = [
+                    'user_id'           => auth()->id(),
+                    'nombre_original'   => $archivo->getClientOriginalName(),
+                    'nombre_almacenado' => basename($ruta),
+                    'extension'         => $ext,
+                    'mime_type'         => $archivo->getMimeType(),
+                    'tamano'            => $archivo->getSize(),
+                    'descripcion'       => null,
+                    'ruta_segura'       => 'public/' . $ruta,
+                ];
+            }
         }
 
         // Recuperar bloques por submódulo o array simple
@@ -487,6 +552,11 @@ class ProcesoDisciplinarioController extends Controller
             'user_id'           => auth()->id(),
         ]);
 
+        foreach ($evidenciasToSave as $ev) {
+            $ev['caso_id'] = $proceso->id;
+            \App\Models\CasoEvidencia::create($ev);
+        }
+
         return redirect()
             ->route('abogado.detalleproceso', $proceso->id)
             ->with('success', 'Proceso disciplinario registrado correctamente. Descargando el documento oficial...')
@@ -526,12 +596,17 @@ class ProcesoDisciplinarioController extends Controller
 
     public function saveOfficialBlocks(Request $request, $id, string $template, OfficialDocumentService $documents)
     {
+        $proceso = $this->accessibleProcess($id);
+        
+        if ($proceso->estado === 'Sancionado') {
+            return redirect()->back()->with('error', 'Acción denegada: Este proceso se encuentra cerrado por Sanción y es inmodificable.');
+        }
+
         $definitions = $documents->blockDefinitions($template);
         $validated = $request->validate([
             'yellow_blocks' => 'required|array|size:' . count($definitions),
             'yellow_blocks.*' => 'required|string|max:30000',
         ]);
-        $proceso = $this->accessibleProcess($id);
         $data = $proceso->datos_oficiales ?: [];
         $data['yellow_blocks'][$template] = array_values($validated['yellow_blocks']);
         $proceso->update(['datos_oficiales' => $data]);
@@ -556,14 +631,36 @@ class ProcesoDisciplinarioController extends Controller
     {
         $proceso = $this->accessibleProcess($id);
 
+        if ($proceso->estado === 'Sancionado') {
+            return redirect()->back()->with('error', 'Acción denegada: Los procesos sancionados están bloqueados permanentemente y no admiten ninguna edición.');
+        }
+
         $rutaDocumento = $proceso->documento_falta;
 
         // SI SUBE NUEVO DOCUMENTO
         if ($request->hasFile('documento_falta')) {
+            $archivos = $request->file('documento_falta');
+            if (!is_array($archivos)) $archivos = [$archivos];
 
-            $archivo = $request->file('documento_falta');
-
-            $rutaDocumento = $archivo->store('documentos', 'public');
+            foreach ($archivos as $archivo) {
+                $ext = strtolower($archivo->getClientOriginalExtension());
+                abort_unless(in_array($ext, ['pdf', 'jpg', 'jpeg', 'png'], true), 422, 'Formato de archivo no permitido. Solo se aceptan PDF, JPG, JPEG o PNG.');
+                
+                $ruta = $archivo->store('documentos', 'public');
+                $rutaDocumento = $ruta;
+                
+                \App\Models\CasoEvidencia::create([
+                    'caso_id'           => $proceso->id,
+                    'user_id'           => auth()->id(),
+                    'nombre_original'   => $archivo->getClientOriginalName(),
+                    'nombre_almacenado' => basename($ruta),
+                    'extension'         => $ext,
+                    'mime_type'         => $archivo->getMimeType(),
+                    'tamano'            => $archivo->getSize(),
+                    'descripcion'       => null,
+                    'ruta_segura'       => 'public/' . $ruta,
+                ]);
+            }
         }
 
         $proceso->update([
@@ -585,13 +682,61 @@ class ProcesoDisciplinarioController extends Controller
             'descargos' => $request->descargos,
             'decision_final' => $request->decision_final,
 
-            // NUEVO ESTADO
             'estado' => $request->estado
         ]);
 
         return redirect()
             ->back()
             ->with('success', 'Proceso actualizado correctamente');
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $proceso = $this->accessibleProcess($id);
+
+        if ($proceso->estado === 'Sancionado') {
+            return redirect()->back()->with('error', 'Acción denegada: Los procesos sancionados están bloqueados permanentemente.');
+        }
+
+        $validated = $request->validate([
+            'estado' => 'required|in:Pendiente,En Proceso,Sancionado,Archivado',
+        ]);
+
+        $proceso->update(['estado' => $validated['estado']]);
+
+        return redirect()->back()->with('success', 'Estado del proceso modificado rápidamente.');
+    }
+
+    public function solicitarVeredicto($id)
+    {
+        $proceso = $this->accessibleProcess($id);
+
+        if ($proceso->estado === 'Sancionado') {
+            return redirect()->back()->with('error', 'Acción denegada: Este proceso ya fue sancionado.');
+        }
+
+        // Se cambia a 'En Proceso' para que el coordinador/admin lo atienda
+        $proceso->update(['estado' => 'En Proceso']);
+
+        return redirect()->back()->with('success', 'Información enviada. El caso ahora está "En Proceso" y pendiente de veredicto por el coordinador/admin.');
+    }
+
+    /**
+     * ELIMINAR PROCESO
+     */
+    public function destroy($id)
+    {
+        $proceso = $this->accessibleProcess($id);
+
+        if ($proceso->documento_falta) {
+            Storage::disk('public')->delete($proceso->documento_falta);
+        }
+
+        $proceso->delete();
+
+        return redirect()
+            ->back()
+            ->with('success', 'Proceso disciplinario eliminado correctamente');
     }
 
     /**
@@ -650,9 +795,19 @@ class ProcesoDisciplinarioController extends Controller
             $resoluciones = $resoluciones->where('tipo', $filtro)->values();
         }
 
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 10;
+        $resolucionesPaginated = new LengthAwarePaginator(
+            $resoluciones->slice(($page - 1) * $perPage, $perPage)->values(),
+            $resoluciones->count(),
+            $perPage,
+            $page,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
+        );
+
         return view('abogado.resoluciones', [
             'pageTitle' => 'Resoluciones',
-            'resoluciones' => $resoluciones,
+            'resoluciones' => $resolucionesPaginated,
             'conteos' => $conteos,
             'filtro' => $filtro,
         ]);
@@ -705,9 +860,19 @@ class ProcesoDisciplinarioController extends Controller
             })->values();
         }
 
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 10;
+        $partesPaginated = new LengthAwarePaginator(
+            $partes->slice(($page - 1) * $perPage, $perPage)->values(),
+            $partes->count(),
+            $perPage,
+            $page,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
+        );
+
         return view('abogado.partes', [
             'pageTitle' => 'Partes involucradas',
-            'partes' => $partes,
+            'partes' => $partesPaginated,
             'conteos' => $conteos,
             'filtro' => $filtro,
         ]);
@@ -778,9 +943,19 @@ class ProcesoDisciplinarioController extends Controller
             $plazos = $plazos->where('semaforo', $filtro)->values();
         }
 
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 10;
+        $plazosPaginated = new LengthAwarePaginator(
+            $plazos->slice(($page - 1) * $perPage, $perPage)->values(),
+            $plazos->count(),
+            $perPage,
+            $page,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
+        );
+
         return view('abogado.plazos', [
             'pageTitle' => 'Plazos y términos',
-            'plazos' => $plazos,
+            'plazos' => $plazosPaginated,
             'conteos' => $conteos,
             'filtro' => $filtro,
         ]);
@@ -801,19 +976,7 @@ class ProcesoDisciplinarioController extends Controller
 
 
 
-    /**
-     * ELIMINAR PROCESO
-     */
-    public function destroy($id)
-    {
-        $proceso = $this->accessibleProcess($id);
 
-        $proceso->delete();
-
-        return redirect()
-            ->back()
-            ->with('success', 'Proceso disciplinario eliminado correctamente');
-    }
 
     /**
      * ELIMINAR ABOGADO

@@ -220,7 +220,11 @@ class DocumentoController extends Controller
                 'acta'          => 'acta-cargos-descargos',
             };
 
-            $response = $documents->downloadOfficial($caso, $tipo, $filename);
+            if (request('format') === 'pdf') {
+                $response = $documents->downloadOfficialPdf($caso, $tipo, $filename);
+            } else {
+                $response = $documents->downloadOfficial($caso, $tipo, $filename);
+            }
 
             // Actualizar estado
             $estadoDoc = $caso->estadoDocumento($tipo);

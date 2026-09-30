@@ -30,6 +30,7 @@ class LoginController extends Controller
 
         switch ($role) {
 
+            case 'admin':
             case 'coordinadora':
                 return '/abogado';
 

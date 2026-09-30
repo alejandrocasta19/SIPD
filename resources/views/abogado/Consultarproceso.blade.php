@@ -1,7 +1,9 @@
 @extends('layouts.master')
 
 @php
-    $pageTitle = 'Procesos disciplinarios';
+    $pageTitle = $isMisCasos ?? auth()->user()->role === 'abogado'
+        ? 'Mis casos'
+        : 'Procesos disciplinarios';
     $estadoActual = request('estado', 'todos');
     $codigo = function ($proceso) {
         return 'PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT);
@@ -12,11 +14,20 @@
     <div class="proc-head">
         <div>
             <h1>Procesos disciplinarios</h1>
-            <p>{{ $conteos['todos'] }} proceso{{ $conteos['todos'] === 1 ? '' : 's' }} registrado{{ $conteos['todos'] === 1 ? '' : 's' }} en el sistema.</p>
+            <p>{{ $conteos['todos'] }} caso{{ $conteos['todos'] === 1 ? '' : 's' }} visible{{ $conteos['todos'] === 1 ? '' : 's' }} para tu cuenta.</p>
         </div>
-        <a class="btn-add" href="{{ route('abogado.registro') }}">
-            <i class="fas fa-plus"></i> Registrar proceso
-        </a>
+        <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
+    </div>
+    <div class="page-banner">
+        <div class="page-banner-left">
+            <div class="page-banner-title">Listado de Procesos</div>
+            <div class="page-banner-sub">Gestiona, filtra y accede a todos los expedientes disciplinarios de tu cuenta.</div>
+        </div>
+        <div class="page-banner-right">
+            <span class="pb-badge">{{ $conteos['todos'] }} total</span>
+            @if($conteos['Pendiente'] > 0)<span class="pb-badge yellow">{{ $conteos['Pendiente'] }} Pendientes</span>@endif
+            @if($conteos['Sancionado'] > 0)<span class="pb-badge red">{{ $conteos['Sancionado'] }} Sancionados</span>@endif
+        </div>
     </div>
 @endsection
 
@@ -43,20 +54,7 @@
         font-size: 14px;
     }
 
-    .btn-add {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: #22c55e;
-        color: #fff;
-        border-radius: 999px;
-        padding: 11px 18px;
-        font-weight: 700;
-        font-size: 14px;
-        text-decoration: none;
-        white-space: nowrap;
-    }
-
+    .btn-add { display: inline-flex; align-items: center; gap: 8px; background: var(--cth-green-bright); color: #fff; border-radius: 999px; padding: 11px 18px; font-weight: 700; font-size: 14px; text-decoration: none; white-space: nowrap; }
     .btn-add:hover { color: #fff; filter: brightness(1.05); }
 
     .chips {
@@ -82,12 +80,12 @@
 
     .chip.active {
         background: #ecfdf5;
-        color: #166534;
+        color: var(--cth-green-text);
     }
 
     .chip i { font-size: 8px; }
     .chip .n { color: #94a3b8; font-weight: 500; }
-    .chip.active .n { color: #166534; }
+    .chip.active .n { color: var(--cth-green-text); }
     .dot-pend { color: #f59e0b; }
     .dot-proc { color: #3b82f6; }
     .dot-sanc { color: #f43f5e; }
@@ -170,7 +168,7 @@
     table.proc tbody tr:hover { background: #fafbfc; }
 
     .id {
-        color: #16a34a;
+        color: var(--cth-green);
         font-weight: 700;
         text-decoration: none;
     }
@@ -201,7 +199,7 @@
         cursor: pointer;
     }
 
-    .acts a:hover, .acts button:hover { background: #ecfdf5; color: #166534; }
+    .acts a:hover, .acts button:hover { background: #ecfdf5; color: var(--cth-green-text); }
     .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
 
     .empty {
@@ -217,6 +215,7 @@
         padding: 14px 16px;
         color: #94a3b8;
         font-size: 13px;
+        border-top: 1px solid #e2e8f0;
     }
 
     .pager-pages { display: flex; gap: 6px; align-items: center; }
@@ -234,8 +233,8 @@
     }
 
     .pager span.current {
-        background: #22c55e;
-        border-color: #22c55e;
+        background: var(--cth-green-bright);
+        border-color: var(--cth-green-bright);
         color: #fff;
         font-weight: 700;
     }
@@ -273,7 +272,7 @@
         @endif
         <div class="search">
             <i class="fas fa-search"></i>
-            <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar por conductor, cédula, placa o ID...">
+            <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar por conductor, cédula, placa o tipo de falta...">
         </div>
         <select name="modalidad" onchange="this.form.submit()">
             <option value="">Todas las modalidades</option>
@@ -324,19 +323,17 @@
                         </td>
                         <td>
                             <div class="acts">
-                                <a href="{{ route('abogado.detalleproceso', $proceso->id) }}" title="Ver">
-                                    <i class="far fa-eye"></i>
+                                <a href="{{ route('abogado.detalleproceso', $proceso->id) }}" title="Editar información del proceso">
+                                    <i class="far fa-edit"></i>
                                 </a>
-                                @if(auth()->user()->role == 'coordinadora')
-                                    <form action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST"
-                                          onsubmit="return confirm('¿Deseas eliminar este proceso disciplinario?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="danger" title="Eliminar">
-                                            <i class="far fa-trash-alt"></i>
-                                        </button>
-                                    </form>
-                                @endif
+                                <form action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST"
+                                      onsubmit="return confirm('¿Deseas eliminar este proceso disciplinario?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="danger" title="Eliminar proceso">
+                                        <i class="far fa-trash-alt"></i>
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>

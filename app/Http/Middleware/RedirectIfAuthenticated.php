@@ -25,8 +25,7 @@ class RedirectIfAuthenticated
             switch ($role) {
 
                 case 'admin':
-                    return redirect()->route('admin.dashboard');
-
+                case 'coordinadora':
                 case 'abogado':
                     return redirect()->route('abogado.dashboard');
 

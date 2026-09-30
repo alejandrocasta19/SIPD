@@ -1,3 +1,5 @@
 *
 !public/
+!plantillas/
+!plantillas/*.docx
 !.gitignore

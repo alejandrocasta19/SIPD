@@ -44,7 +44,7 @@
     .btn-save {
         border: 0;
         border-radius: 999px;
-        background: #22c55e;
+        background: var(--cth-green-bright);
         color: #fff;
         font-weight: 700;
         padding: 11px 18px;
@@ -56,7 +56,7 @@
 @section('content')
 @if(session('success'))
 <script>
-    Swal.fire({ icon: 'success', title: 'Éxito', text: '{{ session('success') }}', confirmButtonColor: '#16a34a' });
+    Swal.fire({ icon: 'success', title: 'Éxito', text: '{{ session('success') }}', confirmButtonColor: '#006837' });
 </script>
 @endif
 

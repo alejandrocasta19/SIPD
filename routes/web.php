@@ -171,8 +171,16 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
         [ProcesoDisciplinarioController::class, 'update']
     )->name('abogado.actualizarproceso');
 
+    Route::put('/abogado/actualizarestado/{id}',
+        [ProcesoDisciplinarioController::class, 'updateStatus']
+    )->name('abogado.actualizarestado');
+
+    Route::put('/abogado/solicitar-veredicto/{id}',
+        [ProcesoDisciplinarioController::class, 'solicitarVeredicto']
+    )->name('abogado.solicitar_veredicto');
+
 });
-Route::middleware(['auth', 'role:admin,coordinadora'])->group(function () {
+Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
     Route::delete('/abogado/eliminarproceso/{id}',
         [ProcesoDisciplinarioController::class, 'destroy']
     )->name('abogado.eliminarproceso');

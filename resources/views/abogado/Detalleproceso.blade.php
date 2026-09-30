@@ -2,6 +2,17 @@
 
 @section('content')
 
+@if(session('error'))
+    <div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> {{ session('error') }}</div>
+@endif
+
+@if($errors->any())
+    <div class="alert alert-warning">
+        <strong>Información pendiente:</strong>
+        <ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+    </div>
+@endif
+
 <form action="{{ route('abogado.actualizarproceso', $proceso->id) }}"
       method="POST"
       enctype="multipart/form-data">
@@ -44,6 +55,127 @@
 
                         </button>
 
+                    </div>
+                </div>
+
+                <div class="card-body border-bottom bg-light">
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="p-3 bg-white rounded border shadow-sm">
+                                <small class="text-uppercase font-weight-bold text-muted d-block mb-2"><i class="fas fa-route text-primary"></i> Estado y Flujo del Proceso:</small>
+                                <div class="d-flex align-items-center justify-content-between text-center position-relative">
+                                    @php
+                                        $e = $proceso->estado;
+                                        $fase1 = in_array($e, ['Pendiente', 'En Proceso', 'Sancionado', 'Archivado']);
+                                        $fase2 = in_array($e, ['En Proceso', 'Sancionado', 'Archivado']);
+                                        $fase3 = in_array($e, ['Sancionado', 'Archivado']);
+                                    @endphp
+                                    <div class="flex-fill">
+                                        <span class="badge badge-{{ $fase1 ? 'success' : 'secondary' }} p-2 mb-1"><i class="fas fa-check-circle"></i> 1. Apertura / Notificación</span>
+                                        <small class="d-block text-muted">Auto Disciplinario o Comprobación</small>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-muted mx-2"></i>
+                                    <div class="flex-fill">
+                                        <span class="badge badge-{{ $fase2 ? 'primary' : 'secondary' }} p-2 mb-1"><i class="{{ $fase2 ? 'fas fa-spinner fa-spin' : 'far fa-circle' }}"></i> 2. Descargos / Pruebas</span>
+                                        <small class="d-block text-muted">Acta de Cargos y Descargos</small>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-muted mx-2"></i>
+                                    <div class="flex-fill">
+                                        <span class="badge badge-{{ $fase3 ? ($e == 'Sancionado' ? 'danger' : 'dark') : 'secondary' }} p-2 mb-1"><i class="fas fa-gavel"></i> 3. Fallo / {{ $e == 'Archivado' ? 'Archivo' : 'Sanción' }}</span>
+                                        <small class="d-block text-muted">Resolución Final</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <h5 class="mb-0 font-weight-bold text-dark">
+                            <i class="fas fa-file-signature text-success"></i> Documentos Oficiales del Caso
+                        </h5>
+                        <a class="btn btn-sm btn-success" href="{{ route('documentos.index', $proceso->id) }}">
+                            <i class="fas fa-folder-open"></i> Ver todos los documentos y evidencias
+                        </a>
+                    </div>
+                    <p class="text-muted small mb-3">
+                        Los 3 documentos oficiales de este expediente utilizan el formato de plantillas institucionales de Cootranshuila.
+                    </p>
+
+                    <div class="row justify-content-center">
+                        @if($proceso->tipo_proceso !== 'comprobacion')
+                        {{-- 1. Apertura Disciplinaria --}}
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border shadow-sm" style="background: linear-gradient(145deg, #ffffff, #f8f9fa); border-radius: 12px; overflow: hidden;">
+                                <div class="card-body p-4 text-center">
+                                    <div class="mb-3">
+                                        <div style="width: 60px; height: 60px; background: rgba(0, 123, 255, 0.1); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+                                            <i class="fas fa-balance-scale text-primary fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <h6 class="font-weight-bold mb-2" style="font-size:14px;">1.1 GA-FT-045 Apertura Proceso Disciplinarios</h6>
+                                    <p class="text-muted small mb-3">Documento principal inicial</p>
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <a href="{{ route('documentos.download', [$proceso->id, 'disciplinario']) }}" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm">
+                                            <i class="fas fa-file-word mr-1"></i> DOCX
+                                        </a>
+                                        <a href="{{ route('documentos.download', [$proceso->id, 'disciplinario']) }}?format=pdf" class="btn btn-sm btn-danger px-3 rounded-pill shadow-sm">
+                                            <i class="fas fa-file-pdf mr-1"></i> PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+
+                        @if($proceso->tipo_proceso !== 'disciplinario')
+                        {{-- 2. Apertura Comprobación --}}
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border shadow-sm" style="background: linear-gradient(145deg, #ffffff, #fefce8); border-radius: 12px; overflow: hidden;">
+                                <div class="card-body p-4 text-center">
+                                    <div class="mb-3">
+                                        <div style="width: 60px; height: 60px; background: rgba(234, 179, 8, 0.15); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+                                            <i class="fas fa-search text-warning fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <h6 class="font-weight-bold mb-2" style="font-size:14px;">1.1 GA-FT-045 Apertura Proceso Comprobación</h6>
+                                    <p class="text-muted small mb-3">Ruta de comprobación</p>
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <a href="{{ route('documentos.download', [$proceso->id, 'comprobacion']) }}" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm">
+                                            <i class="fas fa-file-word mr-1"></i> DOCX
+                                        </a>
+                                        <a href="{{ route('documentos.download', [$proceso->id, 'comprobacion']) }}?format=pdf" class="btn btn-sm btn-danger px-3 rounded-pill shadow-sm">
+                                            <i class="fas fa-file-pdf mr-1"></i> PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+
+                        @if($proceso->estado !== 'Pendiente' || $proceso->tipo_proceso === 'acta')
+                        {{-- 3. Acta Cargos y Descargos --}}
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border shadow-sm" style="background: linear-gradient(145deg, #ffffff, #faf5ff); border-radius: 12px; overflow: hidden;">
+                                <div class="card-body p-4 text-center">
+                                    <div class="mb-3">
+                                        <div style="width: 60px; height: 60px; background: rgba(168, 85, 247, 0.1); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
+                                            <i class="fas fa-gavel fa-2x" style="color:#9333ea;"></i>
+                                        </div>
+                                    </div>
+                                    <h6 class="font-weight-bold mb-2" style="font-size:14px;">2. Acta de cargos y descargos (grabación)</h6>
+                                    <p class="text-muted small mb-3">Diligencia de descargos</p>
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <a href="{{ route('documentos.download', [$proceso->id, 'acta']) }}" class="btn btn-sm btn-primary px-3 rounded-pill shadow-sm">
+                                            <i class="fas fa-file-word mr-1"></i> DOCX
+                                        </a>
+                                        <a href="{{ route('documentos.download', [$proceso->id, 'acta']) }}?format=pdf" class="btn btn-sm btn-danger px-3 rounded-pill shadow-sm">
+                                            <i class="fas fa-file-pdf mr-1"></i> PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
                     </div>
                 </div>
                 
@@ -96,26 +228,6 @@
                                     <input type="text"
                                            name="modalidad"
                                            value="{{ $proceso->modalidad }}"
-                                           class="form-control campo-editable"
-                                           readonly>
-                                </div>
-
-                                <div class="col-md-4">
-                                    <strong>Placa del Vehículo:</strong>
-
-                                    <input type="text"
-                                           name="placa"
-                                           value="{{ $proceso->placa }}"
-                                           class="form-control campo-editable"
-                                           readonly>
-                                </div>
-
-                                <div class="col-md-4">
-                                    <strong>Ruta:</strong>
-
-                                    <input type="text"
-                                           name="ruta"
-                                           value="{{ $proceso->ruta }}"
                                            class="form-control campo-editable"
                                            readonly>
                                 </div>
@@ -180,27 +292,27 @@
 
                                     <strong>Documento de la Falta:</strong>
 
-                                    @if($proceso->documento_falta)
-
+                                    @if($proceso->evidencias && $proceso->evidencias->count() > 0)
+                                        <div style="max-height:100px;overflow-y:auto;margin-bottom:8px;">
+                                            @foreach($proceso->evidencias as $evidencia)
+                                            <p class="mb-1" style="font-size:13px;">
+                                                <a href="{{ route('documentos.evidencias.download', [$proceso->id, $evidencia->id]) }}" class="text-info">
+                                                    <i class="fas fa-paperclip"></i> {{ $evidencia->nombre_original }}
+                                                </a>
+                                            </p>
+                                            @endforeach
+                                        </div>
+                                    @elseif($proceso->documento_falta)
                                         <p>
-                                            <a href="{{ asset('storage/' . $proceso->documento_falta) }}"
-                                               target="_blank"
-                                               class="btn btn-sm btn-info">
-
-                                                <i class="fas fa-file-pdf"></i> Ver Documento
-
+                                            <a href="{{ route('abogado.documento-falta', $proceso->id) }}" class="btn btn-sm btn-info">
+                                                <i class="fas fa-file-pdf"></i> Ver Documento Principal
                                             </a>
                                         </p>
-
                                     @else
-
                                         <p>No hay documento adjunto</p>
-
                                     @endif
 
-                                    <input type="file"
-                                           name="documento_falta" class="form-control campo-editable" disabled>
-                                     </input>
+                                    <input type="file" name="documento_falta[]" multiple class="form-control campo-editable" disabled>
                                 </div>
                             </div>
                         </div>
@@ -240,73 +352,26 @@
 </div>
                                     <!-- Estado del Proceso -->
 <div class="col-md-5">
-
-    <strong>Estado del Proceso:</strong>
-
-   <div id="estadoBotones" style="display:none; margin-top:10px;">
-
-    <div class="d-flex gap-2 flex-wrap">
-
-        <!-- PENDIENTE -->
-        <label class="btn btn-warning">
-
-            <input type="radio"
-                   name="estado"
-                   value="Pendiente"
-                   {{ $proceso->estado == 'Pendiente' ? 'checked' : '' }}>
-
-            Pendiente
-
-        </label>
-
-        <!-- EN PROCESO -->
-        <label class="btn btn-primary">
-
-            <input type="radio"
-                   name="estado"
-                   value="En Proceso"
-                   {{ $proceso->estado == 'En Proceso' ? 'checked' : '' }}>
-
-            En Proceso
-
-        </label>
-
-        <!-- SANCIONADO -->
-        <label class="btn btn-success">
-
-            <input type="radio"
-                   name="estado"
-                   value="Sancionado"
-                   {{ $proceso->estado == 'Sancionado' ? 'checked' : '' }}>
-
-            Sancionado
-
-        </label>
-
-        <!-- ARCHIVADO -->
-        <label class="btn btn-secondary">
-
-            <input type="radio"
-                   name="estado"
-                   value="Archivado"
-                   {{ $proceso->estado == 'Archivado' ? 'checked' : '' }}>
-
-            Archivado
-
-        </label>
-
-    </div>
-
-</div>
-    </div>
-
-    <p id="estadoTexto"
-       class="mt-2">
-
-        {{ $proceso->estado }}
-
-    </p>
-
+    <strong>Cambiar Estado Rápidamente:</strong>
+    <p class="text-muted small mb-2">Selecciona un estado para actualizar el proceso inmediatamente.</p>
+    <form action="{{ route('abogado.actualizarestado', $proceso->id) }}" method="POST">
+        @csrf
+        @method('PUT')
+        <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" name="estado" value="Pendiente" class="btn btn-sm {{ $proceso->estado == 'Pendiente' ? 'btn-warning text-white' : 'btn-outline-warning text-dark' }} font-weight-bold shadow-sm">
+                Pendiente
+            </button>
+            <button type="submit" name="estado" value="En Proceso" class="btn btn-sm {{ $proceso->estado == 'En Proceso' ? 'btn-primary' : 'btn-outline-primary' }} font-weight-bold shadow-sm">
+                En Proceso
+            </button>
+            <button type="submit" name="estado" value="Sancionado" class="btn btn-sm {{ $proceso->estado == 'Sancionado' ? 'btn-danger' : 'btn-outline-danger' }} font-weight-bold shadow-sm" onclick="return confirm('¿Seguro que deseas sancionar? Esto cerrará el proceso permanentemente y no podrás editarlo después.');">
+                Sancionado
+            </button>
+            <button type="submit" name="estado" value="Archivado" class="btn btn-sm {{ $proceso->estado == 'Archivado' ? 'btn-secondary' : 'btn-outline-secondary' }} font-weight-bold shadow-sm">
+                Archivado
+            </button>
+        </div>
+    </form>
 </div>
                                 </div>
                             </div>
@@ -438,23 +503,24 @@
 <script>
 
 function habilitarEdicion() {
-
     let campos = document.querySelectorAll('.campo-editable');
-
     campos.forEach(campo => {
-
         campo.removeAttribute('readonly');
-
         campo.removeAttribute('disabled');
-
     });
-
     document.getElementById('btnGuardar').style.display = 'inline-block';
-
-    document.getElementById('estadoBotones').style.display = 'block';
-
-    document.getElementById('estadoTexto').style.display = 'none';
 }
 
+@if(session('autodownload'))
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        var a = document.createElement('a');
+        a.href = "{{ route('documentos.download', [$proceso->id, session('autodownload')]) }}";
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+    }, 1000); // 1 segundo de retraso para que el toast cargue
+});
+@endif
 </script>
 @endsection

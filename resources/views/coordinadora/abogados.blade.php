@@ -50,7 +50,7 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: #22c55e;
+        background: var(--cth-green-bright);
         color: #fff;
         border: 0;
         border-radius: 999px;
@@ -104,13 +104,13 @@
         outline: none;
     }
 
-    .form-grid input:focus { border-color: #22c55e; }
+    .form-grid input:focus { border-color: var(--cth-green-bright); }
 
     .btn-save {
         height: 42px;
         border: 0;
         border-radius: 10px;
-        background: #16a34a;
+        background: var(--cth-green);
         color: #fff;
         font-weight: 700;
         padding: 0 18px;
@@ -162,7 +162,7 @@
         height: 36px;
         border-radius: 50%;
         background: #ecfdf5;
-        color: #166534;
+        color: var(--cth-green-text);
         display: grid;
         place-items: center;
         font-size: 12px;
@@ -175,10 +175,10 @@
         align-items: center;
         gap: 6px;
         font-weight: 600;
-        color: #166534;
+        color: var(--cth-green-text);
     }
 
-    .st i { font-size: 8px; color: #22c55e; }
+    .st i { font-size: 8px; color: var(--cth-green-bright); }
 
     .acts { display: flex; gap: 8px; }
 
@@ -256,7 +256,7 @@
     }
 
     .btn-ghost { background: #f1f5f9; color: #475569; }
-    .btn-ok { background: #16a34a; color: #fff; }
+    .btn-ok { background: var(--cth-green); color: #fff; }
 
     @media (max-width: 900px) {
         .abg-head { flex-direction: column; }
@@ -273,7 +273,7 @@
         icon: 'success',
         title: 'Éxito',
         text: '{{ session('success') }}',
-        confirmButtonColor: '#16a34a'
+        confirmButtonColor: '#006837'
     });
 </script>
 @endif
