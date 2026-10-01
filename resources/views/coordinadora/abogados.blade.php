@@ -156,6 +156,7 @@
     }
 
     .acts button.key:hover { background: #eff6ff; color: #2563eb; }
+    .acts button.edit-rh:hover { background: #ecfdf5; color: var(--cth-green-text); }
     .perm-chip { font-size: 12px; color: #475569; }
     .perm-chip em { font-style: normal; color: #d97706; font-weight: 600; }
     .perm-lead { margin: 0 0 16px; color: #64748b; font-size: 13px; line-height: 1.45; }
@@ -340,8 +341,11 @@
                                     onclick="abrirPermisos(this)">
                                     <i class="fas fa-key"></i>
                                 </button>
-                                <button type="button" title="Editar"
-                                    onclick="abrirModalEditar('{{ $abogado->id }}', @json($abogado->name), @json($abogado->email), @json($abogado->cargo))">
+                                <button type="button" class="edit-rh" title="Editar"
+                                    data-name="{{ $abogado->name }}"
+                                    data-email="{{ $abogado->email }}"
+                                    data-cargo="{{ $abogado->cargo }}"
+                                    data-action="{{ route('coordinadora.abogados.editar', $abogado->id) }}">
                                     <i class="fas fa-pen"></i>
                                 </button>
                                 <form action="{{ route('coordinadora.abogados.eliminar', $abogado->id) }}" method="POST"
@@ -375,11 +379,18 @@
                 @csrf
                 @method('PUT')
                 <label>Nombre</label>
-                <input type="text" name="name" id="editName" required>
+                <input type="text" name="name" id="editName" required value="{{ session('abrir_editar_rh') ? old('name') : '' }}">
                 <label>Correo</label>
-                <input type="email" name="email" id="editEmail" required>
+                <input type="email" name="email" id="editEmail" required value="{{ session('abrir_editar_rh') ? old('email') : '' }}">
                 <label>Cargo</label>
-                <input type="text" name="cargo" id="editCargo" required>
+                <input type="text" name="cargo" id="editCargo" required value="{{ session('abrir_editar_rh') ? old('cargo') : '' }}">
+                <label>Nueva contraseña</label>
+                <input type="password" name="nueva_password" id="editPassword" minlength="6" autocomplete="new-password" placeholder="Déjala vacía si no la cambias">
+                <label>Confirmar contraseña</label>
+                <input type="password" name="nueva_password_confirmation" id="editPasswordConfirm" minlength="6" autocomplete="new-password">
+                @error('nueva_password')
+                    <p class="sipd-dialog-lead" style="color:#be123c;">{{ $message }}</p>
+                @enderror
                 <div class="sipd-dialog-actions">
                     <button type="button" class="btn-ghost" onclick="cerrarModal()">Cancelar</button>
                     <button type="submit" class="btn-ok">Guardar</button>
@@ -444,17 +455,38 @@
         box.style.display = box.style.display === 'block' ? 'none' : 'block';
     });
 
-    function abrirModalEditar(id, nombre, email, cargo) {
-        document.getElementById('modalEditar').style.display = 'flex';
-        document.getElementById('editName').value = nombre;
-        document.getElementById('editEmail').value = email;
-        document.getElementById('editCargo').value = cargo;
-        document.getElementById('formEditar').action = '/coordinadora/abogados/editar/' + id;
+    function limpiarClaveEditar() {
+        var pass = document.getElementById('editPassword');
+        var conf = document.getElementById('editPasswordConfirm');
+        if (pass) pass.value = '';
+        if (conf) conf.value = '';
     }
+
+    function abrirModalEditar(btn) {
+        document.getElementById('editName').value = btn.getAttribute('data-name') || '';
+        document.getElementById('editEmail').value = btn.getAttribute('data-email') || '';
+        document.getElementById('editCargo').value = btn.getAttribute('data-cargo') || '';
+        document.getElementById('formEditar').action = btn.getAttribute('data-action') || '';
+        limpiarClaveEditar();
+        document.getElementById('modalEditar').style.display = 'flex';
+        document.getElementById('editName').focus();
+    }
+
+    document.querySelectorAll('.edit-rh').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            abrirModalEditar(btn);
+        });
+    });
 
     function cerrarModal() {
         document.getElementById('modalEditar').style.display = 'none';
+        limpiarClaveEditar();
     }
+
+    @if(session('abrir_editar_rh'))
+        document.getElementById('formEditar').action = @json(session('abrir_editar_rh'));
+        document.getElementById('modalEditar').style.display = 'flex';
+    @endif
 
     function abrirPermisos(btn) {
         var data = {};

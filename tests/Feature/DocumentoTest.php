@@ -529,6 +529,8 @@ class DocumentoTest extends TestCase
             ->assertSee('3. Sanción / llamado / terminación')
             ->assertSee('4. Decisión de archivo')
             ->assertSee('Usar formato')
+            ->assertSee('Las zonas amarillas son editables')
+            ->assertSee('no se generan en el documento')
             ->assertSee('sipd_nuevo_proceso', false);
     }
 

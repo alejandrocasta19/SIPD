@@ -94,12 +94,35 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 12px;
     background: #f8fafc;
 }
 .panel-head h3 {
     margin: 0; font-size: 15px; font-weight: 700;
     color: var(--c-slate); display: flex; align-items: center; gap: 8px;
+}
+.doc-yellow-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 420px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    color: #854d0e;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.doc-yellow-hint i { margin-top: 2px; color: #ca8a04; }
+.doc-yellow-hint strong { display: block; font-weight: 800; }
+.doc-yellow-hint small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #a16207;
 }
 
 /* ─── Responsable strip ─── */
@@ -364,7 +387,14 @@
     <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
         <div class="panel-head" style="background:#f8fafc;">
             <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento interactivo oficial</h3>
-            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son opcionales. Al registrar queda en borrador; genera y descarga en Generar documentos.</div>
+            <div class="doc-yellow-hint">
+                <i class="fas fa-highlighter"></i>
+                <div>
+                    <strong>Las zonas amarillas son editables.</strong>
+                    Las que no se rellenen no se generan en el documento.
+                    <small>Al registrar queda en borrador; genera y descarga en Generar documentos.</small>
+                </div>
+            </div>
         </div>
 
         <div id="variant-bar" style="padding:14px 24px; border-bottom:1px solid var(--c-border); display:none; gap:8px; flex-wrap:wrap; align-items:center; background:#fff;">

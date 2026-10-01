@@ -15,8 +15,30 @@
 .ci-badge { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: #fff; }
 .ci-badge.complete { background: rgba(34,197,94,.2); border-color: rgba(34,197,94,.4); }
 .panel-card { background: #fff; border-radius: var(--radius); border: 1px solid var(--c-border); box-shadow: 0 2px 8px rgba(15,23,42,.06); overflow: hidden; }
-.panel-head { padding: 18px 24px; border-bottom: 1px solid var(--c-border); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #f8fafc; }
+.panel-head { padding: 18px 24px; border-bottom: 1px solid var(--c-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: #f8fafc; }
 .panel-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--c-slate); display: flex; align-items: center; gap: 8px; }
+.doc-yellow-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 420px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    color: #854d0e;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.doc-yellow-hint i { margin-top: 2px; color: #ca8a04; }
+.doc-yellow-hint strong { display: block; font-weight: 800; }
+.doc-yellow-hint small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #a16207;
+}
 .resp-strip { background: #f0fdf4; border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; gap: 12px; margin-bottom: 18px; border: 1px solid #bbf7d0; }
 .resp-ava { width: 38px; height: 38px; border-radius: 50%; background: var(--c-green-dk); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
 .resp-info b { display: block; font-size: 13px; color: #0f172a; }
@@ -123,7 +145,14 @@
     <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
         <div class="panel-head" style="background:#f8fafc;">
             <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento Interactivo Oficial</h3>
-            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son opcionales. Genera y descárgalo en Generar documentos.</div>
+            <div class="doc-yellow-hint">
+                <i class="fas fa-highlighter"></i>
+                <div>
+                    <strong>Las zonas amarillas son editables.</strong>
+                    Las que no se rellenen no se generan en el documento.
+                    <small>Genera y descárgalo en Generar documentos.</small>
+                </div>
+            </div>
         </div>
 
         @if(!empty($slot) && \App\Models\CasoDocumentoEstado::slotTieneOpciones($slot))

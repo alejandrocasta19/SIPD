@@ -223,7 +223,7 @@ class OfficialDocumentService
         $n = count($this->blockDefinitions($type));
         return [[
             'titulo' => 'Campos editables del formato',
-            'desc' => 'Las casillas amarillas son opcionales. Las vacías no se incluyen en Word ni PDF.',
+            'desc' => 'Las zonas amarillas son editables. Las que no se rellenen no se generan en el documento.',
             'bloques' => range(0, max(0, $n - 1)),
         ]];
     }

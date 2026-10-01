@@ -1088,17 +1088,44 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function editarAbogado(Request $request, $id)
     {
-        $abogado = User::findOrFail($id);
+        $abogado = User::where('role', 'abogado')->findOrFail($id);
+        $editarUrl = route('coordinadora.abogados.editar', $abogado->id);
 
-        $abogado->update([
-            'name' => $request->name,
-            'email' => $request->email,
-            'cargo' => $request->cargo
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email,' . $abogado->id,
+                'cargo' => 'required|string|max:255',
+                'nueva_password' => 'nullable|string|min:6|confirmed',
+            ], [
+                'nueva_password.min' => 'La contraseña debe tener al menos :min caracteres.',
+                'nueva_password.confirmed' => 'La confirmación de la contraseña no coincide.',
+            ]);
+        } catch (ValidationException $e) {
+            return redirect()
+                ->back()
+                ->withErrors($e->validator)
+                ->withInput()
+                ->with('abrir_editar_rh', $editarUrl);
+        }
+
+        $data = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'cargo' => $validated['cargo'],
+        ];
+
+        if (!empty($validated['nueva_password'])) {
+            $data['password'] = Hash::make($validated['nueva_password']);
+        }
+
+        $abogado->update($data);
 
         return redirect()
             ->back()
-            ->with('success', 'Registro de RH actualizado correctamente');
+            ->with('success', empty($validated['nueva_password'])
+                ? 'Registro de RH actualizado correctamente'
+                : 'Registro de RH y contraseña actualizados.');
     }
 
     public function asignarProceso(Request $request, $id)

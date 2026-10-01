@@ -466,6 +466,95 @@ class CoordinadoraTest extends TestCase
     }
 
     /** @test */
+    public function coordinadora_puede_editar_miembro_del_equipo()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado', [
+            'name' => 'KELLY JOHANNA RODRIGUEZ VARGAS',
+            'email' => 'kelly.johanna.rodriguez@pendiente.local',
+            'cargo' => 'Equipo de RH',
+        ]);
+
+        $this->actingAs($coord)
+            ->get(route('coordinadora.abogados'))
+            ->assertOk()
+            ->assertSee('class="edit-rh"', false)
+            ->assertSee('data-name="KELLY JOHANNA RODRIGUEZ VARGAS"', false)
+            ->assertSee('data-email="kelly.johanna.rodriguez@pendiente.local"', false)
+            ->assertSee(route('coordinadora.abogados.editar', $rh->id), false)
+            ->assertSee('name="nueva_password"', false)
+            ->assertSee('name="nueva_password_confirmation"', false)
+            ->assertDontSee("onclick=\"abrirModalEditar", false);
+
+        $hashAntes = $rh->password;
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.abogados.editar', $rh->id), [
+                'name' => 'Kelly Johanna Rodríguez',
+                'email' => 'kelly.actualizada@sipd.co',
+                'cargo' => 'Analista de RH',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $rh->id,
+            'name' => 'Kelly Johanna Rodríguez',
+            'email' => 'kelly.actualizada@sipd.co',
+            'cargo' => 'Analista de RH',
+        ]);
+        $this->assertSame($hashAntes, $rh->fresh()->password);
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.abogados'))
+            ->put(route('coordinadora.abogados.editar', $rh->id), [
+                'name' => 'Kelly Johanna Rodríguez',
+                'email' => 'kelly.actualizada@sipd.co',
+                'cargo' => 'Analista de RH',
+                'nueva_password' => 'sipd456',
+                'nueva_password_confirmation' => 'sipd456',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sipd456', $rh->fresh()->password));
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.abogados'))
+            ->put(route('coordinadora.abogados.editar', $rh->id), [
+                'name' => 'Kelly Johanna Rodríguez',
+                'email' => 'kelly.actualizada@sipd.co',
+                'cargo' => 'Analista de RH',
+                'nueva_password' => 'otra789',
+                'nueva_password_confirmation' => 'no-coincide',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('abrir_editar_rh')
+            ->assertSessionHasErrors('nueva_password');
+
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sipd456', $rh->fresh()->password));
+    }
+
+    /** @test */
+    public function equipo_rh_no_puede_editar_miembros_del_equipo()
+    {
+        $rh = $this->makeUser('abogado');
+        $otro = $this->makeUser('abogado', ['name' => 'Otra RH']);
+
+        $this->actingAs($rh)
+            ->put(route('coordinadora.abogados.editar', $otro->id), [
+                'name' => 'Hackeado',
+                'email' => 'hack@sipd.co',
+                'cargo' => 'Nada',
+                'nueva_password' => 'clave123',
+                'nueva_password_confirmation' => 'clave123',
+            ])
+            ->assertRedirect('/');
+
+        $this->assertNotSame('Hackeado', $otro->fresh()->name);
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('password', $otro->fresh()->password));
+    }
+
+    /** @test */
     public function rh_sin_permiso_no_descarga_documentos()
     {
         $rh = $this->makeUser('abogado');
