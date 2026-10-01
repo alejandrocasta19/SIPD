@@ -65,7 +65,7 @@
                         $fase = $proceso->faseFlujo();
                         $flujo = $proceso->resumenFlujo();
                         $fasePendienteOn = $flujo['paso'] === 'pendiente';
-                        $faseProcesoOn = $flujo['paso'] === 'revision';
+                        $faseProcesoOn = in_array($flujo['paso'], ['elaboracion', 'revision'], true);
                         $faseFalloOn = $flujo['paso'] === 'fallo';
                         $fase3Cls = $fase === 'archivado' ? 'archivado' : 'sancionado';
                         $falloLabel = match ($fase) {
@@ -73,14 +73,7 @@
                             'sancionado' => 'Sancionado',
                             default => 'Fallo',
                         };
-                        $estadoHint = match ($proceso->estado) {
-                            'Sancionado' => 'El expediente quedó sancionado y está cerrado.',
-                            'Archivado' => 'El expediente quedó archivado y está cerrado.',
-                            'En Proceso' => 'Pendiente de veredicto de la coordinadora.',
-                            default => $proceso->puedeEnviarAProceso()
-                                ? 'Los 4 documentos están listos. Envíe a revisión.'
-                                : $flujo['detalle'],
-                        };
+                        $estadoHint = $flujo['detalle'];
                     @endphp
                     <div class="p-3 bg-white rounded border shadow-sm">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
@@ -116,7 +109,7 @@
                             <i class="fas fa-chevron-right text-muted mx-2"></i>
                             <div class="flex-fill sipd-flujo-step {{ $faseProcesoOn ? 'is-current' : ($faseFalloOn ? 'is-done' : 'is-wait') }}">
                                 <span class="sipd-estado sipd-estado--proceso {{ $faseProcesoOn ? 'is-on' : '' }}">
-                                    <i class="fas {{ $faseProcesoOn ? 'fa-user-check' : ($faseFalloOn ? 'fa-check' : 'fa-pen') }}"></i>
+                                    <i class="fas {{ $flujo['paso'] === 'revision' ? 'fa-user-check' : ($faseFalloOn ? 'fa-check' : 'fa-pen') }}"></i>
                                     En Proceso
                                 </span>
                                 <small class="d-block text-muted">{{ $flujo['sub_medio'] }}</small>
@@ -375,23 +368,22 @@
                                     <div class="detalle-estado">
                                         <p>{{ $estadoHint }}</p>
                                         <div class="detalle-estado-chips">
-                                            <span class="sipd-estado sipd-estado--pendiente {{ $proceso->estado === 'Pendiente' ? 'is-on' : '' }}">
+                                            <span class="sipd-estado sipd-estado--pendiente {{ $fasePendienteOn ? 'is-on' : '' }}">
                                                 Pendiente
+                                            </span>
+                                            <span class="sipd-estado sipd-estado--proceso {{ $faseProcesoOn ? 'is-on' : '' }}">
+                                                En Proceso
                                             </span>
                                             @if($proceso->puedeEnviarAProceso() && !auth()->user()->esCoordinadora())
                                                 <button type="submit"
                                                         form="form-enviar-proceso"
-                                                        class="sipd-estado sipd-estado--proceso is-on"
+                                                        class="btn btn-sm btn-success"
                                                         data-confirm="El caso pasará a revisión de la coordinadora."
                                                         data-confirm-title="Enviar a revisión"
                                                         data-confirm-ok="Enviar"
                                                         data-confirm-icon="question">
-                                                    Enviar
+                                                    Enviar a revisión
                                                 </button>
-                                            @else
-                                                <span class="sipd-estado sipd-estado--proceso {{ $proceso->estado === 'En Proceso' ? 'is-on' : '' }}">
-                                                    En Proceso
-                                                </span>
                                             @endif
                                             @if($proceso->estado === 'En Proceso' && auth()->user()->esCoordinadora())
                                                 <button type="submit"

@@ -491,40 +491,37 @@ class ProcesoDisciplinario extends Model
             $subMedio = 'Pendiente de veredicto';
             $subFallo = 'Sancionado o archivado';
             $slotActual = null;
-        } elseif ($this->puedeEnviarAProceso()) {
-            $paso = 'pendiente';
-            $titulo = 'Pendiente';
-            $detalle = 'Los 4 documentos están generados. Envíe el caso a revisión.';
-            $chipMedio = 'En Proceso';
-            $subPendiente = '4 de 4 documentos listos';
-            $subMedio = 'Envíe a revisión';
-            $subFallo = 'Sancionado o archivado';
-            $slotActual = null;
         } elseif ($generados === 0 && $borradores === 0) {
             $paso = 'pendiente';
             $titulo = 'Pendiente';
             $detalle = 'Todavía no hay documentos. Empiece por Apertura.';
             $chipMedio = 'En Proceso';
             $subPendiente = 'Sin documentos aún';
-            $subMedio = 'Cuando envíe a revisión';
+            $subMedio = 'Desde el primer documento hasta enviarlo a revisión';
             $subFallo = 'Sancionado o archivado';
             $slotActual = 'apertura';
         } else {
-            $paso = 'pendiente';
-            $titulo = 'Pendiente';
-            $detalle = $generados . ' de 4 documentos listos';
-            if ($nombresListos) {
-                $detalle .= ' (' . implode(', ', $nombresListos) . ')';
-            }
-            $detalle .= '.';
-            if ($siguienteEsBorrador) {
-                $detalle .= ' Hay un borrador de ' . $siguienteCorto . '.';
-            } elseif ($siguienteCorto) {
-                $detalle .= ' Siguiente: ' . $siguienteCorto . '.';
+            $paso = 'elaboracion';
+            $titulo = 'En Proceso';
+            if ($this->puedeEnviarAProceso()) {
+                $detalle = 'Los 4 documentos están listos. Envíe el caso a revisión.';
+                $subMedio = '4 de 4 listos · Enviar a revisión';
+                $slotActual = null;
+            } else {
+                $detalle = $generados . ' de 4 documentos listos';
+                if ($nombresListos) {
+                    $detalle .= ' (' . implode(', ', $nombresListos) . ')';
+                }
+                $detalle .= '.';
+                if ($siguienteEsBorrador) {
+                    $detalle .= ' Hay un borrador de ' . $siguienteCorto . '.';
+                } elseif ($siguienteCorto) {
+                    $detalle .= ' Siguiente: ' . $siguienteCorto . '.';
+                }
+                $subMedio = $generados . ' de 4 listos';
             }
             $chipMedio = 'En Proceso';
-            $subPendiente = $generados . ' de 4 listos';
-            $subMedio = 'Cuando envíe a revisión';
+            $subPendiente = 'Ya hay documentos';
             $subFallo = 'Sancionado o archivado';
         }
 
