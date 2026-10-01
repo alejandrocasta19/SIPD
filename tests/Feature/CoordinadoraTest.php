@@ -292,6 +292,74 @@ class CoordinadoraTest extends TestCase
         $this->assertDatabaseMissing('sipd_avisos', ['id' => $aviso->id]);
     }
 
+    /** @test */
+    public function coordinadora_puede_quitar_alertas_del_sistema_y_vuelven_si_hay_caso_nuevo()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $this->makeCaso($coord, [
+            'estado' => 'En Proceso',
+            'nombre' => 'Caso En Trámite',
+            'created_at' => now()->subDays(8),
+            'descargos' => null,
+        ]);
+
+        $this->actingAs($coord)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertSee('Plazos vencidos')
+            ->assertSee('Pendientes de veredicto')
+            ->assertSee('Descargos pendientes')
+            ->assertSee('Quitar alertas de ahora');
+
+        $this->actingAs($coord)
+            ->from(route('notificaciones.index'))
+            ->delete(route('notificaciones.alertas.silenciar', 'veredictos'))
+            ->assertRedirect(route('notificaciones.index'))
+            ->assertSessionHas('success');
+
+        $this->actingAs($coord)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertDontSee('Pendientes de veredicto')
+            ->assertSee('Plazos vencidos')
+            ->assertSee('Descargos pendientes');
+
+        $this->makeCaso($coord, [
+            'estado' => 'En Proceso',
+            'nombre' => 'Nuevo En Trámite',
+        ]);
+
+        $this->actingAs($coord)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertSee('Pendientes de veredicto')
+            ->assertSee('1 expediente en proceso');
+    }
+
+    /** @test */
+    public function coordinadora_quita_todas_las_alertas_de_ahora()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $this->makeCaso($coord, [
+            'estado' => 'En Proceso',
+            'created_at' => now()->subDays(8),
+            'descargos' => null,
+        ]);
+
+        $this->actingAs($coord)
+            ->from(route('notificaciones.index'))
+            ->delete(route('notificaciones.alertas.silenciar-todas'))
+            ->assertRedirect(route('notificaciones.index'));
+
+        $this->actingAs($coord)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertDontSee('Plazos vencidos')
+            ->assertDontSee('Pendientes de veredicto')
+            ->assertDontSee('Descargos pendientes')
+            ->assertSee('No hay notificaciones');
+    }
+
     private function makeCaso(?User $user, array $attrs = []): ProcesoDisciplinario
     {
         return ProcesoDisciplinario::factory()->create(array_merge([

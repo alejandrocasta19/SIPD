@@ -8,26 +8,40 @@
             <h1>Bandeja de notificaciones</h1>
             <p>Los avisos de coordinación llegan aparte de las alertas del sistema.</p>
         </div>
-        @if($avisos->total() > 0)
+        @if($avisos->total() > 0 || count($alertasSistema) > 0)
             <div class="proc-head-side">
-                @if($puedeBorrar)
-                    <form method="POST" action="{{ route('notificaciones.leidas') }}"
-                          data-confirm="Se borrarán las notificaciones que ya leíste."
-                          data-confirm-title="Eliminar leídas"
-                          data-confirm-ok="Eliminar"
-                          data-confirm-danger="1">
+                @if(count($alertasSistema) > 0)
+                    <form method="POST" action="{{ route('notificaciones.alertas.silenciar-todas') }}"
+                          data-confirm="Se quitarán las alertas del sistema que ves ahora. Si entra un caso nuevo, volverán a aparecer."
+                          data-confirm-title="Quitar alertas de ahora"
+                          data-confirm-ok="Quitar">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn-alt">
-                            <i class="far fa-trash-alt"></i> Eliminar leídas
+                            <i class="far fa-bell-slash"></i> Quitar alertas de ahora
                         </button>
                     </form>
-                @else
-                    <button type="button" class="btn-alt"
-                            data-need-permiso="eliminar_notificaciones"
-                            data-que="Borrar notificaciones de la bandeja que ya no necesito.">
-                        <i class="far fa-trash-alt"></i> Solicitar borrar
-                    </button>
+                @endif
+                @if($avisos->total() > 0)
+                    @if($puedeBorrar)
+                        <form method="POST" action="{{ route('notificaciones.leidas') }}"
+                              data-confirm="Se borrarán las notificaciones que ya leíste."
+                              data-confirm-title="Eliminar leídas"
+                              data-confirm-ok="Eliminar"
+                              data-confirm-danger="1">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn-alt">
+                                <i class="far fa-trash-alt"></i> Eliminar leídas
+                            </button>
+                        </form>
+                    @else
+                        <button type="button" class="btn-alt"
+                                data-need-permiso="eliminar_notificaciones"
+                                data-que="Borrar notificaciones de la bandeja que ya no necesito.">
+                            <i class="far fa-trash-alt"></i> Solicitar borrar
+                        </button>
+                    @endif
                 @endif
             </div>
         @endif
@@ -36,7 +50,7 @@
 
 @section('styles')
 <style>
-    .av-list { display:grid; gap:12px; }
+    .proc-head-side { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
     .av-item {
         display:grid;
         grid-template-columns: 1fr auto;
@@ -125,6 +139,26 @@
 
 @section('content')
     <div class="av-list">
+        @foreach($alertasSistema as $alerta)
+            <article class="av-item is-unread">
+                <a class="av-main" href="{{ $alerta['href'] }}">
+                    <span class="dot {{ $alerta['tono'] }}"><i class="{{ $alerta['icono'] }}"></i></span>
+                    <div>
+                        <span class="av-chip {{ $alerta['tono'] }}">Alerta del sistema</span>
+                        <b>{{ $alerta['titulo'] }}</b>
+                        <div class="av-meta">{{ $alerta['detalle'] }} · Se quita de tu campana, no borra el expediente.</div>
+                    </div>
+                </a>
+                <div class="av-side">
+                    <small class="av-state">Activa</small>
+                    <form method="POST" action="{{ route('notificaciones.alertas.silenciar', $alerta['tipo']) }}">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="av-del" title="Quitar alerta"><i class="far fa-trash-alt"></i></button>
+                    </form>
+                </div>
+            </article>
+        @endforeach
         @forelse($avisos as $aviso)
             <article class="av-item {{ $aviso->leida_at ? '' : 'is-unread' }} {{ $aviso->esDirectiva() ? 'is-coord' : '' }}">
                 <a class="av-main" href="{{ route('notificaciones.leer', $aviso->id) }}">
@@ -169,7 +203,9 @@
                 </div>
             </article>
         @empty
-            <div class="empty">No hay notificaciones.</div>
+            @if(count($alertasSistema) === 0)
+                <div class="empty">No hay notificaciones.</div>
+            @endif
         @endforelse
     </div>
     @include('partials.paginacion', ['paginador' => $avisos])

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Aviso;
 use App\Models\PermisoSolicitud;
+use App\Support\AlertasSistema;
 use App\Support\Paginacion;
 use App\Support\RhPermisos;
 use Illuminate\Http\Request;
@@ -24,8 +25,31 @@ class AvisoController extends Controller
         return view('notificaciones.index', [
             'pageTitle' => 'Notificaciones',
             'avisos' => $avisos,
+            'alertasSistema' => AlertasSistema::visibles($user),
             'puedeBorrar' => $user->puede(RhPermisos::ELIMINAR_NOTIFICACIONES),
         ]);
+    }
+
+    public function silenciarAlerta(string $tipo)
+    {
+        $n = AlertasSistema::silenciar(auth()->user(), $tipo);
+
+        if ($n === 0) {
+            return back()->with('info', 'Esa alerta ya no estaba visible.');
+        }
+
+        return back()->with('success', 'Alerta quitada. Si entra un caso nuevo de este tipo, vuelve a avisarte.');
+    }
+
+    public function silenciarAlertas()
+    {
+        $n = AlertasSistema::silenciarTodas(auth()->user());
+
+        if ($n === 0) {
+            return back()->with('info', 'No hay alertas del sistema para quitar.');
+        }
+
+        return back()->with('success', 'Se quitaron las alertas de ahora. Las que se generen después también las podrás borrar.');
     }
 
     public function leer($id)

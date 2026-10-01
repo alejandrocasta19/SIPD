@@ -253,6 +253,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/perfil/contrasena', [PerfilController::class, 'updatePassword'])->name('perfil.password.update');
     Route::get('/notificaciones', [AvisoController::class, 'index'])->name('notificaciones.index');
     Route::delete('/notificaciones/leidas', [AvisoController::class, 'destroyLeidas'])->name('notificaciones.leidas');
+    Route::delete('/notificaciones/alertas/{tipo}', [AvisoController::class, 'silenciarAlerta'])->name('notificaciones.alertas.silenciar');
+    Route::delete('/notificaciones/alertas', [AvisoController::class, 'silenciarAlertas'])->name('notificaciones.alertas.silenciar-todas');
     Route::get('/notificaciones/{id}', [AvisoController::class, 'leer'])->name('notificaciones.leer');
     Route::delete('/notificaciones/{id}', [AvisoController::class, 'destroy'])->name('notificaciones.destroy');
     Route::post('/permisos/solicitar', [AvisoController::class, 'solicitar'])->name('permisos.solicitar');

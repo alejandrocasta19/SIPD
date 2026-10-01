@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=32">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=33">
     @yield('styles')
 </head>
 <body class="theme-cootranshuila">
@@ -32,26 +32,14 @@
             $visibleProcesses->where('user_id', $me->id);
         }
 
-        $notifVencidos = (clone $visibleProcesses)->whereIn('estado', ['Pendiente', 'En Proceso'])
-            ->whereDate('created_at', '<=', now()->subDays(5)->toDateString())
-            ->count();
-        $notifSinRh = $isManager ? (clone $visibleProcesses)->whereNull('user_id')->count() : 0;
         $notifVeredictos = $isManager ? (clone $visibleProcesses)->where('estado', 'En Proceso')->count() : 0;
-        $notifDescargos = (clone $visibleProcesses)->whereIn('estado', ['Pendiente', 'En Proceso'])
-            ->where(function ($query) {
-                $query->whereNull('descargos')->orWhere('descargos', '');
-            })
-            ->count();
         $bandeja = \App\Models\Aviso::noLeidosPara($me)->take(8);
         $bandejaCount = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count();
+        $alertasSistema = \App\Support\AlertasSistema::visibles($me);
         $notifSolicitudes = $isManager
             ? \App\Models\Aviso::where('user_id', $me->id)->where('tipo', 'solicitud')->whereNull('leida_at')->count()
             : 0;
-        $notifTotal = $bandejaCount
-            + ($notifVencidos > 0 ? 1 : 0)
-            + ($notifSinRh > 0 ? 1 : 0)
-            + ($notifVeredictos > 0 && $bandeja->where('tipo', 'veredicto')->isEmpty() ? 1 : 0)
-            + ($notifDescargos > 0 ? 1 : 0);
+        $notifTotal = $bandejaCount + count($alertasSistema);
         $solicitablesPermiso = \App\Support\RhPermisos::solicitables();
         $duracionesHoras = \App\Support\RhPermisos::duracionesHoras();
         $puedeEditarPerfil = $me->puede('editar_perfil');
@@ -241,42 +229,26 @@
                                     </a>
                                 @endforeach
                             @endif
-                            @if($notifVencidos > 0)
-                                <a href="{{ route('abogado.plazos', ['estado' => 'vencido']) }}">
-                                    <span class="notif-ico warn"><i class="far fa-clock"></i></span>
-                                    <span>
-                                        <b>Plazos vencidos</b>
-                                        <span>{{ $notifVencidos }} proceso{{ $notifVencidos === 1 ? '' : 's' }} {{ $notifVencidos === 1 ? 'superó' : 'superaron' }} el término de 5 días</span>
-                                    </span>
-                                </a>
-                            @endif
-                            @if($notifSinRh > 0)
-                                <a href="{{ route('abogado.consultarproceso') }}">
-                                    <span class="notif-ico info"><i class="fas fa-user-slash"></i></span>
-                                    <span>
-                                        <b>Sin RH asignado</b>
-                                        <span>{{ $notifSinRh }} proceso{{ $notifSinRh === 1 ? '' : 's' }} sin responsable</span>
-                                    </span>
-                                </a>
-                            @endif
-                            @if($notifVeredictos > 0 && $bandeja->where('tipo', 'veredicto')->isEmpty())
-                                <a href="{{ route('coordinadora.veredictos') }}">
-                                    <span class="notif-ico info"><i class="fas fa-gavel"></i></span>
-                                    <span>
-                                        <b>Pendientes de veredicto</b>
-                                        <span>{{ $notifVeredictos }} expediente{{ $notifVeredictos === 1 ? '' : 's' }} en proceso</span>
-                                    </span>
-                                </a>
-                            @endif
-                            @if($notifDescargos > 0)
-                                <a href="{{ route('abogado.consultarproceso') }}">
-                                    <span class="notif-ico ok"><i class="far fa-comment-dots"></i></span>
-                                    <span>
-                                        <b>Descargos pendientes</b>
-                                        <span>{{ $notifDescargos }} expediente{{ $notifDescargos === 1 ? '' : 's' }} esperan respuesta</span>
-                                    </span>
-                                </a>
-                            @endif
+                            @foreach($alertasSistema as $alerta)
+                                <div class="notif-item">
+                                    <a href="{{ $alerta['href'] }}">
+                                        <span class="notif-ico {{ $alerta['tono'] }}">
+                                            <i class="{{ $alerta['icono'] }}"></i>
+                                        </span>
+                                        <span>
+                                            <b>{{ $alerta['titulo'] }}</b>
+                                            <span>{{ $alerta['detalle'] }}</span>
+                                        </span>
+                                    </a>
+                                    <form method="POST" action="{{ route('notificaciones.alertas.silenciar', $alerta['tipo']) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="notif-mute" title="Quitar esta alerta">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            @endforeach
                             @if($notifTotal === 0)
                                 <div class="notif-empty">
                                     <i class="far fa-bell-slash"></i>
