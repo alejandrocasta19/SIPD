@@ -13,10 +13,12 @@ class CasoDocumentoEstado extends Model
         'tipo_documento',
         'estado',
         'generado_en',
+        'descargado_en',
     ];
 
     protected $casts = [
         'generado_en' => 'datetime',
+        'descargado_en' => 'datetime',
     ];
 
     public const TIPOS = [
@@ -61,10 +63,10 @@ class CasoDocumentoEstado extends Model
     ];
 
     public const ESTADOS = [
-        'no_iniciado'       => 'No iniciado',
-        'en_diligenciamiento' => 'En diligenciamiento',
-        'completo'          => 'Completo',
-        'generado'          => 'Generado',
+        'no_iniciado'       => 'Pendiente',
+        'en_diligenciamiento' => 'Borrador',
+        'completo'          => 'Generada, no descargada',
+        'generado'          => 'Generada',
     ];
 
     public function caso()
@@ -72,19 +74,70 @@ class CasoDocumentoEstado extends Model
         return $this->belongsTo(ProcesoDisciplinario::class, 'caso_id');
     }
 
+    public function estaGenerado(): bool
+    {
+        return in_array($this->estado, ['completo', 'generado'], true);
+    }
+
+    public function estaDescargado(): bool
+    {
+        return $this->descargado_en !== null;
+    }
+
+    public function etiquetaHub(): string
+    {
+        if ($this->estaDescargado()) {
+            return 'Generada y descargada';
+        }
+        if ($this->estaGenerado()) {
+            return 'Generada, no descargada';
+        }
+        if ($this->estado === 'en_diligenciamiento') {
+            return 'Borrador';
+        }
+
+        return 'Pendiente';
+    }
+
+    public function claseHub(): string
+    {
+        if ($this->estaDescargado()) {
+            return 'db-descargado';
+        }
+        if ($this->estaGenerado()) {
+            return 'db-generado';
+        }
+        if ($this->estado === 'en_diligenciamiento') {
+            return 'db-en_diligenciamiento';
+        }
+
+        return 'db-pendiente';
+    }
+
+    public function tonoTarjeta(): string
+    {
+        if ($this->estaDescargado()) {
+            return 'ok';
+        }
+        if ($this->estado === 'en_diligenciamiento' || $this->estaGenerado()) {
+            return 'borrador';
+        }
+
+        return 'pendiente';
+    }
+
     public function etiquetaEstado(): string
     {
-        return self::ESTADOS[$this->estado] ?? $this->estado;
+        return $this->etiquetaHub();
     }
 
     public function badgeClass(): string
     {
-        return match ($this->estado) {
-            'no_iniciado'         => 'badge-secondary',
-            'en_diligenciamiento' => 'badge-warning',
-            'completo'            => 'badge-info',
-            'generado'            => 'badge-success',
-            default               => 'badge-secondary',
+        return match (true) {
+            $this->estaDescargado() => 'badge-success',
+            $this->estaGenerado() => 'badge-info',
+            $this->estado === 'en_diligenciamiento' => 'badge-warning',
+            default => 'badge-secondary',
         };
     }
 

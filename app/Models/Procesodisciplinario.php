@@ -345,8 +345,8 @@ class ProcesoDisciplinario extends Model
         }
 
         if ($this->estado === 'Pendiente') {
-            if (!$this->tieneDocumentoGenerado()) {
-                return ['texto' => 'Diligenciar Autos y Actas', 'tono' => 'info'];
+            if (!$this->tieneLosCuatroDocumentosGenerados()) {
+                return ['texto' => 'Generar documentos', 'tono' => 'info'];
             }
             if (!filled($this->descargos)) {
                 return ['texto' => 'Registrar descargos', 'tono' => 'warn'];
@@ -394,17 +394,58 @@ class ProcesoDisciplinario extends Model
         return $this->puedeEnviarAProceso();
     }
 
+    public function tieneAvanceDocumental(): bool
+    {
+        foreach (array_keys(CasoDocumentoEstado::SLOTS) as $slot) {
+            $est = $this->estadoDelSlot($slot);
+            if ($est->estado === 'en_diligenciamiento' || $est->estaGenerado()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function faseFlujo(): string
+    {
+        if ($this->estado === 'Sancionado') {
+            return 'sancionado';
+        }
+        if ($this->estado === 'Archivado') {
+            return 'archivado';
+        }
+        if ($this->estado === 'En Proceso') {
+            return 'en_revision';
+        }
+        if ($this->tieneAvanceDocumental()) {
+            return 'en_proceso';
+        }
+
+        return 'pendiente';
+    }
+
     public function tieneDocumentoGenerado(): bool
     {
         $estados = $this->relationLoaded('documentoEstados')
             ? $this->documentoEstados
             : $this->documentoEstados()->get();
 
-        return $estados->contains(fn ($doc) => ($doc->estado ?? '') === 'generado');
+        return $estados->contains(fn ($doc) => $doc->estaGenerado());
+    }
+
+    public function tieneLosCuatroDocumentosGenerados(): bool
+    {
+        foreach (array_keys(CasoDocumentoEstado::SLOTS) as $slot) {
+            if (!$this->estadoDelSlot($slot)->estaGenerado()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
-     * Pendiente + al menos un documento generado → se puede enviar a En Proceso.
+     * Pendiente + los 4 documentos generados → se puede enviar a En Proceso.
      */
     public function puedeEnviarAProceso(): bool
     {
@@ -412,7 +453,7 @@ class ProcesoDisciplinario extends Model
             return false;
         }
 
-        return $this->tieneDocumentoGenerado();
+        return $this->tieneLosCuatroDocumentosGenerados();
     }
 
     /**

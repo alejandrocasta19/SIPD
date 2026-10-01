@@ -6,7 +6,6 @@ use App\Models\ProcesoDisciplinario;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\ValidationException;
 use DOMDocument;
 use DOMXPath;
 use ZipArchive;
@@ -224,7 +223,7 @@ class OfficialDocumentService
         $n = count($this->blockDefinitions($type));
         return [[
             'titulo' => 'Campos editables del formato',
-            'desc' => 'Completa las casillas amarillas en el mismo orden del documento.',
+            'desc' => 'Las casillas amarillas son opcionales. Las vacías no se incluyen en Word ni PDF.',
             'bloques' => range(0, max(0, $n - 1)),
         ]];
     }
@@ -774,18 +773,10 @@ class OfficialDocumentService
     {
         abort_unless(isset(self::TEMPLATES[$template]), 404, 'Tipo de documento no válido');
 
-        $blocks      = $proceso->datos_oficiales['yellow_blocks'][$template] ?? [];
-        $definitions = $this->blockDefinitions($template);
-
-        if (!$strictValidation) {
-            foreach ($definitions as $index => $label) {
-                if (!isset($blocks[$index]) || trim((string) $blocks[$index]) === '') {
-                    $blocks[$index] = '[ Pendiente: ' . $label . ' ]';
-                }
-            }
-        } else {
-            $this->validateBlocks($blocks, $definitions);
-        }
+        $blocks = $this->normalizedYellowBlocks(
+            $proceso->datos_oficiales['yellow_blocks'][$template] ?? [],
+            $this->blockDefinitions($template)
+        );
 
         // Buscar plantilla primaria en /documentos, fallback a storage/app/plantillas/
         $filename = self::TEMPLATES[$template];
@@ -820,20 +811,19 @@ class OfficialDocumentService
         return $output;
     }
 
-    private function validateBlocks(array $blocks, array $definitions): void
+    private function normalizedYellowBlocks(array $blocks, array $definitions): array
     {
-        foreach ($definitions as $index => $label) {
-            if (!isset($blocks[$index]) || trim((string) $blocks[$index]) === '') {
-                throw ValidationException::withMessages([
-                    'yellow_blocks.' . $index => 'Completa el campo amarillo: ' . $label . '.',
-                ]);
-            }
+        $out = [];
+        foreach (array_keys($definitions) as $index) {
+            $out[$index] = trim((string) ($blocks[$index] ?? ''));
         }
+
+        return $out;
     }
 
     /**
      * Reemplaza los bloques resaltados en amarillo en el XML de Word.
-     * Garantiza que el texto fijo no variable permanezca 100% inalterado.
+     * Los vacíos se omiten; el texto fijo no variable permanece inalterado.
      */
     private function replaceYellowBlocks(string $xml, array $blocks): string
     {
@@ -843,23 +833,46 @@ class OfficialDocumentService
         $xpath = new DOMXPath($document);
         $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
 
-        $before      = $this->fixedTextSignature($xpath);
-        $paragraphs  = $xpath->query('//w:p');
+        $before = $this->fixedTextSignature($xpath);
+
+        $paragraphs = [];
+        foreach ($xpath->query('//w:p') as $paragraph) {
+            if ($paragraph instanceof \DOMElement) {
+                $paragraphs[] = $paragraph;
+            }
+        }
+
         $yellowIndex = 0;
+        $removeParagraphs = [];
+        $removeRuns = [];
+        $strippedParagraphs = [];
 
         foreach ($paragraphs as $paragraph) {
-            $runs = $xpath->query('.//w:r[w:rPr/w:highlight[@w:val="yellow"]]', $paragraph);
-            if ($runs->length === 0) {
+            $runs = [];
+            foreach ($xpath->query('.//w:r[w:rPr/w:highlight[@w:val="yellow"]]', $paragraph) as $run) {
+                if ($run instanceof \DOMElement) {
+                    $runs[] = $run;
+                }
+            }
+            if ($runs === []) {
                 continue;
             }
 
-            if (!array_key_exists($yellowIndex, $blocks)) {
-                break;
+            $value = trim((string) ($blocks[$yellowIndex] ?? ''));
+            if ($value === '') {
+                if ($this->paragraphIsOnlyYellow($paragraph, $xpath)) {
+                    $removeParagraphs[] = $paragraph;
+                } else {
+                    foreach ($runs as $run) {
+                        $removeRuns[] = $run;
+                    }
+                    $strippedParagraphs[] = $paragraph;
+                }
+                $yellowIndex++;
+                continue;
             }
 
-            $value     = (string) $blocks[$yellowIndex];
             $firstText = null;
-
             foreach ($runs as $run) {
                 $texts = $xpath->query('.//w:t', $run);
                 foreach ($texts as $text) {
@@ -876,6 +889,34 @@ class OfficialDocumentService
                 }
             }
             $yellowIndex++;
+        }
+
+        foreach ($removeRuns as $run) {
+            $run->parentNode?->removeChild($run);
+        }
+
+        foreach ($strippedParagraphs as $paragraph) {
+            if ($paragraph->parentNode && $this->isEmptyWordParagraph($paragraph, $xpath)) {
+                $removeParagraphs[] = $paragraph;
+            }
+        }
+
+        $extraEmpty = [];
+        foreach ($removeParagraphs as $paragraph) {
+            $next = $this->nextWordParagraph($paragraph);
+            if ($next && $this->isEmptyWordParagraph($next, $xpath)) {
+                $extraEmpty[] = $next;
+            }
+        }
+
+        $seen = [];
+        foreach (array_merge($removeParagraphs, $extraEmpty) as $node) {
+            $id = spl_object_id($node);
+            if (isset($seen[$id]) || !$node->parentNode) {
+                continue;
+            }
+            $seen[$id] = true;
+            $node->parentNode->removeChild($node);
         }
 
         if ($yellowIndex !== count($blocks)) {
@@ -959,6 +1000,29 @@ class OfficialDocumentService
         }
 
         return trim(str_replace("\xc2\xa0", ' ', $text)) === '';
+    }
+
+    private function paragraphIsOnlyYellow(\DOMElement $paragraph, DOMXPath $xpath): bool
+    {
+        $hasYellow = false;
+
+        foreach ($xpath->query('.//w:r', $paragraph) as $run) {
+            if (!($run instanceof \DOMElement)) {
+                continue;
+            }
+
+            $isYellow = $xpath->query('./w:rPr/w:highlight[@w:val="yellow"]', $run)->length > 0;
+            if ($isYellow) {
+                $hasYellow = true;
+                continue;
+            }
+
+            foreach ($xpath->query('.//w:t', $run) as $t) {
+                return false;
+            }
+        }
+
+        return $hasYellow;
     }
 
     /**

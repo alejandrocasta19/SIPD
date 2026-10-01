@@ -98,10 +98,14 @@
         <div class="ci-sub" id="ci-worker-sub">{{ $caso->modalidad ?: '—' }} · {{ $labelTipo }}</div>
     </div>
     <div class="ci-badges">
-        @if($estadoDoc->estado === 'completo')
-            <span class="ci-badge complete"><i class="fas fa-check-circle"></i> Completo</span>
+        @if($estadoDoc->estaDescargado())
+            <span class="ci-badge complete"><i class="fas fa-check-circle"></i> Generada y descargada</span>
+        @elseif($estadoDoc->estaGenerado())
+            <span class="ci-badge complete"><i class="fas fa-file-signature"></i> Generada, no descargada</span>
+        @elseif($estadoDoc->estado === 'en_diligenciamiento' || $estadoDoc->estado === 'completo')
+            <span class="ci-badge"><i class="fas fa-pen"></i> Borrador</span>
         @else
-            <span class="ci-badge"><i class="fas fa-pen"></i> En diligenciamiento</span>
+            <span class="ci-badge"><i class="fas fa-pen"></i> Pendiente</span>
         @endif
     </div>
 </div>
@@ -119,7 +123,7 @@
     <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
         <div class="panel-head" style="background:#f8fafc;">
             <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento Interactivo Oficial</h3>
-            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son editables y no tienen límite de caracteres.</div>
+            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son opcionales. Genera y descárgalo en Generar documentos.</div>
         </div>
 
         @if(!empty($slot) && \App\Models\CasoDocumentoEstado::slotTieneOpciones($slot))
@@ -156,20 +160,15 @@
                     <i class="fas fa-signature"></i> Firma
                     <input type="file" name="firma_digital" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
                 </label>
-                <a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="btn-toolbar btn-ghost" style="text-decoration:none;">
-                    <i class="fas fa-arrow-left"></i> Volver
+                <a href="{{ route('documentos.hub') }}" class="btn-toolbar btn-ghost" style="text-decoration:none;">
+                    <i class="fas fa-arrow-left"></i> Generar documentos
                 </a>
-                <button type="submit" class="btn-toolbar btn-ghost" title="Guarda el avance sin descargar el archivo">
+                <button type="submit" class="btn-toolbar btn-ghost" title="Guarda el avance sin generar el documento">
                     <i class="fas fa-save"></i> Guardar borrador
                 </button>
-                <div class="dl-pair">
-                    <button type="submit" name="formato" value="docx" class="btn-dl btn-dl-word" title="Guardar y descargar Word">
-                        <i class="fas fa-file-word"></i> Word
-                    </button>
-                    <button type="submit" name="formato" value="pdf" class="btn-dl btn-dl-pdf" title="Guardar y descargar PDF">
-                        <i class="fas fa-file-pdf"></i> PDF
-                    </button>
-                </div>
+                <button type="submit" name="formato" value="generar" class="btn-toolbar btn-save" title="Marca el documento como generado. La descarga queda en Generar documentos.">
+                    <i class="fas fa-file-signature"></i> Generar
+                </button>
             </div>
         </div>
 
@@ -234,18 +233,5 @@ document.addEventListener('DOMContentLoaded', function () {
         window.initSipdOptionalClauses(document);
     }
 });
-
-@if(session('autodownload'))
-document.addEventListener('DOMContentLoaded', function () {
-    var url = "{{ route('documentos.download', [$caso->id, session('autodownload')]) }}";
-    @if(session('autodownload_format') === 'pdf')
-    url += '?format=pdf';
-    @endif
-    var iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = url;
-    document.body.appendChild(iframe);
-});
-@endif
 </script>
 @endsection

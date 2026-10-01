@@ -364,7 +364,7 @@
     <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
         <div class="panel-head" style="background:#f8fafc;">
             <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento interactivo oficial</h3>
-            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son editables y no tienen límite de caracteres.</div>
+            <div style="font-size:12px; color:var(--c-muted);">Las zonas amarillas son opcionales. Al registrar queda en borrador; genera y descarga en Generar documentos.</div>
         </div>
 
         <div id="variant-bar" style="padding:14px 24px; border-bottom:1px solid var(--c-border); display:none; gap:8px; flex-wrap:wrap; align-items:center; background:#fff;">
@@ -391,7 +391,7 @@
                     <input type="file" id="firma-registro" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
                 </label>
                 <button type="submit" class="btn-toolbar btn-save">
-                    <i class="fas fa-file-word"></i> Registrar y descargar este documento
+                    <i class="fas fa-save"></i> Registrar proceso
                 </button>
             </div>
         </div>

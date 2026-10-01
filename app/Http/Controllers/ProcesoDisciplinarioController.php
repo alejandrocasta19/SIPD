@@ -619,14 +619,13 @@ class ProcesoDisciplinarioController extends Controller
             \App\Models\CasoEvidencia::create($ev);
         }
 
-        $mensaje = $tipo === 'terminacion'
-            ? 'Proceso registrado. Imprime la terminación para firma del gerente y luego sube el escaneo en Anexos escaneados.'
-            : 'Proceso registrado. Descargando solo el documento que diligenció.';
+        $proceso->estadoDocumento($tipo)->update([
+            'estado' => 'en_diligenciamiento',
+        ]);
 
         return redirect()
-            ->route('abogado.detalleproceso', $proceso->id)
-            ->with('success', $mensaje)
-            ->with('autodownload', $validated['tipo_proceso'])
+            ->route('documentos.hub')
+            ->with('success', 'Proceso registrado como borrador. Genera y descarga en Generar documentos.')
             ->with('clear_nuevo_draft', true);
     }
 
@@ -769,8 +768,8 @@ class ProcesoDisciplinarioController extends Controller
             return redirect()->back()->with('info', 'Este caso ya está En Proceso, pendiente de veredicto.');
         }
 
-        if (!$proceso->tieneDocumentoGenerado()) {
-            return redirect()->back()->with('error', 'Genera al menos un documento oficial antes de enviar el caso.');
+        if (!$proceso->puedeEnviarAProceso()) {
+            return redirect()->back()->with('error', 'Genera los 4 documentos oficiales antes de enviar el caso.');
         }
 
         $proceso->update(['estado' => 'En Proceso']);

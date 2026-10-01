@@ -131,7 +131,11 @@
 .estado-badge.no_iniciado       { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
 .estado-badge.en_diligenciamiento { background: #fefce8; color: #854d0e; border-color: #fef08a; }
 .estado-badge.completo          { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
-.estado-badge.generado          { background: #f0fdf4; color: var(--cth-green-text); border-color: #bbf7d0; }
+.estado-badge.generado          { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.estado-badge.db-pendiente { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+.estado-badge.db-en_diligenciamiento { background: #fefce8; color: #854d0e; border-color: #fef08a; }
+.estado-badge.db-generado { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.estado-badge.db-descargado { background: #f0fdf4; color: var(--cth-green-text); border-color: #bbf7d0; }
 
 .doc-card-body {
     padding: 0 24px 18px;
@@ -170,6 +174,7 @@
 .btn-edit { background: var(--c-green); color: #fff; }
 .btn-preview { background: #f1f5f9; color: #334155; }
 .btn-download { background: #1d4ed8; color: #fff; }
+.btn-download-pdf { background: #e24b3a; color: #fff; }
 
 /* ─── Evidencias ─────────────────────────── */
 .ev-section {
@@ -403,12 +408,15 @@
                     </div>
                 </div>
                 <div class="doc-card-body">
-                    <span class="estado-badge {{ $est->estado }}">
+                    <span class="estado-badge {{ $est->claseHub() }}">
                         <i class="fas fa-circle" style="font-size:7px;"></i>
-                        {{ $est->etiquetaEstado() }}
+                        {{ $est->etiquetaHub() }}
                     </span>
                     @if($est->generado_en)
                         <div class="doc-meta" style="margin-top:8px;">Generado: {{ $est->generado_en->format('d/m/Y H:i') }}</div>
+                    @endif
+                    @if($est->descargado_en)
+                        <div class="doc-meta">Descargado: {{ $est->descargado_en->format('d/m/Y H:i') }}</div>
                     @endif
                     @if($tipoSlot === 'terminacion')
                         <div class="doc-meta" style="margin-top:10px;">Se imprime para firma del gerente y el escaneo se carga en Anexos escaneados.</div>
@@ -432,7 +440,10 @@
                         <i class="fas fa-edit"></i> Diligenciar
                     </a>
                     <a href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}" class="btn-doc btn-download">
-                        <i class="fas fa-file-word"></i> Generar DOCX
+                        <i class="fas fa-file-word"></i> Word
+                    </a>
+                    <a href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}?format=pdf" class="btn-doc btn-download-pdf">
+                        <i class="fas fa-file-pdf"></i> PDF
                     </a>
                 </div>
             </div>

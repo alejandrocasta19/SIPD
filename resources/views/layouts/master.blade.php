@@ -86,6 +86,7 @@
                                 <i class="fas fa-plus-circle"></i> Nuevo Proceso
                             </a>
                         @endif
+                        @include('partials.nav-generar-documentos')
                         @if($me->puede('ver_casos'))
                             <a href="{{ route('abogado.mis-casos') }}" class="{{ request()->routeIs('abogado.mis-casos', 'abogado.detalleproceso') && !request()->routeIs('documentos.*') ? 'active' : '' }}">
                                 <i class="fas fa-search"></i> Mis Casos
@@ -121,34 +122,10 @@
                             <i class="fas fa-plus-circle"></i> Nuevo proceso
                         </a>
                     @endif
-                </nav>
-
-                @if($me->puede('ver_documentos'))
-                <div class="sipd-nav-label">GESTIÓN DOCUMENTAL</div>
-                <nav class="sipd-nav">
-                    <a href="{{ route('documentos.hub') }}"
-                       class="{{ request()->routeIs('documentos.*') ? 'active' : '' }}"
-                       title="Central de Documentos Oficiales">
-                        <i class="fas fa-file-signature"></i> Autos y Actas
-                    </a>
-                    @if(request()->routeIs('documentos.*') && request()->route('id'))
-                        @php
-                            $docCasoId = request()->route('id');
-                            $docCaso = \App\Models\ProcesoDisciplinario::find($docCasoId);
-                            $tipoActual = request()->route('tipo');
-                        @endphp
-                        @foreach(\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes)
-                            @php $tipoSlot = $docCaso ? $docCaso->varianteDelSlot($slot) : $variantes[0]; @endphp
-                            <a href="{{ route('documentos.edit', [$docCasoId, $tipoSlot]) }}"
-                               class="{{ request()->routeIs('documentos.edit') && in_array($tipoActual, $variantes, true) ? 'active' : '' }}"
-                               style="padding-left:28px;font-size:13px;">
-                                <i class="fas {{ \App\Models\CasoDocumentoEstado::SLOT_ICONS[$slot] }}"></i>
-                                {{ \App\Models\CasoDocumentoEstado::SLOT_LABELS[$slot] }}
-                            </a>
-                        @endforeach
+                    @if($isManager)
+                        @include('partials.nav-generar-documentos')
                     @endif
                 </nav>
-                @endif
 
                 @if($me->puede('ver_reportes'))
                 <div class="sipd-nav-label">REPORTES</div>

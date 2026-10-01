@@ -147,7 +147,7 @@
                 </div>
                 <div class="dash-links">
                     <a href="{{ route('documentos.hub') }}">
-                        <span><i class="fas fa-file-signature left"></i> Autos y Actas</span>
+                        <span><i class="fas fa-file-signature left"></i> Generar documentos</span>
                         <i class="fas fa-chevron-right right"></i>
                     </a>
                     <a href="{{ route('abogado.anexos') }}">

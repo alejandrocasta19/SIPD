@@ -236,6 +236,69 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
+    public function generar_documento_lo_marca_sin_descargar()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+        $blocks = $this->filledBlocks('disciplinario');
+        $blocks[3] = '';
+
+        $this->actingAs($user)
+            ->put(route('documentos.save', [$caso->id, 'disciplinario']), [
+                'yellow_blocks_disciplinario' => $blocks,
+                'formato' => 'generar',
+            ])
+            ->assertRedirect(route('documentos.hub'))
+            ->assertSessionMissing('autodownload')
+            ->assertSessionHas('success');
+
+        $estado = $caso->fresh()->estadoDocumento('disciplinario');
+        $this->assertSame('generado', $estado->estado);
+        $this->assertNotNull($estado->generado_en);
+        $this->assertNull($estado->descargado_en);
+    }
+
+    /** @test */
+    public function genera_docx_omitiendo_amarillos_vacios()
+    {
+        $user = $this->makeUser('abogado');
+        $blocks = array_fill(0, 8, '');
+        $blocks[0] = 'MARCADOR_AMARILLO_LLENO_UNO';
+        $blocks[2] = 'MARCADOR_AMARILLO_LLENO_TRES';
+
+        $caso = $this->makeCaso($user, [
+            'datos_oficiales' => [
+                'yellow_blocks' => [
+                    'disciplinario' => $blocks,
+                ],
+            ],
+        ]);
+
+        $plain = $this->docxPlainText($caso, 'disciplinario');
+        $this->assertStringContainsString('MARCADOR_AMARILLO_LLENO_UNO', $plain);
+        $this->assertStringContainsString('MARCADOR_AMARILLO_LLENO_TRES', $plain);
+        $this->assertStringNotContainsString('[ Pendiente:', $plain);
+    }
+
+    /** @test */
+    public function genera_docx_sin_ningun_amarillo_diligenciado()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, [
+            'nombre' => 'Ana Lucia Rojas',
+            'datos_oficiales' => [
+                'yellow_blocks' => [
+                    'disciplinario' => [],
+                ],
+            ],
+        ]);
+
+        $plain = $this->docxPlainText($caso, 'disciplinario');
+        $this->assertStringContainsString('Ana Lucia Rojas', $plain);
+        $this->assertStringNotContainsString('[ Pendiente:', $plain);
+    }
+
+    /** @test */
     public function no_se_puede_guardar_sin_autenticacion()
     {
         $user = $this->makeUser('abogado');
@@ -277,7 +340,7 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
-    public function guardar_documento_completo_descarga_solo_ese_tipo()
+    public function generar_documento_completo_no_autodescarga()
     {
         $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user);
@@ -285,15 +348,17 @@ class DocumentoTest extends TestCase
         $this->actingAs($user)
             ->put(route('documentos.save', [$caso->id, 'disciplinario']), [
                 'yellow_blocks_disciplinario' => $this->filledBlocks('disciplinario'),
-                'formato' => 'docx',
+                'formato' => 'generar',
             ])
-            ->assertRedirect(route('documentos.edit', [$caso->id, 'disciplinario']))
-            ->assertSessionHas('autodownload', 'disciplinario')
-            ->assertSessionHas('autodownload_format', 'docx');
+            ->assertRedirect(route('documentos.hub'))
+            ->assertSessionMissing('autodownload')
+            ->assertSessionHas('success');
+
+        $this->assertSame('generado', $caso->fresh()->estadoDocumento('disciplinario')->estado);
     }
 
     /** @test */
-    public function guardar_comprobacion_no_prepara_descarga_de_otro_documento()
+    public function generar_comprobacion_no_prepara_descarga_de_otro_documento()
     {
         $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user);
@@ -301,10 +366,13 @@ class DocumentoTest extends TestCase
         $this->actingAs($user)
             ->put(route('documentos.save', [$caso->id, 'comprobacion']), [
                 'yellow_blocks_comprobacion' => $this->filledBlocks('comprobacion'),
-                'formato' => 'pdf',
+                'formato' => 'generar',
             ])
-            ->assertSessionHas('autodownload', 'comprobacion')
-            ->assertSessionHas('autodownload_format', 'pdf');
+            ->assertRedirect(route('documentos.hub'))
+            ->assertSessionMissing('autodownload');
+
+        $this->assertSame('generado', $caso->fresh()->estadoDocumento('comprobacion')->estado);
+        $this->assertSame('no_iniciado', $caso->fresh()->estadoDocumento('disciplinario')->estado);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -460,7 +528,7 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
-    public function registrar_proceso_marca_borrador_para_limpiar()
+    public function registrar_proceso_queda_en_borrador_sin_generar()
     {
         $user = $this->makeUser('abogado');
 
@@ -469,12 +537,18 @@ class DocumentoTest extends TestCase
                 'tipo_proceso' => 'terminacion',
                 'nombre' => 'Conductor Demo',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('clear_nuevo_draft');
+            ->assertRedirect(route('documentos.hub'))
+            ->assertSessionHas('clear_nuevo_draft')
+            ->assertSessionMissing('autodownload');
+
+        $proceso = ProcesoDisciplinario::where('nombre', 'Conductor Demo')->first();
+        $this->assertNotNull($proceso);
+        $this->assertSame('en_diligenciamiento', $proceso->estadoDocumento('terminacion')->estado);
+        $this->assertNull($proceso->estadoDocumento('terminacion')->generado_en);
     }
 
     /** @test */
-    public function hub_muestra_nombre_del_formato_en_lugar_de_generado_o_borrador()
+    public function hub_muestra_pendiente_borrador_y_generada_sin_descargar()
     {
         $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user, [
@@ -482,18 +556,37 @@ class DocumentoTest extends TestCase
             'datos_oficiales' => ['slots' => ['apertura' => 'comprobacion']],
         ]);
         $caso->estadoDocumento('comprobacion')->update(['estado' => 'en_diligenciamiento']);
-        $caso->estadoDocumento('acta')->update(['estado' => 'generado']);
+        $caso->estadoDocumento('acta')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+        ]);
 
         $this->actingAs($user)
             ->get(route('documentos.hub'))
             ->assertOk()
             ->assertSee('Pendiente')
-            ->assertSee('1.1 GA-FT-045 Apertura de comprobación')
-            ->assertSee('2. Acta de cargos y descargos (grabación)')
-            ->assertDontSee('>Borrador</span>', false)
-            ->assertDontSee('>Generado</span>', false)
-            ->assertDontSee('hub-sub">3. Sanción', false)
-            ->assertDontSee('hub-sub">1.1 GA-FT-045', false);
+            ->assertSee('Borrador')
+            ->assertSee('Generada, no descargada')
+            ->assertDontSee('Generada y descargada')
+            ->assertSee('Word')
+            ->assertSee('PDF');
+    }
+
+    /** @test */
+    public function hub_muestra_generada_y_descargada()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+        $caso->estadoDocumento('acta')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee('Generada y descargada');
     }
 
     /** @test */
@@ -808,7 +901,9 @@ class DocumentoTest extends TestCase
             ->assertOk()
             ->assertDontSee('form-enviar-proceso', false)
             ->assertSee('sipd-estado--pendiente', false)
-            ->assertSee('Pendiente');
+            ->assertSee('Pendiente')
+            ->assertSee('flujo-doc-card flujo-doc--pendiente', false)
+            ->assertDontSee('Documentos Oficiales del Caso');
 
         $this->actingAs($user)
             ->put(route('abogado.solicitar_veredicto', $caso->id))
@@ -818,7 +913,49 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
-    public function al_generar_un_documento_se_puede_enviar_a_en_proceso()
+    public function detalle_con_borrador_marca_flujo_en_proceso_y_tarjeta_amarilla()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
+        $caso->estadoDocumento('disciplinario')->update(['estado' => 'en_diligenciamiento']);
+
+        $html = $this->actingAs($user)
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('En proceso')
+            ->assertSee('flujo-doc-card flujo-doc--borrador', false)
+            ->assertSee('Borrador')
+            ->assertSee('sipd-estado sipd-estado--proceso is-on', false)
+            ->assertDontSee('sipd-estado sipd-estado--pendiente is-on', false)
+            ->getContent();
+
+        $this->assertSame('en_proceso', $caso->fresh()->faseFlujo());
+        $this->assertStringContainsString('flujo-doc--pendiente', $html);
+    }
+
+    /** @test */
+    public function detalle_con_documento_descargado_pinta_tarjeta_verde()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
+        $caso->estadoDocumento('acta')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('flujo-doc-card flujo-doc--ok', false)
+            ->assertSee('Generada y descargada')
+            ->assertSee('En proceso')
+            ->assertSee('sipd-estado sipd-estado--proceso is-on', false)
+            ->assertDontSee('sipd-estado sipd-estado--pendiente is-on', false);
+    }
+
+    /** @test */
+    public function enviar_no_aparece_hasta_tener_los_cuatro_documentos_generados()
     {
         $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
@@ -830,13 +967,63 @@ class DocumentoTest extends TestCase
         $this->actingAs($user)
             ->get(route('abogado.detalleproceso', $caso->id))
             ->assertOk()
+            ->assertDontSee('form-enviar-proceso', false);
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertDontSee('Enviar a En Proceso', false);
+
+        $this->actingAs($user)
+            ->put(route('abogado.solicitar_veredicto', $caso->id))
+            ->assertRedirect();
+
+        $this->assertSame('Pendiente', $caso->fresh()->estado);
+    }
+
+    /** @test */
+    public function enviar_aparece_cuando_los_cuatro_documentos_estan_generados()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
+        foreach (['disciplinario', 'acta', 'sancion', 'archivo'] as $tipo) {
+            $caso->estadoDocumento($tipo)->update([
+                'estado' => 'generado',
+                'generado_en' => now(),
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
             ->assertSee('form-enviar-proceso', false);
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee('Enviar a En Proceso', false);
 
         $this->actingAs($user)
             ->put(route('abogado.solicitar_veredicto', $caso->id))
             ->assertRedirect();
 
         $this->assertSame('En Proceso', $caso->fresh()->estado);
+    }
+
+    /** @test */
+    public function descargar_documento_marca_generada_y_descargada()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertOk();
+
+        $estado = $caso->fresh()->estadoDocumento('disciplinario');
+        $this->assertSame('generado', $estado->estado);
+        $this->assertNotNull($estado->generado_en);
+        $this->assertNotNull($estado->descargado_en);
     }
 
     /** @test */

@@ -1,6 +1,6 @@
 @extends('layouts.master')
 
-@php $pageTitle = 'Autos y Actas'; @endphp
+@php $pageTitle = 'Generar documentos'; @endphp
 
 @section('styles')
 <style>
@@ -34,8 +34,17 @@
     .doc-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .db-pendiente { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
     .db-en_diligenciamiento { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-    .db-completo { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-    .db-generado { background: #f0fdf4; color: var(--cth-green-text); border: 1px solid #bbf7d0; }
+    .db-generado { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .db-descargado { background: #f0fdf4; color: var(--cth-green-text); border: 1px solid #bbf7d0; }
+    .hub-doc { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .hub-dl { display:flex; gap:4px; justify-content:center; flex-wrap:wrap; }
+    .hub-dl a {
+        display:inline-flex; align-items:center; gap:4px;
+        padding:3px 8px; border-radius:999px; font-size:10px; font-weight:700;
+        text-decoration:none; color:#fff;
+    }
+    .hub-dl-word { background:#1d4ed8; }
+    .hub-dl-pdf { background:#e24b3a; }
 
     .hub-actions {
         display: flex;
@@ -63,8 +72,8 @@
 @section('page-header')
     <div class="proc-head">
         <div>
-            <h1>Autos y Actas</h1>
-            <p>Administra, diligencia y genera las plantillas institucionales de tus procesos activos.</p>
+            <h1>Generar documentos</h1>
+            <p>Nuevo proceso solo deja un borrador. Aquí se genera y se descarga cada formato. Enviar aparece cuando los 4 están generados.</p>
         </div>
     </div>
 @endsection
@@ -100,22 +109,6 @@
         <tbody>
         @forelse($casos as $caso)
             @php
-                $badgeHTML = function($estadoObj, $tipoSlot) {
-                    $nombre = e(\App\Models\CasoDocumentoEstado::etiqueta($tipoSlot));
-                    $estado = $estadoObj->estado ?? 'no_iniciado';
-                    if (in_array($estado, ['pendiente', 'no_iniciado'], true)) {
-                        return '<span class="doc-badge db-pendiente">Pendiente</span>';
-                    }
-
-                    $cls = [
-                        'en_diligenciamiento' => 'db-en_diligenciamiento',
-                        'completo' => 'db-completo',
-                        'generado' => 'db-generado',
-                    ][$estado] ?? 'db-pendiente';
-
-                    return '<span class="doc-badge '.$cls.'">'.$nombre.'</span>';
-                };
-
                 $estadoDot = [
                     'Pendiente' => 'dot-pend',
                     'En Proceso' => 'dot-proc',
@@ -143,9 +136,19 @@
                         $estSlot = $caso->estadoDocumento($tipoSlot);
                     @endphp
                     <td class="center">
-                        <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" title="{{ \App\Models\CasoDocumentoEstado::etiqueta($tipoSlot) }}" style="text-decoration:none;">
-                            {!! $badgeHTML($estSlot, $tipoSlot) !!}
-                        </a>
+                        <div class="hub-doc">
+                            <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" title="{{ \App\Models\CasoDocumentoEstado::etiqueta($tipoSlot) }}" style="text-decoration:none;">
+                                <span class="doc-badge {{ $estSlot->claseHub() }}">{{ $estSlot->etiquetaHub() }}</span>
+                            </a>
+                            <div class="hub-dl">
+                                <a class="hub-dl-word" href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}" title="Descargar Word">
+                                    <i class="fas fa-file-word"></i> Word
+                                </a>
+                                <a class="hub-dl-pdf" href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}?format=pdf" title="Descargar PDF">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </a>
+                            </div>
+                        </div>
                     </td>
                 @endforeach
                 <td>

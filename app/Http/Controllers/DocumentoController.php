@@ -83,7 +83,7 @@ class DocumentoController extends Controller
         $casos = Paginacion::deQuery($query->latest());
 
         return view('documents.hub', [
-            'pageTitle' => 'Autos y Actas',
+            'pageTitle' => 'Generar documentos',
             'casos' => $casos,
         ]);
     }
@@ -179,34 +179,40 @@ class DocumentoController extends Controller
 
         $allFilled = collect($bloques)->every(fn ($v) => trim((string) $v) !== '');
         $nuevoEstado = $allFilled ? 'completo' : 'en_diligenciamiento';
+        $formato = $request->input('formato');
+        $quiereGenerar = in_array($formato, ['docx', 'pdf', 'generar'], true);
 
         $estadoDoc = $caso->estadoDocumento($tipo);
+        if ($quiereGenerar) {
+            $estadoDoc->update([
+                'estado' => 'generado',
+                'generado_en' => $estadoDoc->generado_en ?? now(),
+            ]);
+
+            $mensaje = $tipo === 'terminacion'
+                ? 'Documento generado. Descárgalo en Generar documentos, imprímelo para firma del gerente y sube el escaneo en Anexos.'
+                : 'Documento generado. Descárgalo en Generar documentos.';
+
+            return redirect()
+                ->route('documentos.hub')
+                ->with('success', $mensaje);
+        }
+
         if ($estadoDoc->estado !== 'generado') {
             $estadoDoc->update(['estado' => $nuevoEstado]);
         }
 
         $redirect = redirect()->route('documentos.edit', [$id, $tipo]);
-        $formato = $request->input('formato');
 
-        if ($allFilled && in_array($formato, ['docx', 'pdf'], true)) {
-            return $redirect
-                ->with('success', $formato === 'pdf'
-                    ? 'Documento guardado. Descargando PDF...'
-                    : 'Documento guardado. Descargando Word...')
-                ->with('autodownload', $tipo)
-                ->with('autodownload_format', $formato);
+        if ($tipo === 'terminacion') {
+            return $redirect->with('success', 'Borrador guardado. Genera y descárgalo en Generar documentos.');
         }
 
         if ($allFilled) {
-            $mensaje = $tipo === 'terminacion'
-                ? 'Documento guardado. Imprímelo para firma del gerente y luego sube el escaneo en Anexos escaneados.'
-                : 'Documento guardado. Usa Word o PDF para descargarlo.';
-            return $redirect->with('success', $mensaje);
+            return $redirect->with('success', 'Borrador guardado. Genera y descárgalo en Generar documentos.');
         }
 
-        return $redirect->with('warning', $formato
-            ? 'Completa los campos amarillos para descargar este documento.'
-            : 'Borrador guardado. Completa los campos amarillos para descargar este documento.');
+        return $redirect->with('success', 'Borrador guardado. Los campos amarillos vacíos no se incluyen al generar.');
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -268,10 +274,12 @@ class DocumentoController extends Controller
             }
 
             $estadoDoc = $caso->estadoDocumento($tipo);
-            $estadoDoc->update([
-                'estado'      => 'generado',
-                'generado_en' => now(),
-            ]);
+            $payload = ['descargado_en' => now()];
+            if ($estadoDoc->estado !== 'generado') {
+                $payload['estado'] = 'generado';
+                $payload['generado_en'] = $estadoDoc->generado_en ?? now();
+            }
+            $estadoDoc->update($payload);
 
             return $response;
         } catch (ValidationException $e) {
