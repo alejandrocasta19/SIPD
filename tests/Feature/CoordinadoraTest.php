@@ -432,6 +432,118 @@ class CoordinadoraTest extends TestCase
             ->assertSee('No hay notificaciones');
     }
 
+    /** @test */
+    public function coordinadora_ve_permisos_divididos_por_modulo_y_funcion()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $this->makeUser('abogado', ['name' => 'Kelly RH']);
+
+        $this->actingAs($coord)
+            ->get(route('coordinadora.abogados'))
+            ->assertOk()
+            ->assertSee('Generar documentos')
+            ->assertSee('Descargar Word/PDF')
+            ->assertSee('Guardar borrador')
+            ->assertSee('Generar documento')
+            ->assertSee('Descargar anexos')
+            ->assertSee('Exportar reportes')
+            ->assertSee('Tiempo del módulo')
+            ->assertSee('name="duracion[expedientes]"', false)
+            ->assertSee('name="duracion[documentos]"', false)
+            ->assertDontSee('name="duracion[ver_casos]"', false)
+            ->assertDontSee('name="duracion[editar_casos]"', false)
+            ->assertDontSee('Ver autos y actas')
+            ->assertDontSee('Generar y editar documentos');
+    }
+
+    /** @test */
+    public function rh_sin_permiso_no_descarga_documentos()
+    {
+        $rh = $this->makeUser('abogado');
+        $caso = $this->makeCaso($rh);
+
+        $this->assertFalse($rh->puede('descargar_documentos'));
+
+        $this->actingAs($rh)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertRedirect(route('abogado.dashboard'))
+            ->assertSessionHas('error');
+    }
+
+    /** @test */
+    public function coordinadora_otorga_solo_descarga_de_documentos()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado', ['name' => 'Kelly RH']);
+        $caso = $this->makeCaso($rh);
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.abogados.permisos', $rh->id), [
+                'permisos' => ['ver_casos', 'ver_documentos', 'descargar_documentos'],
+                'duracion' => [
+                    'expedientes' => 'permanente',
+                    'documentos' => 'permanente',
+                ],
+            ])
+            ->assertRedirect(route('coordinadora.abogados'));
+
+        $rh = $rh->fresh();
+        $this->assertTrue($rh->puede('descargar_documentos'));
+        $this->assertTrue($rh->puede('ver_documentos'));
+        $this->assertFalse($rh->puede('generar_documentos'));
+        $this->assertFalse($rh->puede('editar_documentos'));
+
+        $this->actingAs($rh)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertOk();
+    }
+
+    /** @test */
+    public function marcar_descarga_incluye_ver_el_modulo()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.abogados.permisos', $rh->id), [
+                'permisos' => ['descargar_documentos'],
+                'duracion' => ['documentos' => '3'],
+            ])
+            ->assertRedirect();
+
+        $rh = $rh->fresh();
+        $this->assertTrue($rh->puede('descargar_documentos'));
+        $this->assertTrue($rh->puede('ver_documentos'));
+        $this->assertFalse($rh->puede('generar_documentos'));
+    }
+
+    /** @test */
+    public function el_tiempo_del_modulo_cubre_ver_editar_y_eliminar_por_separado()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.abogados.permisos', $rh->id), [
+                'permisos' => ['editar_casos', 'eliminar_casos'],
+                'duracion' => ['expedientes' => '3'],
+            ])
+            ->assertRedirect();
+
+        $rh = $rh->fresh()->load('permisos');
+        $this->assertTrue($rh->puede('ver_casos'));
+        $this->assertTrue($rh->puede('editar_casos'));
+        $this->assertTrue($rh->puede('eliminar_casos'));
+        $this->assertFalse($rh->puede('registrar_casos'));
+
+        foreach (['ver_casos', 'editar_casos', 'eliminar_casos'] as $clave) {
+            $grant = $rh->permisos->firstWhere('permiso', $clave);
+            $this->assertNotNull($grant);
+            $this->assertNotNull($grant->expires_at);
+            $this->assertTrue($grant->expires_at->between(now()->addHours(2), now()->addHours(4)));
+        }
+    }
+
     private function makeCaso(?User $user, array $attrs = []): ProcesoDisciplinario
     {
         return ProcesoDisciplinario::factory()->create(array_merge([

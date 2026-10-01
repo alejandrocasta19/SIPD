@@ -282,7 +282,7 @@
                 @forelse($procesos as $proceso)
                     <tr>
                         <td>
-                            <a class="id" href="{{ route('abogado.detalleproceso', $proceso->id) }}">{{ $codigo($proceso) }}</a>
+                            <a class="id" href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}">{{ $codigo($proceso) }}</a>
                             @if(($proceso->anexos_count ?? 0) > 0)
                                 <span style="display:block;color:#64748b;font-size:12px;margin-top:3px;">{{ $proceso->anexos_count }} anexo{{ $proceso->anexos_count === 1 ? '' : 's' }}</span>
                             @endif
@@ -309,7 +309,7 @@
                         </td>
                         <td>
                             <div class="acts">
-                                <a href="{{ route('abogado.detalleproceso', $proceso->id) }}" title="Ver proceso">
+                                <a href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}" title="Ver proceso">
                                     <i class="far fa-eye"></i>
                                 </a>
                                 @if(auth()->user()->puede('eliminar_casos'))

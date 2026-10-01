@@ -108,6 +108,7 @@
             <h1>Estadísticas y reportes</h1>
             <p>Panorama de procesos disciplinarios y de los anexos del expediente.</p>
         </div>
+        @if(auth()->user()->puede('exportar_reportes'))
         <div class="proc-head-side rp-actions">
             <form method="POST" action="{{ route('abogado.reportes.global', 'pdf') }}" class="export-form">
                 @csrf<input type="hidden" name="desde"><input type="hidden" name="hasta"><input type="hidden" name="q">
@@ -122,6 +123,7 @@
                 <button class="rbtn xls" type="submit"><i class="fas fa-file-excel"></i> Excel</button>
             </form>
         </div>
+        @endif
     </div>
 @endsection
 
@@ -200,11 +202,13 @@
 
     <div class="tbl-toolbar">
         <label><input type="checkbox" id="select-all"> Seleccionar todos</label>
+        @if(auth()->user()->puede('exportar_reportes'))
         <div class="btn-grp">
             <button class="rbtn pdf" data-format="pdf"   type="submit"><i class="fas fa-file-pdf"></i> PDF</button>
             <button class="rbtn doc" data-format="word"  type="submit"><i class="fas fa-file-word"></i> Word</button>
             <button class="rbtn xls" data-format="excel" type="submit"><i class="fas fa-file-excel"></i> Excel</button>
         </div>
+        @endif
     </div>
 
     <div class="case-tbl">

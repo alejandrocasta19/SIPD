@@ -292,13 +292,17 @@
     <div class="sipd-dialog-bg" id="modalSolicitarPermiso">
         <div class="sipd-dialog">
             <h3>Solicitar permiso</h3>
-            <p class="sipd-dialog-lead">La coordinadora recibe qué vas a hacer, por qué y por cuántas horas.</p>
+            <p class="sipd-dialog-lead">La coordinadora recibe el módulo, la función, qué vas a hacer y por cuántas horas. Descargar documentos o anexos se pide aparte de verlos.</p>
             <form method="POST" action="{{ route('permisos.solicitar') }}" id="formSolicitarPermiso">
                 @csrf
-                <label>Módulo</label>
+                <label>Módulo y función</label>
                 <select name="permiso" id="sol-permiso" required>
-                    @foreach($solicitablesPermiso as $clave => $etiqueta)
-                        <option value="{{ $clave }}">{{ $etiqueta }}</option>
+                    @foreach(\App\Support\RhPermisos::solicitablesAgrupados() as $grupo)
+                        <optgroup label="{{ $grupo['label'] }}">
+                            @foreach($grupo['items'] as $clave => $etiqueta)
+                                <option value="{{ $clave }}">{{ $etiqueta }}</option>
+                            @endforeach
+                        </optgroup>
                     @endforeach
                 </select>
                 <label>Qué vas a hacer</label>

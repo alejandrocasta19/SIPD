@@ -80,6 +80,7 @@ class ReporteExportTest extends TestCase
     public function se_puede_descargar_el_informe_global_en_pdf_word_y_excel()
     {
         $user = User::factory()->create(['role' => 'abogado']);
+        $user->otorgarPermiso('exportar_reportes', null);
         ProcesoDisciplinario::factory()->create(['user_id' => $user->id]);
 
         $this->actingAs($user)

@@ -174,6 +174,8 @@ class AnexoTest extends TestCase
             ->assertSee('5. Terminación por justas causas')
             ->assertSee('terminacion-firmada.pdf');
 
+        $user->otorgarPermiso('descargar_anexos', null);
+
         $this->actingAs($user)
             ->get(route('abogado.anexos', ['filtro' => 'resolucion']))
             ->assertOk()

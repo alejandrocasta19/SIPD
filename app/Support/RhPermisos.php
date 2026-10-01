@@ -8,15 +8,23 @@ class RhPermisos
     public const REGISTRAR_CASOS = 'registrar_casos';
     public const EDITAR_CASOS = 'editar_casos';
     public const ELIMINAR_CASOS = 'eliminar_casos';
+
     public const VER_DOCUMENTOS = 'ver_documentos';
     public const EDITAR_DOCUMENTOS = 'editar_documentos';
+    public const GENERAR_DOCUMENTOS = 'generar_documentos';
+    public const DESCARGAR_DOCUMENTOS = 'descargar_documentos';
+
     public const VER_ANEXOS = 'ver_anexos';
     public const SUBIR_ANEXOS = 'subir_anexos';
+    public const DESCARGAR_ANEXOS = 'descargar_anexos';
     public const ELIMINAR_ANEXOS = 'eliminar_anexos';
+
     public const VER_PLAZOS = 'ver_plazos';
     public const VER_RESOLUCIONES = 'ver_resoluciones';
     public const VER_REINCIDENCIAS = 'ver_reincidencias';
     public const VER_REPORTES = 'ver_reportes';
+    public const EXPORTAR_REPORTES = 'exportar_reportes';
+
     public const EDITAR_PERFIL = 'editar_perfil';
     public const ELIMINAR_NOTIFICACIONES = 'eliminar_notificaciones';
 
@@ -25,45 +33,121 @@ class RhPermisos
         return [
             'expedientes' => [
                 'label' => 'Expedientes',
+                'desc' => 'Casos disciplinarios. Ver no da de alta ni borra expedientes.',
                 'items' => [
-                    self::VER_CASOS => 'Ver casos asignados',
+                    self::VER_CASOS => 'Ver casos',
                     self::REGISTRAR_CASOS => 'Registrar procesos',
-                    self::EDITAR_CASOS => 'Editar procesos',
+                    self::EDITAR_CASOS => 'Editar datos del expediente',
                     self::ELIMINAR_CASOS => 'Eliminar procesos',
+                ],
+                'hints' => [
+                    self::VER_CASOS => 'Mis casos y el detalle del expediente.',
+                    self::REGISTRAR_CASOS => 'Nuevo proceso: deja un borrador, no genera ni descarga.',
+                    self::EDITAR_CASOS => 'Cambiar conductor, cédula y demás datos del formulario.',
+                    self::ELIMINAR_CASOS => 'Borrar el proceso por completo.',
                 ],
             ],
             'documentos' => [
-                'label' => 'Documentos oficiales',
+                'label' => 'Generar documentos',
+                'desc' => 'Ver, guardar, generar y descargar van por separado. Si no debe llevarse el archivo, no marques descargar.',
                 'items' => [
-                    self::VER_DOCUMENTOS => 'Ver autos y actas',
-                    self::EDITAR_DOCUMENTOS => 'Generar y editar documentos',
+                    self::VER_DOCUMENTOS => 'Ver formatos',
+                    self::EDITAR_DOCUMENTOS => 'Guardar borrador',
+                    self::GENERAR_DOCUMENTOS => 'Generar documento',
+                    self::DESCARGAR_DOCUMENTOS => 'Descargar Word/PDF',
+                ],
+                'hints' => [
+                    self::VER_DOCUMENTOS => 'Entra a Generar documentos y ve el formato.',
+                    self::EDITAR_DOCUMENTOS => 'Guarda los cuadros amarillos sin generar.',
+                    self::GENERAR_DOCUMENTOS => 'Marca el documento como generado. No descarga el archivo.',
+                    self::DESCARGAR_DOCUMENTOS => 'Baja Word o PDF. Solo si necesita el archivo.',
                 ],
             ],
             'anexos' => [
-                'label' => 'Anexos',
+                'label' => 'Anexos escaneados',
+                'desc' => 'Ver el listado no permite bajar ni subir archivos.',
                 'items' => [
-                    self::VER_ANEXOS => 'Ver anexos escaneados',
+                    self::VER_ANEXOS => 'Ver anexos',
                     self::SUBIR_ANEXOS => 'Subir anexos',
+                    self::DESCARGAR_ANEXOS => 'Descargar anexos',
                     self::ELIMINAR_ANEXOS => 'Eliminar anexos',
                 ],
-            ],
-            'cuenta' => [
-                'label' => 'Cuenta',
-                'items' => [
-                    self::EDITAR_PERFIL => 'Editar perfil y contraseña',
-                    self::ELIMINAR_NOTIFICACIONES => 'Borrar notificaciones',
+                'hints' => [
+                    self::VER_ANEXOS => 'Consulta los archivos del expediente.',
+                    self::SUBIR_ANEXOS => 'Cargar el escaneo o el firmado.',
+                    self::DESCARGAR_ANEXOS => 'Bajar el archivo adjunto.',
+                    self::ELIMINAR_ANEXOS => 'Quitar un anexo del expediente.',
                 ],
             ],
             'control' => [
                 'label' => 'Control y consulta',
+                'desc' => 'Consultar plazos, resoluciones, reincidencias y estadísticas.',
                 'items' => [
                     self::VER_PLAZOS => 'Ver plazos y términos',
                     self::VER_RESOLUCIONES => 'Ver resoluciones',
                     self::VER_REINCIDENCIAS => 'Ver reincidencias',
-                    self::VER_REPORTES => 'Ver estadísticas y reportes',
+                    self::VER_REPORTES => 'Ver estadísticas',
+                    self::EXPORTAR_REPORTES => 'Exportar reportes',
+                ],
+                'hints' => [
+                    self::VER_PLAZOS => 'Tablero de términos del proceso.',
+                    self::VER_RESOLUCIONES => 'Consulta de resoluciones.',
+                    self::VER_REINCIDENCIAS => 'Historial por cédula.',
+                    self::VER_REPORTES => 'Ver el tablero. No descarga Excel, Word ni PDF.',
+                    self::EXPORTAR_REPORTES => 'Descargar el informe en Excel, Word o PDF.',
+                ],
+            ],
+            'cuenta' => [
+                'label' => 'Cuenta',
+                'desc' => 'Datos personales y bandeja.',
+                'items' => [
+                    self::EDITAR_PERFIL => 'Editar perfil y contraseña',
+                    self::ELIMINAR_NOTIFICACIONES => 'Borrar notificaciones',
+                ],
+                'hints' => [
+                    self::EDITAR_PERFIL => 'Nombre, correo y contraseña.',
+                    self::ELIMINAR_NOTIFICACIONES => 'Vaciar avisos de la bandeja.',
                 ],
             ],
         ];
+    }
+
+    public static function requiere(): array
+    {
+        return [
+            self::REGISTRAR_CASOS => [self::VER_CASOS],
+            self::EDITAR_CASOS => [self::VER_CASOS],
+            self::ELIMINAR_CASOS => [self::VER_CASOS],
+            self::EDITAR_DOCUMENTOS => [self::VER_DOCUMENTOS],
+            self::GENERAR_DOCUMENTOS => [self::VER_DOCUMENTOS],
+            self::DESCARGAR_DOCUMENTOS => [self::VER_DOCUMENTOS],
+            self::SUBIR_ANEXOS => [self::VER_ANEXOS],
+            self::DESCARGAR_ANEXOS => [self::VER_ANEXOS],
+            self::ELIMINAR_ANEXOS => [self::VER_ANEXOS],
+            self::EXPORTAR_REPORTES => [self::VER_REPORTES],
+        ];
+    }
+
+    public static function expandir(array $claves): array
+    {
+        $validas = array_values(array_intersect(self::claves(), $claves));
+        $set = array_fill_keys($validas, true);
+        $requiere = self::requiere();
+        $changed = true;
+
+        while ($changed) {
+            $changed = false;
+            foreach (array_keys($set) as $clave) {
+                foreach ($requiere[$clave] ?? [] as $padre) {
+                    if (!isset($set[$padre]) && in_array($padre, self::claves(), true)) {
+                        $set[$padre] = true;
+                        $changed = true;
+                    }
+                }
+            }
+        }
+
+        return array_keys($set);
     }
 
     public static function claves(): array
@@ -89,6 +173,28 @@ class RhPermisos
         return $clave;
     }
 
+    public static function hint(string $clave): string
+    {
+        foreach (self::catalogo() as $grupo) {
+            if (isset($grupo['hints'][$clave])) {
+                return $grupo['hints'][$clave];
+            }
+        }
+
+        return '';
+    }
+
+    public static function grupoDe(string $clave): ?string
+    {
+        foreach (self::catalogo() as $grupo => $def) {
+            if (isset($def['items'][$clave])) {
+                return $grupo;
+            }
+        }
+
+        return null;
+    }
+
     public static function porDefecto(): array
     {
         return [
@@ -96,6 +202,7 @@ class RhPermisos
             self::REGISTRAR_CASOS,
             self::VER_DOCUMENTOS,
             self::EDITAR_DOCUMENTOS,
+            self::GENERAR_DOCUMENTOS,
             self::VER_ANEXOS,
             self::SUBIR_ANEXOS,
             self::VER_PLAZOS,
@@ -107,15 +214,50 @@ class RhPermisos
 
     public static function solicitables(): array
     {
-        return [
-            self::EDITAR_PERFIL => 'Editar perfil y contraseña',
-            self::EDITAR_CASOS => 'Editar procesos',
-            self::ELIMINAR_CASOS => 'Eliminar procesos',
-            self::EDITAR_DOCUMENTOS => 'Generar y editar documentos',
-            self::SUBIR_ANEXOS => 'Subir anexos',
-            self::ELIMINAR_ANEXOS => 'Eliminar anexos',
-            self::ELIMINAR_NOTIFICACIONES => 'Borrar notificaciones',
+        $mapa = [];
+        foreach (self::solicitablesAgrupados() as $grupo) {
+            foreach ($grupo['items'] as $clave => $etiqueta) {
+                $mapa[$clave] = $etiqueta;
+            }
+        }
+
+        return $mapa;
+    }
+
+    public static function solicitablesAgrupados(): array
+    {
+        $acciones = [
+            self::REGISTRAR_CASOS,
+            self::EDITAR_CASOS,
+            self::ELIMINAR_CASOS,
+            self::EDITAR_DOCUMENTOS,
+            self::GENERAR_DOCUMENTOS,
+            self::DESCARGAR_DOCUMENTOS,
+            self::SUBIR_ANEXOS,
+            self::DESCARGAR_ANEXOS,
+            self::ELIMINAR_ANEXOS,
+            self::EXPORTAR_REPORTES,
+            self::EDITAR_PERFIL,
+            self::ELIMINAR_NOTIFICACIONES,
         ];
+
+        $grupos = [];
+        foreach (self::catalogo() as $grupo) {
+            $items = [];
+            foreach ($grupo['items'] as $clave => $etiqueta) {
+                if (in_array($clave, $acciones, true)) {
+                    $items[$clave] = $etiqueta;
+                }
+            }
+            if ($items !== []) {
+                $grupos[] = [
+                    'label' => $grupo['label'],
+                    'items' => $items,
+                ];
+            }
+        }
+
+        return $grupos;
     }
 
     public static function duracionesHoras(): array

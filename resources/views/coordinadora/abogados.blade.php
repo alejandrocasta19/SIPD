@@ -158,22 +158,38 @@
     .acts button.key:hover { background: #eff6ff; color: #2563eb; }
     .perm-chip { font-size: 12px; color: #475569; }
     .perm-chip em { font-style: normal; color: #d97706; font-weight: 600; }
-    .perm-lead { margin: 0 0 16px; color: #64748b; font-size: 13px; }
-    .perm-group { margin-bottom: 14px; }
-    .perm-group h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }
+    .perm-lead { margin: 0 0 16px; color: #64748b; font-size: 13px; line-height: 1.45; }
+    .perm-group { margin-bottom: 18px; padding-bottom: 6px; border-bottom: 1px solid var(--cth-line); }
+    .perm-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+    }
+    .perm-group h4 { margin: 0 0 4px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
+    .perm-group p { margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.4; max-width: 380px; }
+    .perm-time { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .perm-time span { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; }
+    .perm-time select, .perm-time input[type="number"] {
+        height: 34px; border: 1px solid var(--cth-border); border-radius: 8px; font: inherit; font-size: 12px; padding: 0 8px;
+    }
+    .perm-time input[type="number"] { width: 88px; }
     .perm-row {
         display: grid;
-        grid-template-columns: 18px minmax(0,1fr) 130px 88px;
+        grid-template-columns: 18px minmax(0,1fr);
         gap: 8px;
-        align-items: center;
-        padding: 8px 0;
+        align-items: start;
+        padding: 10px 0;
         border-bottom: 1px solid var(--cth-line);
         font-size: 14px;
     }
-    .perm-row select, .perm-row input[type="number"] {
-        height: 34px; border: 1px solid var(--cth-border); border-radius: 8px; font: inherit; font-size: 12px; padding: 0 8px;
-    }
-    .sipd-dialog.modal-perm { max-width: 680px; }
+    .perm-row:last-child { border-bottom: 0; }
+    .perm-row input[type="checkbox"] { margin-top: 4px; }
+    .perm-copy b { display: block; color: #0f172a; font-weight: 600; }
+    .perm-copy small { display: block; margin-top: 2px; color: #94a3b8; font-size: 12px; font-weight: 400; line-height: 1.35; }
+    .sipd-dialog.modal-perm { max-width: 720px; max-height: 88vh; overflow: auto; }
     .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
 
     .empty {
@@ -320,6 +336,7 @@
                                     data-name="{{ $abogado->name }}"
                                     data-action="{{ route('coordinadora.abogados.permisos', $abogado->id) }}"
                                     data-permisos='@json($abogado->permisosParaFormulario())'
+                                    data-modulos='@json($abogado->duracionesModuloParaFormulario())'
                                     onclick="abrirPermisos(this)">
                                     <i class="fas fa-key"></i>
                                 </button>
@@ -374,24 +391,39 @@
     <div class="sipd-dialog-bg" id="modalPermisos">
         <div class="sipd-dialog modal-perm">
             <h3>Permisos · <span id="permNombre"></span></h3>
-            <p class="perm-lead">Editar y eliminar van por horas: 1, 3, 5 o un valor personalizado.</p>
+            <p class="perm-lead">Ver, editar y eliminar van cada uno por su lado. El tiempo es uno por módulo y cubre las funciones que marques.</p>
             <form id="formPermisos" method="POST">
                 @csrf
                 @method('PUT')
-                @foreach($catalogoPermisos as $grupo)
-                    <div class="perm-group">
-                        <h4>{{ $grupo['label'] }}</h4>
-                        @foreach($grupo['items'] as $clave => $etiqueta)
-                            <label class="perm-row">
-                                <input type="checkbox" name="permisos[]" value="{{ $clave }}">
-                                <span>{{ $etiqueta }}</span>
-                                <select name="duracion[{{ $clave }}]" class="dur-sel">
+                @foreach($catalogoPermisos as $grupoKey => $grupo)
+                    <div class="perm-group" data-grupo="{{ $grupoKey }}">
+                        <div class="perm-head">
+                            <div>
+                                <h4>{{ $grupo['label'] }}</h4>
+                                @if(!empty($grupo['desc']))
+                                    <p>{{ $grupo['desc'] }}</p>
+                                @endif
+                            </div>
+                            <div class="perm-time">
+                                <span>Tiempo del módulo</span>
+                                <select name="duracion[{{ $grupoKey }}]" class="mod-dur">
                                     <option value="permanente">Permanente</option>
                                     @foreach($duracionesPermiso as $valor => $texto)
                                         <option value="{{ $valor }}">{{ $texto }}</option>
                                     @endforeach
                                 </select>
-                                <input type="number" name="horas[{{ $clave }}]" min="1" max="168" placeholder="Horas" class="hrs-in" style="display:none;">
+                                <input type="number" name="horas[{{ $grupoKey }}]" min="1" max="168" placeholder="Horas" class="mod-hrs" style="display:none;">
+                            </div>
+                        </div>
+                        @foreach($grupo['items'] as $clave => $etiqueta)
+                            <label class="perm-row">
+                                <input type="checkbox" name="permisos[]" value="{{ $clave }}">
+                                <span class="perm-copy">
+                                    <b>{{ $etiqueta }}</b>
+                                    @if(!empty($grupo['hints'][$clave]))
+                                        <small>{{ $grupo['hints'][$clave] }}</small>
+                                    @endif
+                                </span>
                             </label>
                         @endforeach
                     </div>
@@ -426,21 +458,22 @@
 
     function abrirPermisos(btn) {
         var data = {};
+        var mods = {};
         try { data = JSON.parse(btn.getAttribute('data-permisos') || '{}'); } catch (e) { data = {}; }
+        try { mods = JSON.parse(btn.getAttribute('data-modulos') || '{}'); } catch (e) { mods = {}; }
         document.getElementById('permNombre').textContent = btn.getAttribute('data-name') || '';
         document.getElementById('formPermisos').action = btn.getAttribute('data-action') || '';
         document.querySelectorAll('#formPermisos input[type="checkbox"]').forEach(function (cb) {
             var grant = data[cb.value];
             cb.checked = !!(grant && grant.on);
-            var row = cb.closest('.perm-row');
-            var sel = row.querySelector('.dur-sel');
-            var hrs = row.querySelector('.hrs-in');
-            if (sel) sel.value = grant && grant.duracion ? grant.duracion : 'permanente';
-            if (hrs) {
-                hrs.style.display = sel && sel.value === 'custom' ? '' : 'none';
-                hrs.disabled = !cb.checked || (sel && sel.value !== 'custom');
-            }
-            if (sel) sel.disabled = !cb.checked;
+        });
+        document.querySelectorAll('#formPermisos .perm-group').forEach(function (group) {
+            var info = mods[group.getAttribute('data-grupo')] || {};
+            var sel = group.querySelector('.mod-dur');
+            var hrs = group.querySelector('.mod-hrs');
+            if (sel) sel.value = info.duracion || 'permanente';
+            if (hrs) hrs.value = info.horas || '';
+            syncModuloDuracion(group);
         });
         document.getElementById('modalPermisos').style.display = 'flex';
     }
@@ -449,17 +482,62 @@
         document.getElementById('modalPermisos').style.display = 'none';
     }
 
-    document.getElementById('formPermisos').addEventListener('change', function (e) {
-        var row = e.target.closest('.perm-row');
-        if (!row) return;
-        var cb = row.querySelector('input[type="checkbox"]');
-        var sel = row.querySelector('.dur-sel');
-        var hrs = row.querySelector('.hrs-in');
-        if (sel) sel.disabled = !cb.checked;
+    var REQUIERE = @json($requierePermisos ?? []);
+
+    function permCb(clave) {
+        return document.querySelector('#formPermisos input[type="checkbox"][value="' + clave + '"]');
+    }
+
+    function hijosDe(padre) {
+        return Object.keys(REQUIERE).filter(function (k) {
+            return (REQUIERE[k] || []).indexOf(padre) !== -1;
+        });
+    }
+
+    function syncModuloDuracion(group) {
+        if (!group) return;
+        var alguna = group.querySelector('input[type="checkbox"]:checked');
+        var sel = group.querySelector('.mod-dur');
+        var hrs = group.querySelector('.mod-hrs');
+        if (sel) sel.disabled = !alguna;
         if (hrs) {
-            hrs.style.display = sel && sel.value === 'custom' ? '' : 'none';
-            hrs.disabled = !cb.checked || sel.value !== 'custom';
+            var custom = sel && sel.value === 'custom';
+            hrs.style.display = custom ? '' : 'none';
+            hrs.disabled = !alguna || !custom;
         }
+    }
+
+    function marcarPadres(clave) {
+        (REQUIERE[clave] || []).forEach(function (padre) {
+            var cb = permCb(padre);
+            if (cb && !cb.checked) {
+                cb.checked = true;
+                marcarPadres(padre);
+            }
+        });
+    }
+
+    function desmarcarHijos(padre) {
+        hijosDe(padre).forEach(function (hijo) {
+            var cb = permCb(hijo);
+            if (cb && cb.checked) {
+                cb.checked = false;
+                desmarcarHijos(hijo);
+            }
+        });
+    }
+
+    document.getElementById('formPermisos').addEventListener('change', function (e) {
+        var group = e.target.closest('.perm-group');
+        var row = e.target.closest('.perm-row');
+        if (row && e.target.type === 'checkbox') {
+            if (e.target.checked) {
+                marcarPadres(e.target.value);
+            } else {
+                desmarcarHijos(e.target.value);
+            }
+        }
+        syncModuloDuracion(group);
     });
     document.getElementById('formPermisos').addEventListener('submit', function () {
         this.querySelectorAll('select, input').forEach(function (el) { el.disabled = false; });

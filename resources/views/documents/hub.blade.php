@@ -11,7 +11,7 @@
     .hub-table { background:#fff; border: 1px solid var(--cth-border); border-radius:12px; overflow-x:auto; }
     .hub-table table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:13px; }
     .hub-table col.col-proc { width:14%; }
-    .hub-table col.col-cond { width:14%; }
+    .hub-table col.col-cond { width:16%; }
     .hub-table col.col-doc { width:13%; }
     .hub-table col.col-act { width:16%; }
     .hub-table th, .hub-table td { padding:11px 8px; border:1px solid var(--cth-border); text-align:left; vertical-align:middle; }
@@ -37,14 +37,22 @@
     .db-generado { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
     .db-descargado { background: #f0fdf4; color: var(--cth-green-text); border: 1px solid #bbf7d0; }
     .hub-doc { display:flex; flex-direction:column; align-items:center; gap:6px; }
-    .hub-dl { display:flex; gap:4px; justify-content:center; flex-wrap:wrap; }
+    .hub-dl { display:flex; gap:6px; flex-wrap:wrap; }
     .hub-dl a {
-        display:inline-flex; align-items:center; gap:4px;
-        padding:3px 8px; border-radius:999px; font-size:10px; font-weight:700;
+        display:inline-flex; align-items:center; gap:5px;
+        padding:7px 12px; border-radius:8px; font-size:12px; font-weight:700;
         text-decoration:none; color:#fff;
     }
     .hub-dl-word { background:#1d4ed8; }
     .hub-dl-pdf { background:#e24b3a; }
+    .dl-item {
+        display:flex; align-items:center; justify-content:space-between; gap:12px;
+        padding:12px 0; border-bottom:1px solid var(--cth-border);
+    }
+    .dl-item:last-child { border-bottom:0; }
+    .dl-item b { display:block; color:#0f172a; font-size:14px; }
+    .dl-item small { display:block; margin-top:3px; color:#64748b; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+    #modalDescargas .sipd-dialog { max-width: 520px; }
 
     .hub-actions {
         display: flex;
@@ -118,7 +126,7 @@
             @endphp
             <tr>
                 <td>
-                    <a class="proc-lnk" href="{{ route('abogado.detalleproceso', $caso->id) }}">PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</a>
+                    <a class="proc-lnk" href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}">PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</a>
                     <span class="hub-sub">
                         <span class="st"><i class="fas fa-circle {{ $estadoDot }}"></i> {{ $caso->estado }}</span>
                         @if(($caso->anexos_count ?? 0) > 0)
@@ -140,14 +148,6 @@
                             <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" title="{{ \App\Models\CasoDocumentoEstado::etiqueta($tipoSlot) }}" style="text-decoration:none;">
                                 <span class="doc-badge {{ $estSlot->claseHub() }}">{{ $estSlot->etiquetaHub() }}</span>
                             </a>
-                            <div class="hub-dl">
-                                <a class="hub-dl-word" href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}" title="Descargar Word">
-                                    <i class="fas fa-file-word"></i> Word
-                                </a>
-                                <a class="hub-dl-pdf" href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}?format=pdf" title="Descargar PDF">
-                                    <i class="fas fa-file-pdf"></i> PDF
-                                </a>
-                            </div>
                         </div>
                     </td>
                 @endforeach
@@ -166,9 +166,30 @@
                                 </button>
                             </form>
                         @endif
-                        <a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="action-btn" title="Editar datos del proceso">
+                        <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn" title="Editar datos del proceso">
                             <i class="fas fa-edit"></i> Editar
                         </a>
+                        @if(auth()->user()->puede('descargar_documentos'))
+                            @php
+                                $descargas = [];
+                                foreach (\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes) {
+                                    $tipoSlot = $caso->varianteDelSlot($slot);
+                                    $estSlot = $caso->estadoDocumento($tipoSlot);
+                                    $descargas[] = [
+                                        'label' => \App\Models\CasoDocumentoEstado::SLOT_LABELS[$slot],
+                                        'estado' => $estSlot->etiquetaHub(),
+                                        'word' => route('documentos.download', [$caso->id, $tipoSlot]),
+                                        'pdf' => route('documentos.download', [$caso->id, $tipoSlot]) . '?format=pdf',
+                                    ];
+                                }
+                            @endphp
+                            <button type="button" class="action-btn hub-open-dl"
+                                data-proc="PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}"
+                                data-nombre="{{ $caso->nombre }}"
+                                data-items='@json($descargas)'>
+                                <i class="fas fa-download"></i> Descargar
+                            </button>
+                        @endif
                     </div>
                 </td>
             </tr>
@@ -179,4 +200,65 @@
     </table>
     @include('partials.paginacion', ['paginador' => $casos])
 </div>
+
+@if(auth()->user()->puede('descargar_documentos'))
+<div class="sipd-dialog-bg" id="modalDescargas">
+    <div class="sipd-dialog">
+        <h3>Descargar · <span id="dlProc"></span></h3>
+        <p class="sipd-dialog-lead" id="dlNombre"></p>
+        <div id="dlList"></div>
+        <div class="sipd-dialog-actions">
+            <button type="button" class="btn-ghost" id="dlCerrar">Cerrar</button>
+        </div>
+    </div>
+</div>
+@endif
+@endsection
+
+@section('scripts')
+@if(auth()->user()->puede('descargar_documentos'))
+<script>
+(function () {
+    var modal = document.getElementById('modalDescargas');
+    var list = document.getElementById('dlList');
+    if (!modal || !list) return;
+
+    function cerrar() {
+        modal.style.display = 'none';
+        list.innerHTML = '';
+    }
+
+    function esc(value) {
+        return String(value || '').replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+
+    function abrir(btn) {
+        var items = [];
+        try { items = JSON.parse(btn.getAttribute('data-items') || '[]'); } catch (e) { items = []; }
+        document.getElementById('dlProc').textContent = btn.getAttribute('data-proc') || '';
+        document.getElementById('dlNombre').textContent = btn.getAttribute('data-nombre') || '';
+        list.innerHTML = items.map(function (item) {
+            return '<div class="dl-item">' +
+                '<div><b>' + esc(item.label) + '</b><small>' + esc(item.estado) + '</small></div>' +
+                '<div class="hub-dl">' +
+                    '<a class="hub-dl-word" href="' + esc(item.word) + '" title="Descargar Word"><i class="fas fa-file-word"></i> Word</a>' +
+                    '<a class="hub-dl-pdf" href="' + esc(item.pdf) + '" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+        modal.style.display = 'flex';
+    }
+
+    document.querySelectorAll('.hub-open-dl').forEach(function (btn) {
+        btn.addEventListener('click', function () { abrir(this); });
+    });
+    document.getElementById('dlCerrar').addEventListener('click', cerrar);
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) cerrar();
+    });
+})();
+</script>
+@endif
 @endsection

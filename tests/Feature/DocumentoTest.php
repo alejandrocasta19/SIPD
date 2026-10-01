@@ -17,9 +17,14 @@ class DocumentoTest extends TestCase
 
     // ─── Helpers ────────────────────────────────────────────────────
 
-    private function makeUser(string $role = 'abogado'): User
+    private function makeUser(string $role = 'abogado', array $extras = []): User
     {
-        return User::factory()->create(['role' => $role]);
+        $user = User::factory()->create(['role' => $role]);
+        foreach ($extras as $permiso) {
+            $user->otorgarPermiso($permiso, null);
+        }
+
+        return $user;
     }
 
     private function makeCaso(User $user, array $attrs = []): ProcesoDisciplinario
@@ -100,7 +105,7 @@ class DocumentoTest extends TestCase
     /** @test */
     public function abogado_no_puede_descargar_documento_de_caso_ajeno()
     {
-        $abog1 = $this->makeUser('abogado');
+        $abog1 = $this->makeUser('abogado', ['descargar_documentos']);
         $abog2 = $this->makeUser('abogado');
         $caso  = $this->makeCaso($abog2);
 
@@ -568,8 +573,7 @@ class DocumentoTest extends TestCase
             ->assertSee('Borrador')
             ->assertSee('Generada, no descargada')
             ->assertDontSee('Generada y descargada')
-            ->assertSee('Word')
-            ->assertSee('PDF');
+            ->assertDontSee('hub-open-dl', false);
     }
 
     /** @test */
@@ -587,6 +591,31 @@ class DocumentoTest extends TestCase
             ->get(route('documentos.hub'))
             ->assertOk()
             ->assertSee('Generada y descargada');
+    }
+
+    /** @test */
+    public function hub_oculta_descarga_si_no_tiene_permiso()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertDontSee('hub-open-dl', false);
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertRedirect(route('abogado.dashboard'))
+            ->assertSessionHas('error');
+
+        $user->otorgarPermiso('descargar_documentos', null);
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee('hub-open-dl', false)
+            ->assertSee('Descargar');
     }
 
     /** @test */
@@ -1013,7 +1042,7 @@ class DocumentoTest extends TestCase
     /** @test */
     public function descargar_documento_marca_generada_y_descargada()
     {
-        $user = $this->makeUser('abogado');
+        $user = $this->makeUser('abogado', ['descargar_documentos']);
         $caso = $this->makeCaso($user);
 
         $this->actingAs($user)
@@ -1062,5 +1091,43 @@ class DocumentoTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('Pendiente', $caso->fresh()->estado);
+    }
+
+    /** @test */
+    public function volver_desde_detalle_regresa_a_generar_documentos()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->from(route('documentos.hub'))
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('btn-volver-lista" href="'.route('documentos.hub').'"', false);
+    }
+
+    /** @test */
+    public function volver_desde_detalle_regresa_a_todos_los_procesos()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($coord);
+
+        $this->actingAs($coord)
+            ->from(route('abogado.consultarproceso'))
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('btn-volver-lista" href="'.route('abogado.consultarproceso').'"', false);
+    }
+
+    /** @test */
+    public function volver_respeta_el_origen_from_si_no_hay_lista_previa()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']))
+            ->assertOk()
+            ->assertSee('btn-volver-lista" href="'.route('documentos.hub').'"', false);
     }
 }

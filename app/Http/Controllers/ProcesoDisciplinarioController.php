@@ -13,6 +13,7 @@ use App\Services\ReportService;
 use App\Services\OfficialDocumentService;
 use Illuminate\Validation\ValidationException;
 use App\Support\Paginacion;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ProcesoDisciplinarioController extends Controller
@@ -23,7 +24,8 @@ class ProcesoDisciplinarioController extends Controller
         $this->middleware('permiso:ver_casos')->only(['index', 'misCasos', 'show', 'workerSearch', 'downloadSourceDocument']);
         $this->middleware('permiso:editar_casos')->only(['update']);
         $this->middleware('permiso:eliminar_casos')->only(['destroy']);
-        $this->middleware('permiso:ver_reportes')->only(['reportes', 'reportesData', 'reportesGlobales', 'exportarCasos']);
+        $this->middleware('permiso:ver_reportes')->only(['reportes', 'reportesData']);
+        $this->middleware('permiso:exportar_reportes')->only(['reportesGlobales', 'exportarCasos']);
         $this->middleware('permiso:ver_reincidencias')->only(['reincidencias']);
         $this->middleware('permiso:ver_plazos')->only(['plazos', 'actualizarDescargosPresentacion']);
         $this->middleware('permiso:ver_resoluciones')->only(['resoluciones']);
@@ -327,6 +329,7 @@ class ProcesoDisciplinarioController extends Controller
             'conteos' => $conteos,
             'modalidades' => $modalidades,
             'isMisCasos' => $mine,
+            'fromDetalle' => $mine ? 'casos' : 'procesos',
         ]);
     }
 
@@ -632,7 +635,7 @@ class ProcesoDisciplinarioController extends Controller
     /**
      * Mostrar detalles de un proceso disciplinario
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $proceso = $this->accessibleProcess($id);
         $proceso->loadMissing(['documentoEstados', 'anexos.user']);
@@ -640,10 +643,76 @@ class ProcesoDisciplinarioController extends Controller
         return view('abogado.Detalleproceso', [
             'proceso' => $proceso,
             'pageTitle' => 'PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT),
+            'volverA' => $this->resolverVolverDetalle($request),
             'equipoRh' => auth()->user()->esCoordinadora()
                 ? User::where('role', 'abogado')->orderBy('name')->get()
                 : collect(),
         ]);
+    }
+
+    private function resolverVolverDetalle(Request $request): string
+    {
+        $previo = url()->previous();
+        if ($this->esOrigenDetalleValido($previo)) {
+            session(['detalle_volver' => $previo]);
+            return $previo;
+        }
+
+        $from = $request->query('from');
+        $mapa = $this->origenesDetalle();
+        if (is_string($from) && isset($mapa[$from])) {
+            session(['detalle_volver' => $mapa[$from]]);
+            return $mapa[$from];
+        }
+
+        return session('detalle_volver') ?: $this->listaPorDefectoDetalle();
+    }
+
+    private function origenesDetalle(): array
+    {
+        return [
+            'documentos' => route('documentos.hub'),
+            'procesos' => route('abogado.consultarproceso'),
+            'casos' => route('abogado.mis-casos'),
+            'reportes' => route('abogado.reportes'),
+            'inicio' => route('abogado.dashboard'),
+            'anexos' => route('abogado.anexos'),
+            'plazos' => route('abogado.plazos'),
+            'reincidencias' => route('abogado.reincidencias'),
+            'resoluciones' => route('abogado.resoluciones'),
+            'veredictos' => route('coordinadora.veredictos'),
+        ];
+    }
+
+    private function listaPorDefectoDetalle(): string
+    {
+        return auth()->user()->esCoordinadora()
+            ? route('abogado.consultarproceso')
+            : route('abogado.mis-casos');
+    }
+
+    private function esOrigenDetalleValido(?string $url): bool
+    {
+        if (!$url) {
+            return false;
+        }
+
+        $root = rtrim($this->requestRoot(), '/');
+        if ($root === '' || !Str::startsWith($url, $root)) {
+            return false;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH) ?: '/';
+        if ($path === '/' || $path === '/login') {
+            return false;
+        }
+
+        return !Str::contains($path, '/abogado/detalleproceso');
+    }
+
+    private function requestRoot(): string
+    {
+        return request()->root() ?: rtrim((string) config('app.url'), '/');
     }
 
     public function downloadSourceDocument($id)
@@ -963,6 +1032,7 @@ class ProcesoDisciplinarioController extends Controller
             'abogados' => $abogados,
             'catalogoPermisos' => \App\Support\RhPermisos::catalogo(),
             'duracionesPermiso' => \App\Support\RhPermisos::duracionesHoras(),
+            'requierePermisos' => \App\Support\RhPermisos::requiere(),
         ]);
     }
 

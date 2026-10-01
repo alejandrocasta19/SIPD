@@ -210,11 +210,13 @@
                 </td>
                 <td>
                     <div class="acts">
+                        @if(auth()->user()->puede('descargar_anexos'))
                         <a class="action-btn download" href="{{ route('abogado.anexos.download', $anexo->id) }}" title="Descargar archivo">
                             <i class="fas fa-download"></i>
                             <span>Descargar</span>
                         </a>
-                        @if($anexo->requiereFirma())
+                        @endif
+                        @if($anexo->requiereFirma() && auth()->user()->puede('subir_anexos'))
                             <form action="{{ route('abogado.anexos.firmar', $anexo->id) }}" method="POST" enctype="multipart/form-data">
                                 @csrf
                                 @method('PUT')
@@ -224,7 +226,7 @@
                                 </label>
                             </form>
                         @endif
-                        @if(in_array(auth()->user()->role, ['admin','coordinadora'], true) || $anexo->user_id === auth()->id())
+                        @if(auth()->user()->puede('eliminar_anexos') && (auth()->user()->esCoordinadora() || $anexo->user_id === auth()->id()))
                             <form action="{{ route('abogado.anexos.destroy', $anexo->id) }}" method="POST"
                                   data-confirm="Se eliminará el anexo del expediente."
                                   data-confirm-title="Eliminar anexo"

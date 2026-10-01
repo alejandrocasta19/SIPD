@@ -37,12 +37,7 @@
                 <div class="card-header">
                     <div class="card-tools">
 
-                        <a href="{{ route('abogado.consultarproceso') }}"
-                           class="btn btn-secondary">
-
-                            <i class="fas fa-arrow-left"></i> Volver a la lista
-
-                        </a>
+                        <a class="btn btn-secondary btn-volver-lista" href="{{ $volverA }}"><i class="fas fa-arrow-left"></i> Volver a la lista</a>
 
                         @if(auth()->user()->puede('editar_casos'))
                         <button type="button"
@@ -153,7 +148,11 @@
                                         <div class="mt-2">
                                             @foreach($anexosSlot as $anexo)
                                                 <div class="small mb-1">
-                                                    <a href="{{ route('abogado.anexos.download', $anexo->id) }}">{{ $anexo->nombreVisible() }}</a>
+                                                    @if(auth()->user()->puede('descargar_anexos'))
+                                                        <a href="{{ route('abogado.anexos.download', $anexo->id) }}">{{ $anexo->nombreVisible() }}</a>
+                                                    @else
+                                                        {{ $anexo->nombreVisible() }}
+                                                    @endif
                                                 </div>
                                             @endforeach
                                         </div>

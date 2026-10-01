@@ -6,7 +6,7 @@
     <div class="proc-head">
         <div>
             <h1>Solicitudes de permiso</h1>
-            <p>El equipo indica qué hará y por qué. Tú eliges el módulo y las horas.</p>
+            <p>El equipo indica qué hará y por qué. Tú eliges el módulo, la función y las horas. Descargar se otorga aparte de ver.</p>
         </div>
         <div class="proc-head-side">
             <span class="stat-chip">{{ $pendientes->count() }} pendiente{{ $pendientes->count() === 1 ? '' : 's' }}</span>
@@ -75,10 +75,14 @@
                 @csrf
                 @method('PUT')
                 <div>
-                    <label>Módulo</label>
+                    <label>Módulo y función</label>
                     <select name="permiso">
-                        @foreach($solicitables as $clave => $etiqueta)
-                            <option value="{{ $clave }}" {{ $solicitud->permiso === $clave ? 'selected' : '' }}>{{ $etiqueta }}</option>
+                        @foreach(\App\Support\RhPermisos::solicitablesAgrupados() as $grupo)
+                            <optgroup label="{{ $grupo['label'] }}">
+                                @foreach($grupo['items'] as $clave => $etiqueta)
+                                    <option value="{{ $clave }}" {{ $solicitud->permiso === $clave ? 'selected' : '' }}>{{ $etiqueta }}</option>
+                                @endforeach
+                            </optgroup>
                         @endforeach
                     </select>
                 </div>

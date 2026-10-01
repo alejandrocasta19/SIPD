@@ -163,12 +163,16 @@
                 <a href="{{ route('documentos.hub') }}" class="btn-toolbar btn-ghost" style="text-decoration:none;">
                     <i class="fas fa-arrow-left"></i> Generar documentos
                 </a>
+                @if(auth()->user()->puede('editar_documentos'))
                 <button type="submit" class="btn-toolbar btn-ghost" title="Guarda el avance sin generar el documento">
                     <i class="fas fa-save"></i> Guardar borrador
                 </button>
+                @endif
+                @if(auth()->user()->puede('generar_documentos'))
                 <button type="submit" name="formato" value="generar" class="btn-toolbar btn-save" title="Marca el documento como generado. La descarga queda en Generar documentos.">
                     <i class="fas fa-file-signature"></i> Generar
                 </button>
+                @endif
             </div>
         </div>
 

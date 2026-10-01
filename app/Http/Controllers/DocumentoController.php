@@ -16,8 +16,9 @@ class DocumentoController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permiso:ver_documentos')->only(['hub', 'index', 'edit', 'preview', 'download']);
-        $this->middleware('permiso:editar_documentos')->only(['save', 'elegirVariante']);
+        $this->middleware('permiso:ver_documentos')->only(['hub', 'index', 'edit', 'preview']);
+        $this->middleware('permiso:editar_documentos')->only(['elegirVariante']);
+        $this->middleware('permiso:descargar_documentos')->only(['download']);
         $this->middleware('permiso:subir_anexos')->only(['storeEvidencia']);
         $this->middleware('permiso:eliminar_anexos')->only(['destroyEvidencia']);
     }
@@ -159,6 +160,10 @@ class DocumentoController extends Controller
     public function save(Request $request, int $id, string $tipo, OfficialDocumentService $documents)
     {
         $this->assertValidTipo($tipo);
+        $formato = $request->input('formato');
+        $quiereGenerar = in_array($formato, ['docx', 'pdf', 'generar'], true);
+        auth()->user()->exigir($quiereGenerar ? 'generar_documentos' : 'editar_documentos');
+
         $caso        = $this->accessibleCase($id);
         $slot        = CasoDocumentoEstado::slotDe($tipo);
         if ($slot) {
@@ -179,8 +184,6 @@ class DocumentoController extends Controller
 
         $allFilled = collect($bloques)->every(fn ($v) => trim((string) $v) !== '');
         $nuevoEstado = $allFilled ? 'completo' : 'en_diligenciamiento';
-        $formato = $request->input('formato');
-        $quiereGenerar = in_array($formato, ['docx', 'pdf', 'generar'], true);
 
         $estadoDoc = $caso->estadoDocumento($tipo);
         if ($quiereGenerar) {

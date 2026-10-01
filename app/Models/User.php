@@ -122,30 +122,49 @@ class User extends Authenticatable
                 ['granted_by' => $grantedBy, 'expires_at' => null]
             );
         }
+        $this->unsetRelation('permisos');
     }
 
     public function otorgarPermiso(string $clave, ?int $horas, ?int $grantedBy = null): UserPermiso
     {
         abort_unless(in_array($clave, RhPermisos::claves(), true), 422);
 
-        return $this->permisos()->updateOrCreate(
+        $expires = $horas ? now()->addHours($horas) : null;
+
+        foreach (RhPermisos::expandir([$clave]) as $item) {
+            if ($item === $clave) {
+                continue;
+            }
+            if (!$this->puede($item)) {
+                $this->permisos()->updateOrCreate(
+                    ['permiso' => $item],
+                    ['granted_by' => $grantedBy, 'expires_at' => $expires]
+                );
+            }
+        }
+
+        $grant = $this->permisos()->updateOrCreate(
             ['permiso' => $clave],
             [
                 'granted_by' => $grantedBy,
-                'expires_at' => $horas ? now()->addHours($horas) : null,
+                'expires_at' => $expires,
             ]
         );
+        $this->unsetRelation('permisos');
+
+        return $grant;
     }
 
     public function sincronizarPermisos(array $claves, array $duraciones, ?int $grantedBy = null, array $horasCustom = []): void
     {
-        $validas = array_values(array_intersect(RhPermisos::claves(), $claves));
+        $validas = RhPermisos::expandir($claves);
         $this->permisos()->whereNotIn('permiso', $validas)->delete();
 
         foreach ($validas as $clave) {
+            $grupo = RhPermisos::grupoDe($clave);
             $horas = RhPermisos::resolverHoras(
-                $duraciones[$clave] ?? 'permanente',
-                $horasCustom[$clave] ?? null
+                $duraciones[$grupo] ?? $duraciones[$clave] ?? 'permanente',
+                $horasCustom[$grupo] ?? $horasCustom[$clave] ?? null
             );
             $this->permisos()->updateOrCreate(
                 ['permiso' => $clave],
@@ -155,6 +174,7 @@ class User extends Authenticatable
                 ]
             );
         }
+        $this->unsetRelation('permisos');
     }
 
     public function permisosParaFormulario(): array
@@ -168,7 +188,38 @@ class User extends Authenticatable
                 'on' => true,
                 'temporal' => $grant->esTemporal(),
                 'vence' => $grant->expires_at ? $grant->expires_at->format('Y-m-d H:i') : null,
-                'duracion' => $this->duracionDesdeVencimiento($grant->expires_at),
+            ];
+        }
+
+        return $mapa;
+    }
+
+    public function duracionesModuloParaFormulario(): array
+    {
+        $elegidos = [];
+        foreach ($this->permisos as $grant) {
+            if (!$grant->estaVigente()) {
+                continue;
+            }
+            $grupo = RhPermisos::grupoDe($grant->permiso);
+            if (!$grupo) {
+                continue;
+            }
+            $actual = $elegidos[$grupo] ?? null;
+            if (!$actual || ($grant->expires_at && (!$actual->expires_at || $grant->expires_at->lt($actual->expires_at)))) {
+                $elegidos[$grupo] = $grant;
+            }
+        }
+
+        $mapa = [];
+        foreach (array_keys(RhPermisos::catalogo()) as $grupo) {
+            $grant = $elegidos[$grupo] ?? null;
+            $duracion = $grant ? $this->duracionDesdeVencimiento($grant->expires_at) : 'permanente';
+            $mapa[$grupo] = [
+                'duracion' => $duracion,
+                'horas' => $duracion === 'custom' && $grant && $grant->expires_at
+                    ? max(1, (int) now()->diffInHours($grant->expires_at, false))
+                    : '',
             ];
         }
 

@@ -426,7 +426,11 @@
                         <div class="doc-meta" style="margin-top:10px;">
                             @foreach($anexosSlot as $anexo)
                                 <div style="margin-top:4px;">
-                                    <a href="{{ route('abogado.anexos.download', $anexo->id) }}">{{ $anexo->nombreVisible() }}</a>
+                                    @if(auth()->user()->puede('descargar_anexos'))
+                                        <a href="{{ route('abogado.anexos.download', $anexo->id) }}">{{ $anexo->nombreVisible() }}</a>
+                                    @else
+                                        {{ $anexo->nombreVisible() }}
+                                    @endif
                                     @if($anexo->nombre_original && $anexo->nombre_original !== $anexo->nombreVisible())
                                         <span> · {{ $anexo->nombre_original }}</span>
                                     @endif
@@ -439,12 +443,14 @@
                     <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" class="btn-doc btn-edit">
                         <i class="fas fa-edit"></i> Diligenciar
                     </a>
+                    @if(auth()->user()->puede('descargar_documentos'))
                     <a href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}" class="btn-doc btn-download">
                         <i class="fas fa-file-word"></i> Word
                     </a>
                     <a href="{{ route('documentos.download', [$caso->id, $tipoSlot]) }}?format=pdf" class="btn-doc btn-download-pdf">
                         <i class="fas fa-file-pdf"></i> PDF
                     </a>
+                    @endif
                 </div>
             </div>
         @endforeach

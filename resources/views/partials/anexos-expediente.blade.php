@@ -7,10 +7,17 @@
 @else
     @foreach($lista as $anexo)
         <p class="mb-2">
+            @if(auth()->user()->puede('descargar_anexos'))
             <a href="{{ route('abogado.anexos.download', $anexo->id) }}">
                 <i class="fas fa-paperclip"></i>
                 {{ $anexo->nombreVisible() }}
             </a>
+            @else
+            <span>
+                <i class="fas fa-paperclip"></i>
+                {{ $anexo->nombreVisible() }}
+            </span>
+            @endif
             <span class="hub-sub" style="display:inline;margin-left:6px;">
                 {{ $anexo->etiquetaLugar() }} · {{ $anexo->etiquetaEstado() }}
                 · {{ strtoupper($anexo->extensionVigente()) }} · {{ $anexo->tamanoVigente() }}

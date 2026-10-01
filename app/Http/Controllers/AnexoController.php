@@ -14,7 +14,8 @@ class AnexoController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permiso:ver_anexos')->only(['index', 'download']);
+        $this->middleware('permiso:ver_anexos')->only(['index']);
+        $this->middleware('permiso:descargar_anexos')->only(['download']);
         $this->middleware('permiso:subir_anexos')->only(['store', 'firmar']);
         $this->middleware('permiso:eliminar_anexos')->only(['destroy']);
     }
