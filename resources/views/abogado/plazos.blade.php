@@ -59,7 +59,7 @@
 
 .chips { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; animation: fadeInUp 0.7s ease-out backwards; }
 .chip {
-    display: inline-flex; align-items: center; border-radius: 999px; padding: 10px 20px; background: #fff; color: #475569; text-decoration: none; font-size: 14px; font-weight: 600; box-shadow: var(--p-shadow); transition: var(--t-smooth); border: 1px solid #e2e8f0;
+    display: inline-flex; align-items: center; border-radius: 999px; padding: 10px 20px; background: #fff; color: #475569; text-decoration: none; font-size: 14px; font-weight: 600; box-shadow: var(--p-shadow); transition: var(--t-smooth); border: 1px solid var(--cth-border);
 }
 .chip:hover { border-color: #cbd5e1; color: var(--p-dark); transform: translateY(-2px); box-shadow: var(--p-hover); }
 .chip.active { background: linear-gradient(135deg, #f0fdf4, #dcfce7); color: var(--cth-green); border-color: #bbf7d0; box-shadow: 0 4px 15px rgba(34,197,94,0.15); }
@@ -91,7 +91,7 @@ table.plz tr:hover td { background: #f8fafc; }
 
 .plz-tipo { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
 .plz-tipo select {
-    font-size: 13px; font-weight: 600; color: var(--p-dark); border: 1px solid #e2e8f0;
+    font-size: 13px; font-weight: 600; color: var(--p-dark); border: 1px solid var(--cth-border);
     border-radius: 8px; padding: 7px 10px; background: #fff; max-width: 240px;
 }
 .plz-tipo select:focus { outline: none; border-color: #86efac; box-shadow: 0 0 0 3px rgba(34,197,94,0.12); }
@@ -99,7 +99,7 @@ table.plz tr:hover td { background: #f8fafc; }
 .empty { text-align: center; padding: 40px 16px; color: #94a3b8; }
 .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; color: #94a3b8; font-size: 13px; }
 .pager-pages { display: flex; gap: 6px; align-items: center; }
-.pager a, .pager span.current { min-width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; text-decoration: none; color: #64748b; background: #fff; border: 1px solid #e2e8f0; }
+.pager a, .pager span.current { min-width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; text-decoration: none; color: #64748b; background: #fff; border: 1px solid var(--cth-border); }
 .pager span.current { background: var(--p-primary); border-color: var(--p-primary); color: #fff; font-weight: 700; }
 @media (max-width: 900px) { .kpis { grid-template-columns: 1fr; } .table-card { overflow-x: auto; } .proc-head { flex-direction: column; } }
 @media (max-width: 1100px) and (min-width: 901px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

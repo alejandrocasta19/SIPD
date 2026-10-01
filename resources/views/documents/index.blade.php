@@ -98,7 +98,7 @@
 
 .variant-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 .variant-pills a, .variant-pills button {
-    border:1px solid #cbd5e1; background:#f8fafc; color:#334155;
+    border: 1px solid var(--cth-border); background:#f8fafc; color:#334155;
     border-radius:999px; padding:4px 10px; font-size:11px; font-weight:700;
     cursor:pointer; text-decoration:none;
 }

@@ -15,7 +15,7 @@
 <style>
     .nt-layout { display:grid; grid-template-columns: minmax(0,1.2fr) minmax(280px,.8fr); gap:20px; align-items:start; }
     .nt-card, .nt-preview {
-        background:#fff; border:1px solid #e2e8f0; border-radius:18px;
+        background:#fff; border: 1px solid var(--cth-border); border-radius:18px;
         padding:24px; box-shadow:0 1px 2px rgba(15,23,42,.04);
     }
     .nt-banner {
@@ -26,7 +26,7 @@
     .nt-banner i { margin-top:2px; }
     .nt-card label { display:block; font-size:13px; font-weight:600; color:#64748b; margin:0 0 6px; }
     .nt-card input[type="text"], .nt-card select, .nt-card textarea {
-        width:100%; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:14px; font:inherit;
+        width:100%; border: 1px solid var(--cth-border); border-radius:10px; padding:10px 12px; margin-bottom:14px; font:inherit;
     }
     .who-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
     .who-head button { border:0; background:none; color:var(--cth-green); font-weight:700; font-size:12px; cursor:pointer; }

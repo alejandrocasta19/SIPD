@@ -57,7 +57,7 @@
         gap:12px;
         align-items:stretch;
         background:#fff;
-        border:1px solid #e2e8f0;
+        border: 1px solid var(--cth-border);
         border-radius:16px;
         overflow:hidden;
         box-shadow:0 1px 2px rgba(15,23,42,.04);

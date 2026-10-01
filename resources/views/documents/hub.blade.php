@@ -5,10 +5,10 @@
 @section('styles')
 <style>
     .hub-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
-    .hub-toolbar input { height:40px; flex:1 1 220px; min-width:0; max-width:420px; border:1px solid #cbd5e1; border-radius:8px; padding:0 12px; }
+    .hub-toolbar input { height:40px; flex:1 1 220px; min-width:0; max-width:420px; border: 1px solid var(--cth-border); border-radius:8px; padding:0 12px; }
     .hub-btn { border:0; border-radius:8px; padding:10px 16px; font-weight:700; cursor:pointer; display:inline-flex; gap:7px; align-items:center; background:var(--cth-green); color:#fff; }
 
-    .hub-table { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow-x:auto; }
+    .hub-table { background:#fff; border: 1px solid var(--cth-border); border-radius:12px; overflow-x:auto; }
     .hub-table table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:13px; }
     .hub-table col.col-proc { width:14%; }
     .hub-table col.col-cond { width:14%; }
@@ -45,7 +45,7 @@
     }
     .hub-actions form { margin: 0; display: block; }
     .action-btn {
-        background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;
+        background: #f1f5f9; color: #334155; border: 1px solid var(--cth-border);
         padding: 7px 8px; border-radius: 8px; font-size: 11px; font-weight: 700;
         text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
         gap: 5px; white-space: nowrap; line-height: 1.2; cursor: pointer; width: 100%;

@@ -19,7 +19,7 @@
 @section('styles')
 <style>
     .table-card { background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 24px; }
-    .worker-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+    .worker-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid var(--cth-line); display: flex; justify-content: space-between; align-items: center; }
     .worker-info { flex: 1; }
     .worker-info b { font-size: 16px; color: #0f172a; display: block; margin-bottom: 2px; }
     .worker-info span { font-size: 13px; color: #64748b; }
@@ -48,9 +48,9 @@
 
     .empty { text-align: center; padding: 40px 16px; color: #94a3b8; background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
     
-    .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #94a3b8; font-size: 13px; border-top: 1px solid #e2e8f0; }
+    .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #94a3b8; font-size: 13px; border-top: 1px solid var(--cth-line); }
     .pager-pages { display: flex; gap: 6px; align-items: center; }
-    .pager a, .pager span.current { min-width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; text-decoration: none; color: #64748b; background: #fff; border: 1px solid #e2e8f0; }
+    .pager a, .pager span.current { min-width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; text-decoration: none; color: #64748b; background: #fff; border: 1px solid var(--cth-border); }
     .pager span.current { background: var(--cth-green-bright); border-color: var(--cth-green-bright); color: #fff; font-weight: 700; }
     
     .global-pager-card { background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 24px; }
@@ -60,7 +60,7 @@
         align-items: center;
         gap: 10px;
         padding: 10px 16px;
-        border-top: 1px solid #e2e8f0;
+        border-top: 1px solid var(--cth-line);
         color: #94a3b8;
         font-size: 12px;
     }

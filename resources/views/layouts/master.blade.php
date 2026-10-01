@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=34">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=38">
     @yield('styles')
 </head>
 <body class="theme-cootranshuila">

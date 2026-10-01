@@ -495,17 +495,17 @@
     }
     .info-box {
         background: #fff;
-        border: 1px solid #ddd;
-        border-radius: 8px;
+        border: 1px solid var(--cth-border);
+        border-radius: 12px;
         margin-bottom: 25px;
         overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        box-shadow: var(--cth-shadow);
     }
     
     .info-header {
-        background: #f8f9fa;
+        background: #f6f8f9;
         padding: 12px 20px;
-        border-bottom: 2px solid #007bff;
+        border-bottom: 1px solid var(--cth-line);
     }
     
     .info-header h4 {
@@ -538,12 +538,12 @@
         font-size: 15px;
         line-height: 1.4;
         padding: 5px 0;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--cth-line);
     }
 
     .campo-editable {
         width: 100%;
-        border: 1px solid #ddd;
+        border: 1px solid var(--cth-border);
         border-radius: 4px;
         padding: 8px;
         margin-bottom: 15px;

@@ -13,21 +13,21 @@
     .rbtn.xls { background:#dcfce7; color:var(--cth-green-text); }
 
     /* ── FILTERS ─────────────────────────────────── */
-    .rp-filters { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
+    .rp-filters { background:#fff; border: 1px solid var(--cth-border); border-radius:10px; padding:10px 14px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
     .rf { min-width:140px; flex:1; }
     .rf label { display:block; color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px; }
-    .rf input  { width:100%; height:32px; border:1px solid #cbd5e1; border-radius:7px; padding:0 9px; font-size:12px; }
+    .rf input  { width:100%; height:32px; border: 1px solid var(--cth-border); border-radius:7px; padding:0 9px; font-size:12px; }
     .rp-error  { display:none; background:#fef2f2; color:#b91c1c; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; }
 
     /* ── KPI CARDS ───────────────────────────────── */
     .kpi-row   { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-bottom:14px; }
-    .kpi-card  { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; min-width:0; }
+    .kpi-card  { background:#fff; border: 1px solid var(--cth-border); border-radius:10px; padding:12px 14px; min-width:0; }
     .kpi-card small  { color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; display:block; }
     .kpi-card strong { font-size:22px; font-weight:800; color:#0f172a; display:block; margin-top:2px; line-height:1; }
 
     /* ── CHARTS ──────────────────────────────────── */
     .charts-wrap { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3, minmax(0,1fr)); gap:10px; margin-bottom:16px; }
-    .ch-card     { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; min-width:0; display:flex; flex-direction:column; }
+    .ch-card     { background:#fff; border: 1px solid var(--cth-border); border-radius:10px; padding:12px 14px; min-width:0; display:flex; flex-direction:column; }
     .ch-card h3  { margin:0 0 1px; font-size:12px; font-weight:700; color:#0f172a; }
     .ch-card p   { color:#64748b; font-size:10px; margin:0 0 8px; }
     .ch-wrap     { position:relative; height:160px; flex:0 0 160px; }
@@ -36,7 +36,7 @@
     .top-more    { border:1px solid #dbeafe; background:#f8fafc; color:#1d4ed8; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer; display:none; width:100%; margin-top:auto; justify-content:center; flex-shrink:0; }
     .top-more:hover { background:#eff6ff; }
     .top-list    { list-style:none; margin:0; padding:0; flex:1; min-height:0; overflow:hidden; }
-    .top-list li { padding:4px 0; border-bottom:1px solid #f1f5f9; }
+    .top-list li { padding:4px 0; border-bottom: 1px solid var(--cth-line); }
     .top-list li:last-child { border-bottom:0; }
     .top-row     { display:flex; align-items:center; gap:8px; }
     .top-rank    { width:18px; height:18px; border-radius:50%; background:#f1f5f9; color:#475569; font-size:9px; font-weight:800; display:grid; place-items:center; flex-shrink:0; }
@@ -57,7 +57,7 @@
     .sec-div { display:flex; align-items:center; gap:10px; margin:16px 0 12px; }
     .sec-div h2   { margin:0; font-size:13px; font-weight:800; color:#0f172a; white-space:nowrap; }
     .sec-div span { color:#94a3b8; font-size:11px; white-space:nowrap; }
-    .sec-div hr   { flex:1; border:none; border-top:1px solid #e2e8f0; }
+    .sec-div hr   { flex:1; border:none; border-top: 1px solid var(--cth-line); }
 
     /* ── TABLE TOOLBAR ───────────────────────────── */
     .tbl-toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
@@ -65,7 +65,7 @@
     .btn-grp { display:flex; gap:5px; flex-wrap:wrap; }
 
     /* ── TABLE ───────────────────────────────────── */
-    .case-tbl { background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:auto; }
+    .case-tbl { background:#fff; border: 1px solid var(--cth-border); border-radius:10px; overflow:auto; }
     .case-tbl table { width:100%; min-width:720px; border-collapse:collapse; font-size:11.5px; }
     .case-tbl thead tr { background:#f8fafc; }
     .case-tbl th { padding:6px 9px; border:1px solid var(--cth-border); text-align:left; color:#64748b; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }

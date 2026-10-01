@@ -32,7 +32,7 @@
     .pf-card input {
         width: 100%;
         height: 44px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--cth-border);
         border-radius: 10px;
         padding: 0 12px;
         margin-bottom: 14px;

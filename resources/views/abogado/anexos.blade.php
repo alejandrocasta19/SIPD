@@ -65,7 +65,7 @@
     .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
     .acts form { margin: 0; }
     .acts .action-btn {
-        background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;
+        background: #f1f5f9; color: #334155; border: 1px solid var(--cth-border);
         padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
         text-decoration: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
         white-space: nowrap; line-height: 1;
@@ -85,7 +85,7 @@
     table.proc th:last-child,
     table.proc td:last-child { width: 1%; white-space: nowrap; }
 
-    .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #94a3b8; font-size: 13px; border-top: 1px solid #e2e8f0; }
+    .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #94a3b8; font-size: 13px; border-top: 1px solid var(--cth-line); }
 
     @media (max-width: 640px) {
         .anexo-grid { grid-template-columns: 1fr; }

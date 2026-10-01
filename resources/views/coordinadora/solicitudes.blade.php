@@ -17,7 +17,7 @@
 
 @section('styles')
 <style>
-    .sol-card { background:#fff; border:1px solid #e2e8f0; border-radius:18px; padding:20px; margin-bottom:16px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+    .sol-card { background:#fff; border: 1px solid var(--cth-border); border-radius:18px; padding:20px; margin-bottom:16px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
     .sol-top { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
     .sol-top b { display:block; color:#0f172a; }
     .sol-top small { color:#64748b; }
@@ -26,7 +26,7 @@
     .sol-form { display:grid; grid-template-columns: minmax(0,1.2fr) 140px 110px auto auto; gap:8px; align-items:end; }
     .sol-form label { display:block; font-size:11px; font-weight:700; color:#94a3b8; margin-bottom:4px; }
     .sol-form select, .sol-form input, .sol-form textarea {
-        width:100%; height:40px; border:1px solid #e2e8f0; border-radius:10px; padding:0 10px; font:inherit; font-size:13px;
+        width:100%; height:40px; border: 1px solid var(--cth-border); border-radius:10px; padding:0 10px; font:inherit; font-size:13px;
     }
     .sol-form textarea { height:40px; padding:8px 10px; }
     .sol-form .custom { display:none; }
@@ -42,7 +42,7 @@
         color:#64748b;
         font-size:13px;
         padding:10px 4px 10px 0;
-        border-bottom:1px solid #f1f5f9;
+        border-bottom: 1px solid var(--cth-line);
     }
     .hist b { color:#334155; }
     .hist-del {

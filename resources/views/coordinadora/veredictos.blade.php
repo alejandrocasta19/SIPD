@@ -22,8 +22,8 @@
 
 @section('styles')
 <style>
-    .ver-card { background:#fff; border:1px solid #e2e8f0; border-radius:18px; box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
-    .ver-row { display:grid; grid-template-columns: 88px minmax(0,1.4fr) minmax(0,1fr) auto; gap:16px; align-items:center; padding:18px 20px; border-bottom:1px solid #f1f5f9; }
+    .ver-card { background:#fff; border: 1px solid var(--cth-border); border-radius:18px; box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
+    .ver-row { display:grid; grid-template-columns: 88px minmax(0,1.4fr) minmax(0,1fr) auto; gap:16px; align-items:center; padding:18px 20px; border-bottom: 1px solid var(--cth-line); }
     .ver-row:last-child { border-bottom:0; }
     .ver-code { font-weight:800; color:var(--cth-green); text-decoration:none; }
     .ver-main b { display:block; color:#0f172a; font-size:15px; }

@@ -22,7 +22,7 @@
 
 .case-info-bar {
     background: #fff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--cth-border);
     border-radius: var(--radius);
     padding: 16px 20px;
     color: #334155;
@@ -39,7 +39,7 @@
 .ci-badges { display: flex; gap: 8px; flex-wrap: wrap; }
 .ci-badge {
     background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--cth-border);
     border-radius: 999px;
     padding: 4px 12px;
     font-size: 12px;
@@ -224,7 +224,7 @@
 /* ─── Worker search autocomplete ─── */
 #worker-results button {
     display: block; width: 100%; text-align: left;
-    border: 1px solid #cbd5e1; background: #fff;
+    border: 1px solid var(--cth-border); background: #fff;
     padding: 8px 12px; border-radius: 8px;
     margin-top: 4px; cursor: pointer; font-size: 12px;
 }

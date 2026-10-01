@@ -60,7 +60,7 @@
     .form-grid input {
         width: 100%;
         height: 42px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--cth-border);
         border-radius: 10px;
         padding: 0 12px;
         font: inherit;
@@ -167,11 +167,11 @@
         gap: 8px;
         align-items: center;
         padding: 8px 0;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid var(--cth-line);
         font-size: 14px;
     }
     .perm-row select, .perm-row input[type="number"] {
-        height: 34px; border: 1px solid #e2e8f0; border-radius: 8px; font: inherit; font-size: 12px; padding: 0 8px;
+        height: 34px; border: 1px solid var(--cth-border); border-radius: 8px; font: inherit; font-size: 12px; padding: 0 8px;
     }
     .sipd-dialog.modal-perm { max-width: 680px; }
     .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
@@ -214,7 +214,7 @@
     .modal input {
         width: 100%;
         height: 42px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--cth-border);
         border-radius: 10px;
         padding: 0 12px;
         margin-bottom: 14px;

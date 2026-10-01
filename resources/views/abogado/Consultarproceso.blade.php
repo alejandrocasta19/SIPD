@@ -192,7 +192,7 @@
         padding: 14px 16px;
         color: #94a3b8;
         font-size: 13px;
-        border-top: 1px solid #e2e8f0;
+        border-top: 1px solid var(--cth-line);
     }
 
     .pager-pages { display: flex; gap: 6px; align-items: center; }
@@ -206,7 +206,7 @@
         text-decoration: none;
         color: #64748b;
         background: #fff;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--cth-border);
     }
 
     .pager span.current {
