@@ -424,6 +424,132 @@ class ProcesoDisciplinario extends Model
         return 'pendiente';
     }
 
+    /**
+     * Texto y progreso del bloque "Estado y flujo" en el detalle.
+     * Distingue elaborar documentos vs. revisión de la coordinadora.
+     */
+    public function resumenFlujo(): array
+    {
+        $fase = $this->faseFlujo();
+        $pasosSlot = [];
+        $generados = 0;
+        $borradores = 0;
+        $nombresListos = [];
+        $slotActual = null;
+
+        foreach (array_keys(CasoDocumentoEstado::SLOTS) as $slot) {
+            $est = $this->estadoDelSlot($slot);
+            $corto = CasoDocumentoEstado::SLOT_SHORT[$slot] ?? $slot;
+
+            if ($est->estaGenerado()) {
+                $pasoSlot = $est->estaDescargado() ? 'listo' : 'generado';
+                $generados++;
+                $nombresListos[] = $corto;
+            } elseif ($est->estado === 'en_diligenciamiento') {
+                $pasoSlot = 'borrador';
+                $borradores++;
+                if ($slotActual === null) {
+                    $slotActual = $slot;
+                }
+            } else {
+                $pasoSlot = 'pendiente';
+                if ($slotActual === null) {
+                    $slotActual = $slot;
+                }
+            }
+
+            $pasosSlot[$slot] = $pasoSlot;
+        }
+
+        $siguienteCorto = $slotActual ? (CasoDocumentoEstado::SLOT_SHORT[$slotActual] ?? $slotActual) : null;
+        $siguienteEsBorrador = $slotActual && ($pasosSlot[$slotActual] ?? null) === 'borrador';
+
+        if ($fase === 'sancionado') {
+            $paso = 'fallo';
+            $titulo = 'Sancionado';
+            $detalle = 'La coordinadora sancionó el expediente. El proceso está cerrado.';
+            $chipMedio = 'En Proceso';
+            $subPendiente = 'Documentos listos';
+            $subMedio = 'Revisión completada';
+            $subFallo = 'Quedó sancionado';
+            $slotActual = null;
+        } elseif ($fase === 'archivado') {
+            $paso = 'fallo';
+            $titulo = 'Archivado';
+            $detalle = 'La coordinadora archivó el expediente. El proceso está cerrado.';
+            $chipMedio = 'En Proceso';
+            $subPendiente = 'Documentos listos';
+            $subMedio = 'Revisión completada';
+            $subFallo = 'Quedó archivado';
+            $slotActual = null;
+        } elseif ($fase === 'en_revision') {
+            $paso = 'revision';
+            $titulo = 'En Proceso';
+            $detalle = 'Los 4 documentos están listos. Esperando el veredicto de la coordinadora.';
+            $chipMedio = 'En Proceso';
+            $subPendiente = 'Documentos listos';
+            $subMedio = 'Pendiente de veredicto';
+            $subFallo = 'Sancionado o archivado';
+            $slotActual = null;
+        } elseif ($this->puedeEnviarAProceso()) {
+            $paso = 'pendiente';
+            $titulo = 'Pendiente';
+            $detalle = 'Los 4 documentos están generados. Envíe el caso a revisión.';
+            $chipMedio = 'En Proceso';
+            $subPendiente = '4 de 4 documentos listos';
+            $subMedio = 'Envíe a revisión';
+            $subFallo = 'Sancionado o archivado';
+            $slotActual = null;
+        } elseif ($generados === 0 && $borradores === 0) {
+            $paso = 'pendiente';
+            $titulo = 'Pendiente';
+            $detalle = 'Todavía no hay documentos. Empiece por Apertura.';
+            $chipMedio = 'En Proceso';
+            $subPendiente = 'Sin documentos aún';
+            $subMedio = 'Cuando envíe a revisión';
+            $subFallo = 'Sancionado o archivado';
+            $slotActual = 'apertura';
+        } else {
+            $paso = 'pendiente';
+            $titulo = 'Pendiente';
+            $detalle = $generados . ' de 4 documentos listos';
+            if ($nombresListos) {
+                $detalle .= ' (' . implode(', ', $nombresListos) . ')';
+            }
+            $detalle .= '.';
+            if ($siguienteEsBorrador) {
+                $detalle .= ' Hay un borrador de ' . $siguienteCorto . '.';
+            } elseif ($siguienteCorto) {
+                $detalle .= ' Siguiente: ' . $siguienteCorto . '.';
+            }
+            $chipMedio = 'En Proceso';
+            $subPendiente = $generados . ' de 4 listos';
+            $subMedio = 'Cuando envíe a revisión';
+            $subFallo = 'Sancionado o archivado';
+        }
+
+        $pct = in_array($paso, ['revision', 'fallo'], true)
+            ? 100
+            : (int) round(($generados / 4) * 100);
+
+        return [
+            'fase' => $fase,
+            'paso' => $paso,
+            'titulo' => $titulo,
+            'detalle' => $detalle,
+            'generados' => $generados,
+            'borradores' => $borradores,
+            'total' => 4,
+            'pct' => $pct,
+            'slot_actual' => $slotActual,
+            'slots' => $pasosSlot,
+            'chip_medio' => $chipMedio,
+            'sub_pendiente' => $subPendiente,
+            'sub_medio' => $subMedio,
+            'sub_fallo' => $subFallo,
+        ];
+    }
+
     public function tieneDocumentoGenerado(): bool
     {
         $estados = $this->relationLoaded('documentoEstados')

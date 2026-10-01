@@ -1,49 +1,50 @@
-@extends('layouts.app')
+@extends('layouts.guest')
+
+@section('title', 'Confirmar contraseña · SIPD Cootranshuila')
 
 @section('content')
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">{{ __('Confirm Password') }}</div>
+    <h2>Confirmar contraseña</h2>
+    <p class="guest-lead">Vuelve a escribir tu contraseña para continuar.</p>
 
-                <div class="card-body">
-                    {{ __('Please confirm your password before continuing.') }}
-
-                    <form method="POST" action="{{ route('password.confirm') }}">
-                        @csrf
-
-                        <div class="row mb-3">
-                            <label for="password" class="col-md-4 col-form-label text-md-end">{{ __('Password') }}</label>
-
-                            <div class="col-md-6">
-                                <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" name="password" required autocomplete="current-password">
-
-                                @error('password')
-                                    <span class="invalid-feedback" role="alert">
-                                        <strong>{{ $message }}</strong>
-                                    </span>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div class="row mb-0">
-                            <div class="col-md-8 offset-md-4">
-                                <button type="submit" class="btn btn-primary">
-                                    {{ __('Confirm Password') }}
-                                </button>
-
-                                @if (Route::has('password.request'))
-                                    <a class="btn btn-link" href="{{ route('password.request') }}">
-                                        {{ __('Forgot Your Password?') }}
-                                    </a>
-                                @endif
-                            </div>
-                        </div>
-                    </form>
-                </div>
+    @if($errors->any())
+        <div class="sipd-alert sipd-alert-error" role="alert">
+            <div>
+                <strong>No se pudo confirmar</strong>
+                <ul>
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
         </div>
-    </div>
-</div>
+    @endif
+
+    <form method="POST" action="{{ route('password.confirm') }}">
+        @csrf
+        <div class="guest-field">
+            <label for="password">Contraseña <span class="req">*</span></label>
+            <div class="password-wrap">
+                <input id="password" type="password" name="password" required autocomplete="current-password" class="{{ $errors->has('password') ? 'is-invalid' : '' }}">
+                <button type="button" class="toggle-pass" id="toggle-pass" aria-label="Mostrar contraseña">Ver</button>
+            </div>
+        </div>
+        <button type="submit" class="btn-submit">Confirmar</button>
+    </form>
+
+    <a class="guest-back" href="{{ route('password.request') }}">¿Olvidaste tu contraseña?</a>
+@endsection
+
+@section('scripts')
+<script>
+    (function () {
+        var toggle = document.getElementById('toggle-pass');
+        var password = document.getElementById('password');
+        if (!toggle || !password) return;
+        toggle.addEventListener('click', function () {
+            var visible = password.type === 'text';
+            password.type = visible ? 'password' : 'text';
+            toggle.textContent = visible ? 'Ver' : 'Ocultar';
+        });
+    })();
+</script>
 @endsection

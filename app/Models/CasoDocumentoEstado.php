@@ -45,6 +45,13 @@ class CasoDocumentoEstado extends Model
         'archivo' => '4. Decisión de archivo',
     ];
 
+    public const SLOT_SHORT = [
+        'apertura' => 'Apertura',
+        'acta' => 'Acta de cargos',
+        'resolucion' => 'Sanción',
+        'archivo' => 'Archivo',
+    ];
+
     public const SLOT_ICONS = [
         'apertura' => 'fa-balance-scale',
         'acta' => 'fa-gavel',

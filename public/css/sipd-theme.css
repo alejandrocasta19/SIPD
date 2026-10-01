@@ -163,6 +163,79 @@ button.sipd-estado--sancionado:hover { background: #f43f5e; color: #fff; border-
 .sipd-estado--archivado.is-on { background: #64748b; color: #fff; border-color: #475569; }
 button.sipd-estado--archivado:hover { background: #475569; color: #fff; border-color: #334155; }
 .sipd-flujo .sipd-estado { margin-bottom: 4px; }
+.sipd-flujo-fallo {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.sipd-flujo-now {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+    border: 1px solid #bfdbfe;
+    background: #f8fafc;
+}
+.sipd-flujo-now__copy { min-width: 220px; flex: 1; }
+.sipd-flujo-now__kicker {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #2563eb;
+    margin-bottom: 2px;
+}
+.sipd-flujo-now__title {
+    display: block;
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+}
+.sipd-flujo-now__detail {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.4;
+}
+.sipd-flujo-now__meter { min-width: 140px; width: 180px; }
+.sipd-flujo-now__count {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-align: right;
+    margin-bottom: 6px;
+}
+.sipd-flujo-now__bar {
+    height: 8px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+.sipd-flujo-now__bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--cth-green, #0d7a4f);
+}
+.sipd-flujo-step.is-done .sipd-estado {
+    background: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+.sipd-flujo-step.is-done small,
+.sipd-flujo-step.is-wait small { color: #94a3b8; }
+.sipd-flujo-step.is-wait { opacity: .72; }
+.sipd-flujo-step small { min-height: 2.4em; }
 .theme-cootranshuila table .st:has(.dot-green),
 .theme-cootranshuila table .dias.ok { background: #f0fdf4; color: #15803d; }
 .theme-cootranshuila table .st:has(.dot-purple) { background: #f5f3ff; color: #6d28d9; }
@@ -1450,6 +1523,16 @@ html:has(.guest-split) *::after {
 .quick-copy span { display: block; font-size: 11px; color: var(--cth-muted); }
 .quick-go { color: var(--cth-green); font-weight: 700; font-size: 12px; }
 .guest-note { margin-top: 8px; font-size: 11px; color: #8a958e; text-align: center; }
+.guest-back {
+    display: block;
+    text-align: center;
+    margin: 14px 0 0;
+    color: var(--cth-green);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+}
+.guest-back:hover { text-decoration: underline; }
 .guest-error { color: var(--cth-red); font-size: 12px; margin-top: 6px; }
 
 .guest-auth-card {

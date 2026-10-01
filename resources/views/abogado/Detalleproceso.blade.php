@@ -63,14 +63,23 @@
                 <div class="card-body border-bottom bg-light">
                     @php
                         $fase = $proceso->faseFlujo();
-                        $fasePendienteOn = $fase === 'pendiente';
-                        $faseProcesoOn = in_array($fase, ['en_proceso', 'en_revision'], true);
-                        $faseFalloOn = in_array($fase, ['sancionado', 'archivado'], true);
+                        $flujo = $proceso->resumenFlujo();
+                        $fasePendienteOn = $flujo['paso'] === 'pendiente';
+                        $faseProcesoOn = $flujo['paso'] === 'revision';
+                        $faseFalloOn = $flujo['paso'] === 'fallo';
                         $fase3Cls = $fase === 'archivado' ? 'archivado' : 'sancionado';
                         $falloLabel = match ($fase) {
                             'archivado' => 'Archivado',
                             'sancionado' => 'Sancionado',
                             default => 'Fallo',
+                        };
+                        $estadoHint = match ($proceso->estado) {
+                            'Sancionado' => 'El expediente quedó sancionado y está cerrado.',
+                            'Archivado' => 'El expediente quedó archivado y está cerrado.',
+                            'En Proceso' => 'Pendiente de veredicto de la coordinadora.',
+                            default => $proceso->puedeEnviarAProceso()
+                                ? 'Los 4 documentos están listos. Envíe a revisión.'
+                                : $flujo['detalle'],
                         };
                     @endphp
                     <div class="p-3 bg-white rounded border shadow-sm">
@@ -83,22 +92,34 @@
                             </a>
                         </div>
 
+                        <div class="sipd-flujo-now">
+                            <div class="sipd-flujo-now__copy">
+                                <span class="sipd-flujo-now__kicker">Ahora</span>
+                                <strong class="sipd-flujo-now__title">{{ $flujo['titulo'] }}</strong>
+                                <span class="sipd-flujo-now__detail">{{ $flujo['detalle'] }}</span>
+                            </div>
+                            <div class="sipd-flujo-now__meter">
+                                <span class="sipd-flujo-now__count">{{ $flujo['generados'] }} de {{ $flujo['total'] }} documentos</span>
+                                <div class="sipd-flujo-now__bar" role="progressbar" aria-valuenow="{{ $flujo['pct'] }}" aria-valuemin="0" aria-valuemax="100">
+                                    <span style="width: {{ $flujo['pct'] }}%"></span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="sipd-flujo d-flex align-items-center justify-content-between text-center mb-4">
-                            <div class="flex-fill">
+                            <div class="flex-fill sipd-flujo-step {{ $fasePendienteOn ? 'is-current' : ($faseProcesoOn || $faseFalloOn ? 'is-done' : '') }}">
                                 <span class="sipd-estado sipd-estado--pendiente {{ $fasePendienteOn ? 'is-on' : '' }}">
-                                    <i class="fas fa-hourglass-half"></i> Pendiente
+                                    <i class="fas {{ $fasePendienteOn ? 'fa-hourglass-half' : 'fa-check' }}"></i> Pendiente
                                 </span>
-                                <small class="d-block text-muted">Sin borradores</small>
+                                <small class="d-block text-muted">{{ $flujo['sub_pendiente'] }}</small>
                             </div>
                             <i class="fas fa-chevron-right text-muted mx-2"></i>
-                            <div class="flex-fill">
+                            <div class="flex-fill sipd-flujo-step {{ $faseProcesoOn ? 'is-current' : ($faseFalloOn ? 'is-done' : 'is-wait') }}">
                                 <span class="sipd-estado sipd-estado--proceso {{ $faseProcesoOn ? 'is-on' : '' }}">
-                                    <i class="fas {{ $fase === 'en_revision' ? 'fa-spinner' : 'fa-pen' }}"></i>
-                                    {{ $fase === 'en_revision' ? 'En revisión' : 'En proceso' }}
+                                    <i class="fas {{ $faseProcesoOn ? 'fa-user-check' : ($faseFalloOn ? 'fa-check' : 'fa-pen') }}"></i>
+                                    En Proceso
                                 </span>
-                                <small class="d-block text-muted">
-                                    {{ $fase === 'en_revision' ? 'Solicitud enviada a la coordinadora' : 'Hay borrador de uno o más documentos' }}
-                                </small>
+                                <small class="d-block text-muted">{{ $flujo['sub_medio'] }}</small>
                                 @if($proceso->puedeEnviarAProceso() && !auth()->user()->esCoordinadora())
                                     <button type="submit"
                                             form="form-enviar-proceso"
@@ -112,11 +133,11 @@
                                 @endif
                             </div>
                             <i class="fas fa-chevron-right text-muted mx-2"></i>
-                            <div class="flex-fill">
+                            <div class="flex-fill sipd-flujo-step {{ $faseFalloOn ? 'is-current' : 'is-wait' }}">
                                 <span class="sipd-estado sipd-estado--{{ $fase3Cls }} {{ $faseFalloOn ? 'is-on' : '' }}">
                                     <i class="fas fa-gavel"></i> {{ $falloLabel }}
                                 </span>
-                                <small class="d-block text-muted">Veredicto de la coordinadora</small>
+                                <small class="d-block text-muted">{{ $flujo['sub_fallo'] }}</small>
                             </div>
                         </div>
 
@@ -126,12 +147,16 @@
                                     $tipoSlot = $proceso->varianteDelSlot($slot);
                                     $estSlot = $proceso->estadoDelSlot($slot);
                                     $tono = $estSlot->tonoTarjeta();
+                                    $esActual = $flujo['slot_actual'] === $slot;
                                     $anexosSlot = $proceso->anexos->filter(fn ($anexo) => $anexo->slot() === $slot);
                                 @endphp
                                 <div class="col-md-3 mb-3">
-                                    <a href="{{ route('documentos.edit', [$proceso->id, $tipoSlot]) }}" class="flujo-doc-card flujo-doc--{{ $tono }}">
+                                    <a href="{{ route('documentos.edit', [$proceso->id, $tipoSlot]) }}" class="flujo-doc-card flujo-doc--{{ $tono }} {{ $esActual ? 'is-actual' : '' }}">
                                         <div class="card h-100 border shadow-sm">
                                             <div class="card-body p-3 text-center">
+                                                @if($esActual)
+                                                    <span class="flujo-doc-now">{{ ($flujo['slots'][$slot] ?? '') === 'borrador' ? 'En curso' : 'Siguiente' }}</span>
+                                                @endif
                                                 <div class="flujo-icon mb-3">
                                                     <i class="fas {{ \App\Models\CasoDocumentoEstado::SLOT_ICONS[$slot] }}"></i>
                                                 </div>
@@ -176,7 +201,7 @@
 
                             <div class="row">
 
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <strong>Nombre del Conductor:</strong>
 
                                     <input type="text"
@@ -186,7 +211,7 @@
                                            readonly>
                                 </div>
 
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <strong>Cédula:</strong>
 
                                     <input type="text"
@@ -206,7 +231,7 @@
                                            readonly>
                                 </div>
 
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <strong>Modalidad o Cargo:</strong>
 
                                     <input type="text"
@@ -277,26 +302,26 @@
                                     <strong>Documento de la Falta:</strong>
 
                                     @if($proceso->evidencias && $proceso->evidencias->count() > 0)
-                                        <div style="max-height:100px;overflow-y:auto;margin-bottom:8px;">
+                                        <div class="detalle-docs">
                                             @foreach($proceso->evidencias as $evidencia)
-                                            <p class="mb-1" style="font-size:13px;">
-                                                <a href="{{ route('documentos.evidencias.download', [$proceso->id, $evidencia->id]) }}" class="text-info">
+                                            <p class="detalle-doc-line">
+                                                <a href="{{ route('documentos.evidencias.download', [$proceso->id, $evidencia->id]) }}">
                                                     <i class="fas fa-paperclip"></i> {{ $evidencia->nombre_original }}
                                                 </a>
                                             </p>
                                             @endforeach
                                         </div>
                                     @elseif($proceso->documento_falta)
-                                        <p>
+                                        <p class="detalle-doc-line">
                                             <a href="{{ route('abogado.documento-falta', $proceso->id) }}" class="btn btn-sm btn-info">
                                                 <i class="fas fa-file-pdf"></i> Ver Documento Principal
                                             </a>
                                         </p>
                                     @else
-                                        <p>No hay documento adjunto</p>
+                                        <p class="detalle-empty">No hay documento adjunto</p>
                                     @endif
 
-                                    <input type="file" name="documento_falta[]" multiple class="form-control campo-editable" disabled>
+                                    <input type="file" name="documento_falta[]" multiple class="form-control campo-editable detalle-file" disabled>
                                 </div>
                             </div>
                         </div>
@@ -312,19 +337,16 @@
                         <div class="info-content">
 
                             <div class="row">
-
-                                <div class="col-md-4">
-
+                                <div class="col-md-6">
                                     <strong>Observaciones:</strong>
-
                                     <textarea name="observacion"
-                                              class="form-control campo-editable" rows="3"
+                                              class="form-control campo-editable" rows="4"
                                               readonly>{{ $proceso->observacion }}</textarea>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <strong>Descargos:</strong>
                                     <select name="descargos_presentacion"
-                                            class="form-control campo-editable"
+                                            class="form-control campo-editable detalle-select"
                                             disabled>
                                         @if($proceso->descargosPresentacionValue() === 'presentado')
                                             <option value="presentado" selected>Presentado (sin medio)</option>
@@ -336,88 +358,89 @@
                                     <textarea name="descargos"
                                               class="form-control campo-editable"
                                               rows="3"
+                                              placeholder="Notas de descargos"
                                               readonly>{{ $proceso->descargos }}</textarea>
                                 </div>
-                                <div class="col-md-5">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
                                     <strong>Decisión Final:</strong>
                                     <textarea name="decision_final"
-                                              class="form-control campo-editable decision-text" rows="3"
+                                              class="form-control campo-editable decision-text" rows="4"
                                               readonly>{{ $proceso->decision_final }}</textarea>
                                 </div>
-                                <div class="col-md-5">
+                                <div class="col-md-6">
                                     <strong>Estado del proceso:</strong>
-                                    <p class="text-muted small mb-2">
-                                        Pendiente si no hay borradores. Con un borrador el flujo pasa a En proceso. Enviar a revisión cuando los 4 estén generados. El veredicto de la coordinadora cierra como Sancionado o Archivado.
-                                    </p>
-                                    <div class="d-flex gap-2 flex-wrap align-items-center">
-                                        <span class="sipd-estado sipd-estado--pendiente {{ $fase === 'pendiente' ? 'is-on' : '' }}">
-                                            Pendiente
-                                        </span>
-                                        @if($proceso->puedeEnviarAProceso() && !auth()->user()->esCoordinadora())
-                                            <button type="submit"
-                                                    form="form-enviar-proceso"
-                                                    class="sipd-estado sipd-estado--proceso is-on"
-                                                    data-confirm="El caso pasará a revisión de la coordinadora."
-                                                    data-confirm-title="Enviar a revisión"
-                                                    data-confirm-ok="Enviar"
-                                                    data-confirm-icon="question">
-                                                Enviar
-                                            </button>
-                                        @else
-                                            <span class="sipd-estado sipd-estado--proceso {{ in_array($fase, ['en_proceso', 'en_revision'], true) ? 'is-on' : '' }}">
-                                                En Proceso
+                                    <div class="detalle-estado">
+                                        <p>{{ $estadoHint }}</p>
+                                        <div class="detalle-estado-chips">
+                                            <span class="sipd-estado sipd-estado--pendiente {{ $proceso->estado === 'Pendiente' ? 'is-on' : '' }}">
+                                                Pendiente
                                             </span>
-                                        @endif
-                                        @if($proceso->estado === 'En Proceso' && auth()->user()->esCoordinadora())
-                                            <button type="submit"
-                                                    form="form-estado-veredicto"
-                                                    name="estado"
-                                                    value="Sancionado"
-                                                    class="sipd-estado sipd-estado--sancionado"
-                                                    data-confirm="Esto cerrará el proceso de forma permanente y ya no se podrá editar."
-                                                    data-confirm-title="Sancionar proceso"
-                                                    data-confirm-ok="Sancionar"
-                                                    data-confirm-danger="1"
-                                                    data-confirm-icon="warning">
-                                                Sancionado
-                                            </button>
-                                            <button type="submit"
-                                                    form="form-estado-veredicto"
-                                                    name="estado"
-                                                    value="Archivado"
-                                                    class="sipd-estado sipd-estado--archivado"
-                                                    data-confirm="El expediente quedará archivado."
-                                                    data-confirm-title="Archivar proceso"
-                                                    data-confirm-ok="Archivar"
-                                                    data-confirm-icon="question">
-                                                Archivado
-                                            </button>
-                                        @else
-                                            <span class="sipd-estado sipd-estado--sancionado {{ $proceso->estado == 'Sancionado' ? 'is-on' : '' }}">
-                                                Sancionado
-                                            </span>
-                                            <span class="sipd-estado sipd-estado--archivado {{ $proceso->estado == 'Archivado' ? 'is-on' : '' }}">
-                                                Archivado
-                                            </span>
-                                            @if($proceso->estado === 'En Proceso')
-                                                <small class="text-muted d-block w-100 mt-1">Pendiente de veredicto de la coordinadora.</small>
+                                            @if($proceso->puedeEnviarAProceso() && !auth()->user()->esCoordinadora())
+                                                <button type="submit"
+                                                        form="form-enviar-proceso"
+                                                        class="sipd-estado sipd-estado--proceso is-on"
+                                                        data-confirm="El caso pasará a revisión de la coordinadora."
+                                                        data-confirm-title="Enviar a revisión"
+                                                        data-confirm-ok="Enviar"
+                                                        data-confirm-icon="question">
+                                                    Enviar
+                                                </button>
+                                            @else
+                                                <span class="sipd-estado sipd-estado--proceso {{ $proceso->estado === 'En Proceso' ? 'is-on' : '' }}">
+                                                    En Proceso
+                                                </span>
                                             @endif
+                                            @if($proceso->estado === 'En Proceso' && auth()->user()->esCoordinadora())
+                                                <button type="submit"
+                                                        form="form-estado-veredicto"
+                                                        name="estado"
+                                                        value="Sancionado"
+                                                        class="sipd-estado sipd-estado--sancionado"
+                                                        data-confirm="Esto cerrará el proceso de forma permanente y ya no se podrá editar."
+                                                        data-confirm-title="Sancionar proceso"
+                                                        data-confirm-ok="Sancionar"
+                                                        data-confirm-danger="1"
+                                                        data-confirm-icon="warning">
+                                                    Sancionado
+                                                </button>
+                                                <button type="submit"
+                                                        form="form-estado-veredicto"
+                                                        name="estado"
+                                                        value="Archivado"
+                                                        class="sipd-estado sipd-estado--archivado"
+                                                        data-confirm="El expediente quedará archivado."
+                                                        data-confirm-title="Archivar proceso"
+                                                        data-confirm-ok="Archivar"
+                                                        data-confirm-icon="question">
+                                                    Archivado
+                                                </button>
+                                            @else
+                                                <span class="sipd-estado sipd-estado--sancionado {{ $proceso->estado == 'Sancionado' ? 'is-on' : '' }}">
+                                                    Sancionado
+                                                </span>
+                                                <span class="sipd-estado sipd-estado--archivado {{ $proceso->estado == 'Archivado' ? 'is-on' : '' }}">
+                                                    Archivado
+                                                </span>
+                                            @endif
+                                        </div>
+                                        @if(auth()->user()->esCoordinadora())
+                                            <div class="detalle-asignar">
+                                                <label class="mb-0" for="asignar-rh">Responsable RH</label>
+                                                <select id="asignar-rh" name="user_id" form="form-asignar-rh" class="form-control form-control-sm" required>
+                                                    @foreach($equipoRh as $rh)
+                                                        <option value="{{ $rh->id }}" {{ (int) $proceso->user_id === (int) $rh->id ? 'selected' : '' }}>{{ $rh->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <button type="submit" form="form-asignar-rh" class="btn btn-sm btn-success">Asignar</button>
+                                            </div>
                                         @endif
                                     </div>
-                                    @if(auth()->user()->esCoordinadora())
-                                        <div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
-                                            <label class="mb-0 small text-muted font-weight-bold" for="asignar-rh">Responsable RH</label>
-                                            <select id="asignar-rh" name="user_id" form="form-asignar-rh" class="form-control form-control-sm" style="max-width:260px" required>
-                                                @foreach($equipoRh as $rh)
-                                                    <option value="{{ $rh->id }}" {{ (int) $proceso->user_id === (int) $rh->id ? 'selected' : '' }}>{{ $rh->name }}</option>
-                                                @endforeach
-                                            </select>
-                                            <button type="submit" form="form-asignar-rh" class="btn btn-sm btn-success">Asignar</button>
-                                        </div>
-                                    @endif
-                                </div>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                     <div class="info-box">
@@ -484,7 +507,9 @@
     .flujo-doc-card .card {
         border-radius: 12px;
         transition: transform .15s ease, box-shadow .15s ease;
+        position: relative;
     }
+    .flujo-doc-card .card-body { padding-top: 28px; }
     .flujo-doc-card:hover { text-decoration: none; color: inherit; }
     .flujo-doc-card:hover .card {
         transform: translateY(-2px);
@@ -518,13 +543,30 @@
     .flujo-doc--ok .card { background: #f0fdf4; border-color: #86efac; color: #166534; }
     .flujo-doc--ok .flujo-icon { background: #dcfce7; color: #15803d; }
     .flujo-doc--ok .flujo-doc-tag { background: #bbf7d0; color: #166534; }
+    .flujo-doc-now {
+        display: block;
+        position: absolute;
+        top: 8px;
+        left: 0;
+        right: 0;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: #2563eb;
+    }
+    .flujo-doc-card.is-actual .card {
+        box-shadow: 0 0 0 2px #3b82f6, 0 8px 16px rgba(37, 99, 235, .12);
+    }
+    .flujo-doc-card.is-actual .flujo-doc-now { color: #1d4ed8; }
 
     .info-box {
         background: #fff;
         border: 1px solid var(--cth-border);
         border-radius: 12px;
         margin-bottom: 25px;
-        overflow: hidden;
+        overflow: visible;
+        align-items: stretch;
         box-shadow: var(--cth-shadow);
     }
     
@@ -547,6 +589,8 @@
     
     .info-content {
         padding: 20px;
+        flex: 1;
+        min-width: 0;
     }
     
     .info-content strong {
@@ -591,6 +635,60 @@
         border-radius: 4px;
         border-left: 4px solid #28a745;
     }
+
+    .detalle-empty {
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 0 8px !important;
+        color: #64748b;
+        font-size: 14px;
+    }
+    .detalle-doc-line {
+        border: none !important;
+        padding: 0 0 6px !important;
+        margin: 0 !important;
+        font-size: 13px;
+    }
+    .detalle-docs { max-height: 110px; overflow-y: auto; margin-bottom: 8px; }
+    .detalle-file[disabled] { display: none; }
+    .detalle-select { margin-bottom: 8px; }
+    .detalle-estado {
+        padding: 12px 14px;
+        border: 1px solid var(--cth-border);
+        border-radius: 12px;
+        background: #f8fafc;
+    }
+    .detalle-estado p {
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 0 10px !important;
+        color: #64748b;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+    .detalle-estado-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+    .detalle-asignar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--cth-line);
+    }
+    .detalle-asignar label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .detalle-asignar select { max-width: 260px; }
     
     @media print {
 

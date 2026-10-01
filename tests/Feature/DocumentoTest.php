@@ -931,7 +931,10 @@ class DocumentoTest extends TestCase
             ->assertDontSee('form-enviar-proceso', false)
             ->assertSee('sipd-estado--pendiente', false)
             ->assertSee('Pendiente')
+            ->assertSee('Empiece por Apertura')
+            ->assertSee('Fallo')
             ->assertSee('flujo-doc-card flujo-doc--pendiente', false)
+            ->assertSee('flujo-doc-card flujo-doc--pendiente is-actual', false)
             ->assertDontSee('Documentos Oficiales del Caso');
 
         $this->actingAs($user)
@@ -951,11 +954,12 @@ class DocumentoTest extends TestCase
         $html = $this->actingAs($user)
             ->get(route('abogado.detalleproceso', $caso->id))
             ->assertOk()
-            ->assertSee('En proceso')
-            ->assertSee('flujo-doc-card flujo-doc--borrador', false)
+            ->assertSee('Pendiente')
+            ->assertSee('Hay un borrador de Apertura')
+            ->assertSee('flujo-doc-card flujo-doc--borrador is-actual', false)
             ->assertSee('Borrador')
-            ->assertSee('sipd-estado sipd-estado--proceso is-on', false)
-            ->assertDontSee('sipd-estado sipd-estado--pendiente is-on', false)
+            ->assertSee('sipd-estado sipd-estado--pendiente is-on', false)
+            ->assertDontSee('sipd-estado sipd-estado--proceso is-on', false)
             ->getContent();
 
         $this->assertSame('en_proceso', $caso->fresh()->faseFlujo());
@@ -978,9 +982,78 @@ class DocumentoTest extends TestCase
             ->assertOk()
             ->assertSee('flujo-doc-card flujo-doc--ok', false)
             ->assertSee('Generada y descargada')
-            ->assertSee('En proceso')
-            ->assertSee('sipd-estado sipd-estado--proceso is-on', false)
-            ->assertDontSee('sipd-estado sipd-estado--pendiente is-on', false);
+            ->assertSee('Pendiente')
+            ->assertSee('1 de 4 documentos listos')
+            ->assertSee('Siguiente: Apertura')
+            ->assertSee('sipd-estado sipd-estado--pendiente is-on', false)
+            ->assertDontSee('sipd-estado sipd-estado--proceso is-on', false);
+    }
+
+    /** @test */
+    public function detalle_con_apertura_lista_dice_siguiente_acta()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
+        $caso->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now(),
+        ]);
+
+        $resumen = $caso->fresh()->resumenFlujo();
+        $this->assertSame('pendiente', $resumen['paso']);
+        $this->assertSame('acta', $resumen['slot_actual']);
+        $this->assertSame(1, $resumen['generados']);
+        $this->assertStringContainsString('Siguiente: Acta de cargos', $resumen['detalle']);
+
+        $this->actingAs($user)
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('Pendiente')
+            ->assertSee('1 de 4 documentos listos (Apertura)')
+            ->assertSee('Siguiente: Acta de cargos')
+            ->assertSee('Fallo')
+            ->assertSee('flujo-doc-card flujo-doc--ok', false)
+            ->assertSee('flujo-doc--pendiente is-actual', false);
+    }
+
+    /** @test */
+    public function detalle_sancionado_prende_el_fallo_sancionado()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, ['estado' => 'Sancionado']);
+
+        $resumen = $caso->fresh()->resumenFlujo();
+        $this->assertSame('fallo', $resumen['paso']);
+        $this->assertSame('Quedó sancionado', $resumen['sub_fallo']);
+
+        $this->actingAs($user)
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('Sancionado')
+            ->assertSee('sipd-estado sipd-estado--sancionado is-on', false)
+            ->assertDontSee('sipd-estado sipd-estado--archivado is-on', false)
+            ->assertSee('Quedó sancionado')
+            ->assertSee('El expediente quedó sancionado y está cerrado.');
+    }
+
+    /** @test */
+    public function detalle_archivado_prende_el_fallo_archivado()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, ['estado' => 'Archivado']);
+
+        $resumen = $caso->fresh()->resumenFlujo();
+        $this->assertSame('fallo', $resumen['paso']);
+        $this->assertSame('Quedó archivado', $resumen['sub_fallo']);
+
+        $this->actingAs($user)
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('Archivado')
+            ->assertSee('sipd-estado sipd-estado--archivado is-on', false)
+            ->assertDontSee('sipd-estado sipd-estado--sancionado is-on', false)
+            ->assertSee('Quedó archivado');
     }
 
     /** @test */

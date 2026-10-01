@@ -1,47 +1,53 @@
-@extends('layouts.app')
+@extends('layouts.guest')
+
+@section('title', 'Recuperar contraseña · SIPD Cootranshuila')
 
 @section('content')
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">{{ __('Reset Password') }}</div>
+    <h2>Recuperar contraseña</h2>
+    <p class="guest-lead">Ingresa el correo de tu cuenta institucional. Te enviaremos un enlace para restablecerla.</p>
 
-                <div class="card-body">
-                    @if (session('status'))
-                        <div class="alert alert-success" role="alert">
-                            {{ session('status') }}
-                        </div>
-                    @endif
+    @if(session('status'))
+        <div class="sipd-alert sipd-alert-success" role="status">
+            Te enviamos el enlace al correo si esa cuenta existe en el sistema.
+        </div>
+    @endif
 
-                    <form method="POST" action="{{ route('password.email') }}">
-                        @csrf
-
-                        <div class="row mb-3">
-                            <label for="email" class="col-md-4 col-form-label text-md-end">{{ __('Email Address') }}</label>
-
-                            <div class="col-md-6">
-                                <input id="email" type="email" class="form-control @error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" required autocomplete="email" autofocus>
-
-                                @error('email')
-                                    <span class="invalid-feedback" role="alert">
-                                        <strong>{{ $message }}</strong>
-                                    </span>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div class="row mb-0">
-                            <div class="col-md-6 offset-md-4">
-                                <button type="submit" class="btn btn-primary">
-                                    {{ __('Send Password Reset Link') }}
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
+    @if($errors->any())
+        <div class="sipd-alert sipd-alert-error" role="alert">
+            <div>
+                <strong>No se pudo enviar el enlace</strong>
+                <ul>
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
         </div>
-    </div>
-</div>
+    @endif
+
+    <form method="POST" action="{{ route('password.email') }}" id="forgot-form">
+        @csrf
+        <div class="guest-field">
+            <label for="email">Correo electrónico <span class="req">*</span></label>
+            <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="usuario@cootranshuila.com" autocomplete="username" required autofocus class="{{ $errors->has('email') ? 'is-invalid' : '' }}">
+        </div>
+        <button type="submit" class="btn-submit" id="forgot-submit">Enviar enlace</button>
+    </form>
+
+    <a class="guest-back" href="{{ route('login') }}">← Volver al acceso</a>
+    <div class="guest-note">Acceso exclusivo para personal institucional de Cootranshuila.</div>
+@endsection
+
+@section('scripts')
+<script>
+    (function () {
+        var form = document.getElementById('forgot-form');
+        var submit = document.getElementById('forgot-submit');
+        if (!form || !submit) return;
+        form.addEventListener('submit', function () {
+            submit.disabled = true;
+            submit.textContent = 'Enviando…';
+        });
+    })();
+</script>
 @endsection
