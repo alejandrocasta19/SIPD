@@ -108,6 +108,33 @@ class CoordinadoraTest extends TestCase
             ->assertSessionHas('error');
 
         $this->assertSame($rh->name, $rh->fresh()->name);
+
+        $this->actingAs($rh)
+            ->put(route('perfil.password.update'), [
+                'current_password' => 'password',
+                'password' => 'nueva123',
+                'password_confirmation' => 'nueva123',
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('password', $rh->fresh()->password));
+    }
+
+    /** @test */
+    public function rh_con_permiso_de_perfil_si_cambia_contrasena()
+    {
+        $rh = $this->makeUser('abogado');
+        $rh->otorgarPermiso('editar_perfil', 1);
+
+        $this->actingAs($rh)
+            ->put(route('perfil.password.update'), [
+                'current_password' => 'password',
+                'password' => 'nueva123',
+                'password_confirmation' => 'nueva123',
+            ])
+            ->assertSessionHas('password_success');
+
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('nueva123', $rh->fresh()->password));
     }
 
     /** @test */

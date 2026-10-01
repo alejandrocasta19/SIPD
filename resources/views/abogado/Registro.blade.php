@@ -242,6 +242,11 @@
 #doc-html-host textarea.doc-interactive-field { max-width: 100%; box-sizing: border-box; }
 #doc-html-host textarea.js-inline { height: 2em !important; min-height: 2em !important; overflow: hidden !important; vertical-align: baseline; white-space: nowrap; }
 #doc-html-host .doc-header-field { font-weight: 700; border-bottom: 1px solid #0f172a; padding: 0 4px; }
+#doc-html-host .doc-optional-clause,
+#doc-html-host .doc-optional-bar,
+#doc-html-host .doc-optional-bar input,
+#doc-html-host .doc-optional-bar label { pointer-events: auto; }
+#doc-html-host .doc-optional-bar label { cursor: pointer; }
 </style>
 @endsection
 
@@ -413,7 +418,7 @@ var DRAFT_KEY = 'sipd_nuevo_proceso';
 var persistTimer;
 
 function emptyDraft() {
-    return { slot: 'apertura', tipo: 'disciplinario', fields: {}, yellow: {} };
+    return { slot: 'apertura', tipo: 'disciplinario', fields: {}, yellow: {}, optional: {} };
 }
 
 function readDraft() {
@@ -424,6 +429,7 @@ function readDraft() {
         if (!d || typeof d !== 'object') return emptyDraft();
         d.fields = d.fields && typeof d.fields === 'object' ? d.fields : {};
         d.yellow = d.yellow && typeof d.yellow === 'object' ? d.yellow : {};
+        d.optional = d.optional && typeof d.optional === 'object' ? d.optional : {};
         return d;
     } catch (e) {
         return emptyDraft();
@@ -490,6 +496,16 @@ function collectYellow() {
     return values;
 }
 
+function collectOptional() {
+    var hidden = document.querySelector('#doc-html-host .js-optional-value');
+    return hidden ? hidden.value : 'omit';
+}
+
+function applyOptional(value) {
+    var hidden = document.querySelector('#doc-html-host .js-optional-value');
+    if (hidden && value) hidden.value = value;
+}
+
 function applyYellow(values) {
     if (!values) return;
     document.querySelectorAll('#doc-html-host textarea[name^="yellow_blocks_"], #doc-html-host input[name^="yellow_blocks_"]').forEach(function(el) {
@@ -510,8 +526,10 @@ function persistDraft() {
     d.tipo = currentTipo;
     d.fields = Object.assign({}, d.fields || {}, collectGeneralFields());
     d.yellow = d.yellow || {};
+    d.optional = d.optional || {};
     if (hostMatchesTipo(currentTipo)) {
         d.yellow[currentTipo] = collectYellow();
+        d.optional[currentTipo] = collectOptional();
     }
     writeDraft(d);
 }
@@ -541,11 +559,24 @@ function bindYellowPersist(root) {
     });
 }
 
+function bindOptionalPersist(root) {
+    (root || document).querySelectorAll('#doc-html-host .doc-optional-clause').forEach(function(box) {
+        if (box.dataset.draftBound) return;
+        box.dataset.draftBound = '1';
+        box.addEventListener('change', persistDraftSoon);
+    });
+}
+
 function hydratePlantilla(tipo) {
     var host = document.getElementById('doc-html-host');
     applyYellow((readDraft().yellow || {})[tipo]);
+    applyOptional((readDraft().optional || {})[tipo]);
+    if (typeof window.initSipdOptionalClauses === 'function') {
+        window.initSipdOptionalClauses(host);
+    }
     autosizeTextareas(host);
     bindYellowPersist(host);
+    bindOptionalPersist(host);
     syncDocHeader();
     persistDraft();
 }
@@ -637,7 +668,7 @@ function loadPlantilla(tipo, slot) {
         return;
     }
     host.innerHTML = '<p style="color:#64748b;text-align:center;padding:40px 0;">Cargando formato…</p>';
-    fetch(PLANTILLA_URL + '?tipo=' + encodeURIComponent(tipo), { headers: { Accept: 'application/json' } })
+    fetch(PLANTILLA_URL + '?tipo=' + encodeURIComponent(tipo), { headers: { Accept: 'application/json' }, cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             plantillaCache[tipo] = data.html || '';

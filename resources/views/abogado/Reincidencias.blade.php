@@ -54,13 +54,68 @@
     .pager span.current { background: var(--cth-green-bright); border-color: var(--cth-green-bright); color: #fff; font-weight: 700; }
     
     .global-pager-card { background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 24px; }
+    .casos-pager {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        border-top: 1px solid #e2e8f0;
+        color: #94a3b8;
+        font-size: 12px;
+    }
+    .casos-pager-nav { display: flex; gap: 6px; }
+    .casos-pager .sipd-page[disabled] { opacity: .45; cursor: default; }
 
     @media (max-width: 900px) { .toolbar { grid-template-columns: 1fr; } .proc-head { flex-direction: column; } .table-card { overflow-x: auto; } }
 </style>
 @endsection
 
+@section('scripts')
+<script>
+(function () {
+    document.querySelectorAll('.js-casos-card').forEach(function (card) {
+        var rows = Array.prototype.slice.call(card.querySelectorAll('tbody tr'));
+        var nav = card.querySelector('.js-casos-pager');
+        var perPage = Math.max(1, parseInt(card.getAttribute('data-per-page'), 10) || 10);
+        var page = 1;
+        var total = rows.length;
+        if (!nav || total === 0) return;
+
+        function render() {
+            var pages = Math.max(1, Math.ceil(total / perPage));
+            if (page < 1) page = 1;
+            if (page > pages) page = pages;
+            var from = (page - 1) * perPage;
+            var to = Math.min(from + perPage, total);
+            rows.forEach(function (row, index) {
+                row.hidden = index < from || index >= to;
+            });
+            var needsPager = total > perPage;
+            nav.hidden = !needsPager;
+            var count = nav.querySelector('.js-casos-count');
+            if (count) {
+                count.textContent = (from + 1) + '-' + to + ' de ' + total + ' casos';
+            }
+            var prev = nav.querySelector('.js-casos-prev');
+            var next = nav.querySelector('.js-casos-next');
+            if (prev) prev.disabled = page <= 1;
+            if (next) next.disabled = page >= pages;
+        }
+
+        var prev = nav.querySelector('.js-casos-prev');
+        var next = nav.querySelector('.js-casos-next');
+        if (prev) prev.addEventListener('click', function () { page -= 1; render(); });
+        if (next) next.addEventListener('click', function () { page += 1; render(); });
+        render();
+    });
+})();
+</script>
+@endsection
+
 @section('content')
     <form class="toolbar" method="GET" action="{{ route('abogado.reincidencias') }}">
+        <input type="hidden" name="per_page" value="{{ $workersGrouped->perPage() }}">
         <div class="search">
             <i class="fas fa-search"></i>
             <input type="text" name="q" value="{{ $search }}" placeholder="Buscar por nombre del conductor o cédula...">
@@ -114,7 +169,12 @@
                     <tbody>
                         @foreach($worker->procesos as $p)
                             <tr>
-                                <td><a class="id" href="{{ route('abogado.detalleproceso', $p->id) }}">{{ $p->numeroExpediente() }}</a></td>
+                                <td>
+                                    <a class="id" href="{{ route('abogado.detalleproceso', $p->id) }}">{{ $p->numeroExpediente() }}</a>
+                                    @if(($p->anexos_count ?? 0) > 0)
+                                        <span style="display:block;color:#64748b;font-size:12px;margin-top:3px;">{{ $p->anexos_count }} anexo{{ $p->anexos_count === 1 ? '' : 's' }}</span>
+                                    @endif
+                                </td>
                                 <td>{{ $p->fecha_falta ? \Carbon\Carbon::parse($p->fecha_falta)->format('Y-m-d') : '—' }}</td>
                                 <td class="name">{{ $p->tipo_falta ?: 'Sin tipo' }}</td>
                                 <td>
@@ -138,36 +198,18 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
-        @endforeach
-
-        @if($workersGrouped->total() > 0)
-            <div class="global-pager-card">
-                <div class="pager" style="border-top:0;">
-                    <div>
-                        {{ $workersGrouped->firstItem() }}-{{ $workersGrouped->lastItem() }} de {{ $workersGrouped->total() }} · {{ $workersGrouped->perPage() }} por página
-                    </div>
-                    <div class="pager-pages">
-                        @if($workersGrouped->onFirstPage())
-                            <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">‹</span>
-                        @else
-                            <a href="{{ $workersGrouped->previousPageUrl() }}">‹</a>
-                        @endif
-                        @foreach($workersGrouped->getUrlRange(1, $workersGrouped->lastPage()) as $p => $url)
-                            @if($p == $workersGrouped->currentPage())
-                                <span class="current">{{ $p }}</span>
-                            @else
-                                <a href="{{ $url }}">{{ $p }}</a>
-                            @endif
-                        @endforeach
-                        @if($workersGrouped->hasMorePages())
-                            <a href="{{ $workersGrouped->nextPageUrl() }}">›</a>
-                        @else
-                            <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">›</span>
-                        @endif
+                <div class="casos-pager js-casos-pager" hidden>
+                    <span class="js-casos-count"></span>
+                    <div class="casos-pager-nav">
+                        <button type="button" class="sipd-page js-casos-prev">Anterior</button>
+                        <button type="button" class="sipd-page js-casos-next">Siguiente</button>
                     </div>
                 </div>
             </div>
-        @endif
+        @endforeach
+
+        <div class="table-card">
+            @include('partials.paginacion', ['paginador' => $workersGrouped, 'etiqueta' => 'personas'])
+        </div>
     @endif
 @endsection

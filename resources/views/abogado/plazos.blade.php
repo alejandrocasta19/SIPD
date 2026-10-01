@@ -123,10 +123,10 @@ table.plz tr:hover td { background: #f8fafc; }
     </section>
 
     <div class="chips">
-        <a class="chip {{ $filtro === 'todos' ? 'active' : '' }}" href="{{ route('abogado.plazos') }}">Todos</a>
-        <a class="chip {{ $filtro === 'vigente' ? 'active' : '' }}" href="{{ route('abogado.plazos', ['estado' => 'vigente']) }}">Vigente</a>
-        <a class="chip {{ $filtro === 'por_vencer' ? 'active' : '' }}" href="{{ route('abogado.plazos', ['estado' => 'por_vencer']) }}">Por vencer</a>
-        <a class="chip {{ $filtro === 'vencido' ? 'active' : '' }}" href="{{ route('abogado.plazos', ['estado' => 'vencido']) }}">Vencido</a>
+        <a class="chip {{ $filtro === 'todos' ? 'active' : '' }}" href="{{ route('abogado.plazos', array_filter(['per_page' => request('per_page')])) }}">Todos</a>
+        <a class="chip {{ $filtro === 'vigente' ? 'active' : '' }}" href="{{ route('abogado.plazos', array_filter(['estado' => 'vigente', 'per_page' => request('per_page')])) }}">Vigente</a>
+        <a class="chip {{ $filtro === 'por_vencer' ? 'active' : '' }}" href="{{ route('abogado.plazos', array_filter(['estado' => 'por_vencer', 'per_page' => request('per_page')])) }}">Por vencer</a>
+        <a class="chip {{ $filtro === 'vencido' ? 'active' : '' }}" href="{{ route('abogado.plazos', array_filter(['estado' => 'vencido', 'per_page' => request('per_page')])) }}">Vencido</a>
     </div>
 
     <div class="table-card">
@@ -199,31 +199,6 @@ table.plz tr:hover td { background: #f8fafc; }
                 @endforelse
             </tbody>
         </table>
-        @if($plazos->total() > 0)
-            <div class="pager">
-                <div>
-                    {{ $plazos->firstItem() }}-{{ $plazos->lastItem() }} de {{ $plazos->total() }} · {{ $plazos->perPage() }} por página
-                </div>
-                <div class="pager-pages">
-                    @if($plazos->onFirstPage())
-                        <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">‹</span>
-                    @else
-                        <a href="{{ $plazos->previousPageUrl() }}">‹</a>
-                    @endif
-                    @foreach($plazos->getUrlRange(1, $plazos->lastPage()) as $p => $url)
-                        @if($p == $plazos->currentPage())
-                            <span class="current">{{ $p }}</span>
-                        @else
-                            <a href="{{ $url }}">{{ $p }}</a>
-                        @endif
-                    @endforeach
-                    @if($plazos->hasMorePages())
-                        <a href="{{ $plazos->nextPageUrl() }}">›</a>
-                    @else
-                        <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">›</span>
-                    @endif
-                </div>
-            </div>
-        @endif
+        @include('partials.paginacion', ['paginador' => $plazos])
     </div>
 @endsection

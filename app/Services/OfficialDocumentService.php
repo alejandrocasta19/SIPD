@@ -301,7 +301,7 @@ class OfficialDocumentService
         ])->deleteFileAfterSend(true);
     }
 
-    public function getInteractiveDocumentHtml(string $tipo, array $currentValues = [], ?ProcesoDisciplinario $proceso = null): string
+    public function getInteractiveDocumentHtml(string $tipo, array $currentValues = [], ?ProcesoDisciplinario $proceso = null, ?string $clauseMode = null): string
     {
         $filename = self::TEMPLATES[$tipo] ?? null;
         if (!$filename) return "<p>Error: Tipo de documento inválido.</p>";
@@ -316,7 +316,7 @@ class OfficialDocumentService
 
         // Usamos cache para no convertir a HTML en cada recarga
         $fileHash = md5_file($source);
-        $cacheKey = "sipd_interactive_doc_{$tipo}_{$fileHash}_v7";
+        $cacheKey = "sipd_interactive_doc_{$tipo}_{$fileHash}_v10";
 
         $html = Cache::rememberForever($cacheKey, function () use ($source, $tipo) {
             return $this->generateInteractiveHtmlFromDocx($source, $tipo);
@@ -331,6 +331,8 @@ class OfficialDocumentService
                 $html = preg_replace($search, '${1}' . htmlspecialchars($value, ENT_QUOTES), $html);
             }
         }
+
+        $html = $this->applyOptionalClauseState($html, $tipo, $this->clauseModeFor($tipo, $proceso, $clauseMode));
 
         return $this->fillHeaderInHtml($html, ProcesoDisciplinario::datosEncabezadoDocumento($proceso));
     }
@@ -431,6 +433,7 @@ class OfficialDocumentService
             $dom->appendChild($extra);
         }
 
+        $this->wrapCyanOptionalClauses($dom, $xpath, $tipo);
         $this->compactPhpWordLayout($dom, $xpath);
         $this->prepareHeaderFieldsInHtml($dom, $xpath);
         $html = $dom->saveHTML();
@@ -527,6 +530,222 @@ class OfficialDocumentService
             || str_contains($style, 'rgb(255,255,0)');
     }
 
+    private function styleLooksCyan(string $style): bool
+    {
+        $style = strtolower($style);
+        return str_contains($style, 'cyan')
+            || str_contains($style, 'aqua')
+            || str_contains($style, '#00ffff')
+            || str_contains($style, '#0ff;')
+            || str_contains($style, 'rgb(0, 255, 255)')
+            || str_contains($style, 'rgb(0,255,255)');
+    }
+
+    public static function normalizeClauseMode(?string $mode): string
+    {
+        return in_array((string) $mode, ['no_presento', 'extemporaneo'], true)
+            ? (string) $mode
+            : 'omit';
+    }
+
+    private function clauseModeFor(string $tipo, ?ProcesoDisciplinario $proceso, ?string $override = null): string
+    {
+        if ($override !== null && $override !== '') {
+            return self::normalizeClauseMode($override);
+        }
+
+        if ($proceso) {
+            return self::normalizeClauseMode(
+                $proceso->datos_oficiales['optional_clauses'][$tipo]['descargos_fuera_de_termino'] ?? null
+            );
+        }
+
+        return 'omit';
+    }
+
+    private function applyOptionalClauseState(string $html, string $tipo, string $mode): string
+    {
+        if (!str_contains($html, 'CLAUSE_MODE_TOKEN')) {
+            return $html;
+        }
+
+        return str_replace('CLAUSE_MODE_TOKEN', self::normalizeClauseMode($mode), $html);
+    }
+
+    private function elementLooksCyan(\DOMElement $el, DOMXPath $xpath): bool
+    {
+        if ($this->styleLooksCyan($el->getAttribute('style'))) {
+            return true;
+        }
+
+        foreach ($el->getElementsByTagName('*') as $child) {
+            if ($child instanceof \DOMElement && $this->styleLooksCyan($child->getAttribute('style'))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isOptionalDescargosParagraph(\DOMElement $p, DOMXPath $xpath): bool
+    {
+        if ($this->elementLooksCyan($p, $xpath)) {
+            return true;
+        }
+
+        $text = mb_strtolower(trim(preg_replace('/\s+/u', ' ', str_replace("\xc2\xa0", ' ', $p->textContent)) ?? ''));
+
+        return (str_contains($text, 'se deja constancia') && str_contains($text, 'vencido'))
+            || str_contains($text, 'manera extempor');
+    }
+
+    private function isHtmlSpacerParagraph(\DOMElement $p): bool
+    {
+        $text = trim(str_replace("\xc2\xa0", ' ', $p->textContent));
+
+        return $text === '';
+    }
+
+    private function wrapCyanOptionalClauses(DOMDocument $dom, DOMXPath $xpath, string $tipo): void
+    {
+        if ($tipo !== 'sancion') {
+            return;
+        }
+
+        $paragraphs = [];
+        foreach ($xpath->query('//p') as $p) {
+            if ($p instanceof \DOMElement) {
+                $paragraphs[] = $p;
+            }
+        }
+
+        $i = 0;
+        $n = count($paragraphs);
+        while ($i < $n) {
+            if (!$this->isOptionalDescargosParagraph($paragraphs[$i], $xpath)) {
+                $i++;
+                continue;
+            }
+
+            $group = [$paragraphs[$i]];
+            $j = $i + 1;
+            while ($j < $n) {
+                if ($this->isOptionalDescargosParagraph($paragraphs[$j], $xpath)) {
+                    $group[] = $paragraphs[$j];
+                    $j++;
+                    continue;
+                }
+                if ($this->isHtmlSpacerParagraph($paragraphs[$j])
+                    && ($j + 1) < $n
+                    && $this->isOptionalDescargosParagraph($paragraphs[$j + 1], $xpath)) {
+                    $group[] = $paragraphs[$j];
+                    $j++;
+                    continue;
+                }
+                break;
+            }
+
+            $this->wrapOptionalClauseGroup($dom, $xpath, $group, $tipo);
+            $i = $j;
+        }
+    }
+
+    private function wrapOptionalClauseGroup(DOMDocument $dom, DOMXPath $xpath, array $group, string $tipo): void
+    {
+        if ($group === []) {
+            return;
+        }
+
+        $first = $group[0];
+        $parent = $first->parentNode;
+        if (!$parent) {
+            return;
+        }
+
+        $wrapper = $dom->createElement('div');
+        $wrapper->setAttribute('class', 'doc-optional-clause');
+        $wrapper->setAttribute('data-clause', 'descargos_fuera_de_termino');
+        $wrapper->setAttribute('data-mode', 'CLAUSE_MODE_TOKEN');
+
+        $body = $dom->createElement('div');
+        $body->setAttribute('class', 'doc-optional-body');
+
+        $parent->insertBefore($wrapper, $first);
+        $wrapper->appendChild($this->makeOptionalClauseBar($dom, $tipo));
+        $wrapper->appendChild($body);
+
+        $partIndex = 0;
+        foreach ($group as $p) {
+            if ($this->isOptionalDescargosParagraph($p, $xpath)) {
+                $p->setAttribute('data-optional-part', $partIndex === 0 ? 'vencido' : 'extemporaneo');
+                $partIndex++;
+            }
+            $body->appendChild($p);
+        }
+    }
+
+    private function makeOptionalClauseBar(DOMDocument $dom, string $tipo): \DOMElement
+    {
+        $bar = $dom->createElement('div');
+        $bar->setAttribute('class', 'doc-optional-bar');
+
+        $hidden = $dom->createElement('input');
+        $hidden->setAttribute('type', 'hidden');
+        $hidden->setAttribute('name', "optional_clauses[{$tipo}][descargos_fuera_de_termino]");
+        $hidden->setAttribute('value', 'CLAUSE_MODE_TOKEN');
+        $hidden->setAttribute('class', 'js-optional-value');
+        $bar->appendChild($hidden);
+
+        $toggle = $dom->createElement('div');
+        $toggle->setAttribute('class', 'doc-optional-toggle');
+        $checkId = 'optional-include-' . $tipo . '-descargos_fuera_de_termino';
+        $check = $dom->createElement('input');
+        $check->setAttribute('type', 'checkbox');
+        $check->setAttribute('id', $checkId);
+        $check->setAttribute('class', 'js-optional-include');
+        $toggle->appendChild($check);
+        $title = $dom->createElement('label');
+        $title->setAttribute('for', $checkId);
+        $title->appendChild($dom->createTextNode('Incluir constancia de descargos fuera de término '));
+        $em = $dom->createElement('em');
+        $em->appendChild($dom->createTextNode('(opcional)'));
+        $title->appendChild($em);
+        $toggle->appendChild($title);
+        $bar->appendChild($toggle);
+
+        $hint = $dom->createElement('p');
+        $hint->setAttribute('class', 'doc-optional-hint');
+        $hint->appendChild($dom->createTextNode('Úsalo si no presentaron descargos o si los entregaron después del plazo.'));
+        $bar->appendChild($hint);
+
+        $modes = $dom->createElement('div');
+        $modes->setAttribute('class', 'doc-optional-modes');
+        foreach ([
+            'no_presento' => 'No los presentaron',
+            'extemporaneo' => 'Los presentaron tarde',
+        ] as $value => $label) {
+            $opt = $dom->createElement('div');
+            $opt->setAttribute('class', 'doc-optional-choice');
+            $radioId = 'optional-mode-' . $tipo . '-' . $value;
+            $radio = $dom->createElement('input');
+            $radio->setAttribute('type', 'radio');
+            $radio->setAttribute('id', $radioId);
+            $radio->setAttribute('class', 'js-optional-mode');
+            $radio->setAttribute('name', 'optional_mode_' . $tipo . '_descargos_fuera_de_termino');
+            $radio->setAttribute('value', $value);
+            $radio->setAttribute('data-optional-choice', $value);
+            $opt->appendChild($radio);
+            $lab = $dom->createElement('label');
+            $lab->setAttribute('for', $radioId);
+            $lab->appendChild($dom->createTextNode($label));
+            $opt->appendChild($lab);
+            $modes->appendChild($opt);
+        }
+        $bar->appendChild($modes);
+
+        return $bar;
+    }
+
     private function makeYellowTextarea(DOMDocument $dom, string $tipo, int $index, string $placeholder, bool $inline = false): \DOMElement
     {
         $len = mb_strlen($placeholder);
@@ -587,6 +806,11 @@ class OfficialDocumentService
         $entryName   = 'word/document.xml';
         $originalXml = $zip->getFromName($entryName);
         $updatedXml  = $this->replaceYellowBlocks($originalXml, $blocks);
+        $updatedXml  = $this->applyOptionalCyanClauses(
+            $updatedXml,
+            $template,
+            $this->clauseModeFor($template, $proceso)
+        );
         $updatedXml  = $this->fillHeaderInXml($updatedXml, ProcesoDisciplinario::datosEncabezadoDocumento($proceso));
 
         $zip->deleteName($entryName);
@@ -664,6 +888,77 @@ class OfficialDocumentService
         }
 
         return $document->saveXML();
+    }
+
+    private function applyOptionalCyanClauses(string $xml, string $template, string $mode): string
+    {
+        if ($template !== 'sancion') {
+            return $xml;
+        }
+
+        $mode = self::normalizeClauseMode($mode);
+        if ($mode === 'extemporaneo') {
+            return $xml;
+        }
+
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $document->preserveWhiteSpace = true;
+        if (!$document->loadXML($xml, LIBXML_NOERROR | LIBXML_NOWARNING)) {
+            return $xml;
+        }
+
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+
+        $cyan = [];
+        foreach ($xpath->query('//w:p') as $paragraph) {
+            if (!($paragraph instanceof \DOMElement)) {
+                continue;
+            }
+            if ($xpath->query('.//w:r[w:rPr/w:highlight[@w:val="cyan"]]', $paragraph)->length === 0) {
+                continue;
+            }
+            $cyan[] = $paragraph;
+        }
+
+        $targets = $mode === 'omit' ? $cyan : array_slice($cyan, 1);
+        $remove = [];
+        foreach ($targets as $paragraph) {
+            $remove[] = $paragraph;
+            $next = $this->nextWordParagraph($paragraph);
+            if ($next && $this->isEmptyWordParagraph($next, $xpath)) {
+                $remove[] = $next;
+            }
+        }
+
+        foreach ($remove as $node) {
+            $node->parentNode?->removeChild($node);
+        }
+
+        return $document->saveXML() ?: $xml;
+    }
+
+    private function nextWordParagraph(\DOMElement $paragraph): ?\DOMElement
+    {
+        $node = $paragraph->nextSibling;
+        while ($node) {
+            if ($node instanceof \DOMElement && preg_match('/(?:^|:)p$/', $node->nodeName)) {
+                return $node;
+            }
+            $node = $node->nextSibling;
+        }
+
+        return null;
+    }
+
+    private function isEmptyWordParagraph(\DOMElement $paragraph, DOMXPath $xpath): bool
+    {
+        $text = '';
+        foreach ($xpath->query('.//w:t', $paragraph) as $t) {
+            $text .= $t->nodeValue;
+        }
+
+        return trim(str_replace("\xc2\xa0", ' ', $text)) === '';
     }
 
     /**

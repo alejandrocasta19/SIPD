@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=20">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=32">
     @yield('styles')
 </head>
 <body class="theme-cootranshuila">
@@ -310,7 +310,7 @@
                                     <span class="umi"><i class="far fa-user"></i></span>
                                     Mi perfil
                                 </a>
-                                <a class="dropdown-item" href="#" id="open-password-modal">
+                                <a class="dropdown-item" href="#" id="open-password-modal" @if(!$puedeEditarPerfil) data-need-perfil="1" @endif>
                                     <span class="umi"><i class="fas fa-lock"></i></span>
                                     Cambiar contraseña
                                 </a>
@@ -455,6 +455,7 @@
                 @csrf
                 @method('PUT')
 
+                @if($puedeEditarPerfil)
                 <label>Contraseña actual</label>
                 <div class="pwd-field">
                     <input type="password" name="current_password" id="current_password" required>
@@ -483,6 +484,13 @@
                     <button type="button" class="pwd-cancel" id="cancel-password-modal">Cancelar</button>
                     <button type="submit" class="pwd-save">Actualizar contraseña</button>
                 </div>
+                @else
+                <p class="pwd-error" style="margin:0 0 16px;">Cambiar la contraseña entra en el permiso de editar perfil. Pídeselo a la coordinadora.</p>
+                <div class="pwd-actions">
+                    <button type="button" class="pwd-cancel" id="cancel-password-modal">Cancelar</button>
+                    <button type="button" class="pwd-save" id="pedir-password-btn">Solicitar permiso</button>
+                </div>
+                @endif
             </form>
         </div>
     </div>
@@ -516,7 +524,7 @@
         })();
     </script>
     @endif
-    <script src="{{ rtrim(request()->root(), '/') }}/js/sipd-feedback.js?v=4"></script>
+    <script src="{{ rtrim(request()->root(), '/') }}/js/sipd-feedback.js?v=8"></script>
 
     <script src="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/plugins/jquery/jquery.min.js"></script>
     <script src="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -552,6 +560,12 @@
 
             function openModal(e) {
                 if (e) e.preventDefault();
+                if (openBtn && openBtn.getAttribute('data-need-perfil')) {
+                    var ta = document.querySelector('#formSolicitarPermiso textarea[name="que_hara"]');
+                    if (ta && !ta.value) ta.value = 'Cambiar la contraseña de mi cuenta.';
+                    abrirPermisoModal('editar_perfil');
+                    return;
+                }
                 modal.classList.add('open');
             }
 
@@ -624,6 +638,15 @@
                     abrirPermisoModal('editar_perfil');
                 });
             }
+            var pedirPassword = document.getElementById('pedir-password-btn');
+            if (pedirPassword) {
+                pedirPassword.addEventListener('click', function () {
+                    closeModal();
+                    var ta = document.querySelector('#formSolicitarPermiso textarea[name="que_hara"]');
+                    if (ta && !ta.value) ta.value = 'Cambiar la contraseña de mi cuenta.';
+                    abrirPermisoModal('editar_perfil');
+                });
+            }
             var solDuracion = document.getElementById('sol-duracion');
             var solCustom = document.getElementById('sol-custom');
             if (solDuracion && solCustom) {
@@ -675,6 +698,26 @@
                     input.type = visible ? 'password' : 'text';
                     button.textContent = visible ? 'Ver' : 'Ocultar';
                 });
+            });
+
+            document.querySelectorAll('.sipd-pager-size').forEach(function (form) {
+                var choice = form.querySelector('.sipd-pager-choice');
+                var input = form.querySelector('input[name="per_page"]');
+                var go = form.querySelector('.sipd-pager-go');
+                if (!choice || !input) return;
+                function sync(submitPreset) {
+                    var custom = choice.value === 'custom';
+                    input.classList.toggle('is-hidden', !custom);
+                    if (go) go.classList.toggle('is-hidden', !custom);
+                    if (!custom) {
+                        input.value = choice.value;
+                        if (submitPreset) form.submit();
+                    } else if (submitPreset) {
+                        input.focus();
+                        input.select();
+                    }
+                }
+                choice.addEventListener('change', function () { sync(true); });
             });
         })();
     </script>

@@ -128,6 +128,9 @@
                     <a class="proc-lnk" href="{{ route('abogado.detalleproceso', $caso->id) }}">PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</a>
                     <span class="hub-sub">
                         <span class="st"><i class="fas fa-circle {{ $estadoDot }}"></i> {{ $caso->estado }}</span>
+                        @if(($caso->anexos_count ?? 0) > 0)
+                            · {{ $caso->anexos_count }} anexo{{ $caso->anexos_count === 1 ? '' : 's' }}
+                        @endif
                     </span>
                 </td>
                 <td>
@@ -171,11 +174,6 @@
         @endforelse
         </tbody>
     </table>
-    @if($casos->hasPages())
-        <div class="hub-pager">
-            <span>Mostrando {{ $casos->firstItem() }}-{{ $casos->lastItem() }} de {{ $casos->total() }}</span>
-            <span>{{ $casos->links() }}</span>
-        </div>
-    @endif
+    @include('partials.paginacion', ['paginador' => $casos])
 </div>
 @endsection

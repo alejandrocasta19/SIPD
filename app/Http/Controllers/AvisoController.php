@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Aviso;
 use App\Models\PermisoSolicitud;
+use App\Support\Paginacion;
 use App\Support\RhPermisos;
 use Illuminate\Http\Request;
 
@@ -11,11 +12,12 @@ class AvisoController extends Controller
 {
     public function index()
     {
-        $avisos = Aviso::query()
-            ->where('user_id', auth()->id())
-            ->with(['remitente', 'proceso', 'solicitud'])
-            ->latest()
-            ->paginate(20);
+        $avisos = Paginacion::deQuery(
+            Aviso::query()
+                ->where('user_id', auth()->id())
+                ->with(['remitente', 'proceso', 'solicitud'])
+                ->latest()
+        );
 
         $user = auth()->user();
 

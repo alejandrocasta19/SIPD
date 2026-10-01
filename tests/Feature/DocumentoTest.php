@@ -335,6 +335,115 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
+    public function plantilla_sancion_muestra_constancia_opcional_de_descargos()
+    {
+        $user = $this->makeUser('abogado');
+
+        $html = $this->actingAs($user)
+            ->get(route('abogado.registro.plantilla', ['tipo' => 'sancion']))
+            ->assertOk()
+            ->json('html');
+
+        $this->assertStringContainsString('doc-optional-clause', $html);
+        $this->assertStringContainsString('js-optional-include', $html);
+        $this->assertStringContainsString('optional-include-sancion-descargos_fuera_de_termino', $html);
+        $this->assertStringContainsString('optional_mode_sancion_descargos_fuera_de_termino', $html);
+        $this->assertStringContainsString('data-optional-part="vencido"', $html);
+        $this->assertStringContainsString('data-optional-part="extemporaneo"', $html);
+        $this->assertStringContainsString('data-mode="omit"', $html);
+        $this->assertStringNotContainsString('CLAUSE_MODE_TOKEN', $html);
+    }
+
+    /** @test */
+    public function guardar_sancion_persiste_clausula_opcional_de_descargos()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)->put(
+            route('documentos.save', [$caso->id, 'sancion']),
+            [
+                'yellow_blocks' => $this->filledBlocks('sancion'),
+                'optional_clauses' => [
+                    'sancion' => ['descargos_fuera_de_termino' => 'extemporaneo'],
+                ],
+            ]
+        )->assertRedirect();
+
+        $caso->refresh();
+        $this->assertSame(
+            'extemporaneo',
+            $caso->datos_oficiales['optional_clauses']['sancion']['descargos_fuera_de_termino']
+        );
+    }
+
+    /** @test */
+    public function sancion_omite_constancia_cyan_por_defecto()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, [
+            'datos_oficiales' => [
+                'yellow_blocks' => ['sancion' => $this->filledBlocks('sancion')],
+            ],
+        ]);
+
+        $plain = $this->docxPlainText($caso, 'sancion');
+        $this->assertStringNotContainsString('se deja constancia', mb_strtolower($plain));
+        $this->assertStringNotContainsString('manera extemporánea', mb_strtolower($plain));
+    }
+
+    /** @test */
+    public function sancion_incluye_constancia_si_no_presentaron_descargos()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, [
+            'datos_oficiales' => [
+                'yellow_blocks' => ['sancion' => $this->filledBlocks('sancion')],
+                'optional_clauses' => [
+                    'sancion' => ['descargos_fuera_de_termino' => 'no_presento'],
+                ],
+            ],
+        ]);
+
+        $plain = $this->docxPlainText($caso, 'sancion');
+        $this->assertStringContainsString('se deja constancia', mb_strtolower($plain));
+        $this->assertStringContainsString('debida oportunidad', mb_strtolower($plain));
+        $this->assertStringNotContainsString('manera extemporánea', mb_strtolower($plain));
+    }
+
+    /** @test */
+    public function sancion_incluye_ambos_parrafos_si_descargos_fueron_extemporaneos()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, [
+            'datos_oficiales' => [
+                'yellow_blocks' => ['sancion' => $this->filledBlocks('sancion')],
+                'optional_clauses' => [
+                    'sancion' => ['descargos_fuera_de_termino' => 'extemporaneo'],
+                ],
+            ],
+        ]);
+
+        $plain = $this->docxPlainText($caso, 'sancion');
+        $this->assertStringContainsString('se deja constancia', mb_strtolower($plain));
+        $this->assertStringContainsString('manera extemporánea', mb_strtolower($plain));
+    }
+
+    private function docxPlainText(ProcesoDisciplinario $caso, string $tipo): string
+    {
+        $path = app(\App\Services\OfficialDocumentService::class)->materializeDocx($caso, $tipo);
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $xml = (string) $zip->getFromName('word/document.xml');
+        $zip->close();
+        @unlink($path);
+
+        preg_match_all('/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/u', $xml, $matches);
+
+        return html_entity_decode(implode('', $matches[1] ?? []), ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    /** @test */
     public function registro_muestra_cuatro_pestanias_de_formato()
     {
         $user = $this->makeUser('abogado');
@@ -385,6 +494,23 @@ class DocumentoTest extends TestCase
             ->assertDontSee('>Generado</span>', false)
             ->assertDontSee('hub-sub">3. Sanción', false)
             ->assertDontSee('hub-sub">1.1 GA-FT-045', false);
+    }
+
+    /** @test */
+    public function hub_permite_cambiar_registros_por_pagina()
+    {
+        $user = $this->makeUser('abogado');
+        for ($i = 1; $i <= 6; $i++) {
+            $this->makeCaso($user, ['nombre' => 'Conductor Pagina ' . $i]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub', ['per_page' => 5]))
+            ->assertOk()
+            ->assertSee('Personalizado')
+            ->assertSee('Mostrar')
+            ->assertSee('value="5"', false)
+            ->assertSee('selected', false);
     }
 
     /** @test */

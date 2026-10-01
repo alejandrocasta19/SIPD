@@ -3,16 +3,16 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\CasoAnexo;
 use App\Models\CasoDocumentoEstado;
 use App\Models\ProcesoDisciplinario;
-use Carbon\Carbon;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ReportService;
 use App\Services\OfficialDocumentService;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Pagination\LengthAwarePaginator;
+use App\Support\Paginacion;
 use Throwable;
 
 class ProcesoDisciplinarioController extends Controller
@@ -61,42 +61,57 @@ class ProcesoDisciplinarioController extends Controller
         $sinAbogado = (clone $visible)->whereNull('user_id')->count();
         $resueltos = $sancionados + $archivados;
         $tasaResolucion = $total > 0 ? (int) round(($resueltos / $total) * 100) : 0;
+        $abiertos = $pendientes + $enProceso;
 
         $pct = function ($count) use ($total) {
             return $total > 0 ? (int) round(($count / $total) * 100) : 0;
         };
 
-        $proximoVencer = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso'])
-            ->orderBy('created_at')
-            ->first();
+        $hora = (int) now()->format('G');
+        $saludo = $hora < 12 ? 'Buenos días' : ($hora < 19 ? 'Buenas tardes' : 'Buenas noches');
 
-        $diasVencer = null;
-        if ($proximoVencer) {
-            $diasVencer = 5 - now()->startOfDay()->diffInDays($proximoVencer->created_at->copy()->startOfDay());
-        }
+        $casosAbiertos = (clone $visible)
+            ->whereIn('estado', ['Pendiente', 'En Proceso'])
+            ->with(['documentoEstados', 'anexos', 'user'])
+            ->get()
+            ->sortBy(fn ($proceso) => $proceso->diasPlazo())
+            ->values();
+
+        $proximoVencer = $casosAbiertos->first();
+        $diasVencer = $proximoVencer ? $proximoVencer->diasPlazo() : null;
+        $plazosVencidos = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'vencido')->count();
+        $plazosPorVencer = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'por_vencer')->count();
 
         $procesosSinAsignar = (clone $visible)->whereNull('user_id')
             ->latest()
             ->take($user->esCoordinadora() ? 8 : 4)
             ->get();
 
-        $alertaDescargos = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso'])
+        $descargosPendientes = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso'])
             ->where(function ($query) {
                 $query->whereNull('descargos')->orWhere('descargos', '');
             })
-            ->oldest()
-            ->first();
+            ->count();
+
+        $alertaDescargos = $casosAbiertos->first(function ($proceso) {
+            return !filled($proceso->descargos);
+        });
 
         $alertasActivas = collect([
-            $proximoVencer && $diasVencer !== null && $diasVencer <= 5,
+            $plazosVencidos > 0,
+            $plazosPorVencer > 0,
             $sinAbogado > 0,
-            $alertaDescargos !== null,
+            $descargosPendientes > 0,
         ])->filter()->count();
 
-        $recientes = (clone $visible)->with('user')
+        $atencion = $casosAbiertos->take(6);
+
+        $recientes = (clone $visible)->with(['user', 'documentoEstados', 'anexos'])
             ->latest()
-            ->take(5)
+            ->take(6)
             ->get();
+
+        $anexosTotal = CasoAnexo::whereIn('caso_id', (clone $visible)->select('id'))->count();
 
         $cargaAbogados = User::where('role', 'abogado')
             ->when(!$user->esCoordinadora(), function ($query) use ($user) {
@@ -130,11 +145,13 @@ class ProcesoDisciplinarioController extends Controller
         return view($vista, [
             'pageTitle' => $user->esCoordinadora() ? 'Coordinación de RH' : 'Inicio',
             'user' => $user,
+            'saludo' => $saludo,
             'pendientes' => $pendientes,
             'enProceso' => $enProceso,
             'sancionados' => $sancionados,
             'archivados' => $archivados,
             'total' => $total,
+            'abiertos' => $abiertos,
             'sinAbogado' => $sinAbogado,
             'tasaResolucion' => $tasaResolucion,
             'pctPendiente' => $pct($pendientes),
@@ -143,10 +160,15 @@ class ProcesoDisciplinarioController extends Controller
             'pctArchivado' => $pct($archivados),
             'proximoVencer' => $proximoVencer,
             'diasVencer' => $diasVencer,
+            'plazosVencidos' => $plazosVencidos,
+            'plazosPorVencer' => $plazosPorVencer,
             'procesosSinAsignar' => $procesosSinAsignar,
             'alertaDescargos' => $alertaDescargos,
+            'descargosPendientes' => $descargosPendientes,
             'alertasActivas' => $alertasActivas,
+            'atencion' => $atencion,
             'recientes' => $recientes,
+            'anexosTotal' => $anexosTotal,
             'cargaAbogados' => $cargaAbogados,
             'equipoRh' => $equipoRh,
             'pendientesVeredicto' => $pendientesVeredicto,
@@ -170,7 +192,9 @@ class ProcesoDisciplinarioController extends Controller
             'tipoInicial' => $tipoInicial,
             'interactiveHtml' => $documents->getInteractiveDocumentHtml(
                 $tipoInicial,
-                is_array($oldBlocks) ? $oldBlocks : []
+                is_array($oldBlocks) ? $oldBlocks : [],
+                null,
+                old('optional_clauses.' . $tipoInicial . '.descargos_fuera_de_termino')
             ),
             'profileUser' => auth()->user(),
         ]);
@@ -183,7 +207,12 @@ class ProcesoDisciplinarioController extends Controller
         $oldBlocks = old('yellow_blocks_' . $tipo, []);
 
         return response()->json([
-            'html' => $documents->getInteractiveDocumentHtml($tipo, is_array($oldBlocks) ? $oldBlocks : []),
+            'html' => $documents->getInteractiveDocumentHtml(
+                $tipo,
+                is_array($oldBlocks) ? $oldBlocks : [],
+                null,
+                old('optional_clauses.' . $tipo . '.descargos_fuera_de_termino')
+            ),
             'tipo' => $tipo,
             'etiqueta' => CasoDocumentoEstado::etiqueta($tipo),
             'slot' => CasoDocumentoEstado::slotDe($tipo),
@@ -231,7 +260,7 @@ class ProcesoDisciplinarioController extends Controller
             });
         }
 
-        $allProcesses = $query->orderBy('created_at', 'desc')->get();
+        $allProcesses = $query->withCount('anexos')->orderBy('created_at', 'desc')->get();
 
         // Agrupar por trabajador (cédula o nombre)
         $workersGrouped = $allProcesses->groupBy(function ($item) {
@@ -250,15 +279,7 @@ class ProcesoDisciplinarioController extends Controller
             ];
         })->sortByDesc('total_casos')->values();
 
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = 10;
-        $workersGroupedPaginated = new LengthAwarePaginator(
-            $workersGrouped->slice(($page - 1) * $perPage, $perPage)->values(),
-            $workersGrouped->count(),
-            $perPage,
-            $page,
-            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
-        );
+        $workersGroupedPaginated = Paginacion::deColeccion($workersGrouped);
 
         return view('abogado.Reincidencias', [
             'pageTitle'      => 'Reincidencias',
@@ -282,7 +303,7 @@ class ProcesoDisciplinarioController extends Controller
             'Archivado' => (clone $visible)->where('estado', 'Archivado')->count(),
         ];
 
-        $query = $visible->with('user');
+        $query = $visible->with('user')->withCount('anexos');
 
         if ($request->filled('estado') && $request->estado !== 'todos') {
             $query->where('estado', $request->estado);
@@ -307,9 +328,7 @@ class ProcesoDisciplinarioController extends Controller
             $query->where('modalidad', $request->modalidad);
         }
 
-        /** @var \Illuminate\Pagination\LengthAwarePaginator $procesos */
-        $procesos = $query->latest()->paginate(8);
-        $procesos->withQueryString();
+        $procesos = Paginacion::deQuery($query->latest());
         $modalidades = $this->visibleProcesses()->whereNotNull('modalidad')
             ->where('modalidad', '!=', '')
             ->distinct()
@@ -358,9 +377,7 @@ class ProcesoDisciplinarioController extends Controller
             $query->where('created_at', '<=', $request->hasta . ' 23:59:59');
         }
 
-        /** @var \Illuminate\Pagination\LengthAwarePaginator $casos */
-        $casos = (clone $query)->whereIn('estado', ['Pendiente', 'En Proceso'])->withCount('anexos')->latest()->paginate(12);
-        $casos->withQueryString();
+        $casos = Paginacion::deQuery((clone $query)->whereIn('estado', ['Pendiente', 'En Proceso'])->withCount('anexos')->latest());
 
         // Historial: cerrados (Sancionado + Archivado)
         $historial = (clone $query)->whereIn('estado', ['Sancionado', 'Archivado'])
@@ -488,6 +505,7 @@ class ProcesoDisciplinarioController extends Controller
         try {
             $casos = $this->visibleProcesses()
                 ->whereIn('id', $validated['ids'])
+                ->with('user')
                 ->withCount('anexos')
                 ->orderBy('id')
                 ->get();
@@ -577,6 +595,15 @@ class ProcesoDisciplinarioController extends Controller
             $slots[$slot] = $tipo;
         }
 
+        $optionalClauses = [];
+        if ($tipo === 'sancion') {
+            $optionalClauses['sancion'] = [
+                'descargos_fuera_de_termino' => OfficialDocumentService::normalizeClauseMode(
+                    $request->input('optional_clauses.sancion.descargos_fuera_de_termino')
+                ),
+            ];
+        }
+
         $proceso = ProcesoDisciplinario::create([
             'tipo_proceso'      => $validated['tipo_proceso'],
             'nombre'            => $request->nombre,
@@ -590,6 +617,7 @@ class ProcesoDisciplinarioController extends Controller
             'datos_oficiales'   => [
                 'yellow_blocks' => $yellowBlocksData,
                 'slots' => $slots,
+                'optional_clauses' => $optionalClauses,
             ],
             'fecha_falta'       => $request->fecha_falta,
             'documento_falta'   => $rutaDocumento,
@@ -840,15 +868,7 @@ class ProcesoDisciplinarioController extends Controller
             $resoluciones = $resoluciones->where('tipo', $filtro)->values();
         }
 
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = 10;
-        $resolucionesPaginated = new LengthAwarePaginator(
-            $resoluciones->slice(($page - 1) * $perPage, $perPage)->values(),
-            $resoluciones->count(),
-            $perPage,
-            $page,
-            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
-        );
+        $resolucionesPaginated = Paginacion::deColeccion($resoluciones);
 
         return view('abogado.resoluciones', [
             'pageTitle' => 'Resoluciones',
@@ -870,27 +890,10 @@ class ProcesoDisciplinarioController extends Controller
             'Archivado' => 'Notificación',
         ];
 
-        $hoy = Carbon::now()->startOfDay();
-
         $plazos = $this->visibleProcesses()
             ->latest()
             ->get()
-            ->map(function ($proceso) use ($tipos, $hoy) {
-                $inicio = $proceso->created_at
-                    ? $proceso->created_at->copy()->startOfDay()
-                    : $hoy->copy();
-
-                $vencimiento = $inicio->copy()->addDays(5);
-                $dias = $hoy->diffInDays($vencimiento, false);
-
-                if ($dias <= 0) {
-                    $semaforo = 'vencido';
-                } elseif ($dias <= 2) {
-                    $semaforo = 'por_vencer';
-                } else {
-                    $semaforo = 'vigente';
-                }
-
+            ->map(function ($proceso) use ($tipos) {
                 $tipo = $tipos[$proceso->estado] ?? 'Descargos';
                 if ($proceso->estado === 'Pendiente') {
                     $tipo = $proceso->etiquetaTipoDescargos();
@@ -905,9 +908,9 @@ class ProcesoDisciplinarioController extends Controller
                     'tipo' => $tipo,
                     'es_descargos' => $proceso->estado === 'Pendiente',
                     'descargos_presentacion' => $proceso->descargosPresentacionValue(),
-                    'vencimiento' => $vencimiento,
-                    'dias' => $dias,
-                    'semaforo' => $semaforo,
+                    'vencimiento' => $proceso->vencimientoPlazo(),
+                    'dias' => $proceso->diasPlazo(),
+                    'semaforo' => $proceso->semaforoPlazo(),
                 ];
             });
 
@@ -923,15 +926,7 @@ class ProcesoDisciplinarioController extends Controller
             $plazos = $plazos->where('semaforo', $filtro)->values();
         }
 
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = 10;
-        $plazosPaginated = new LengthAwarePaginator(
-            $plazos->slice(($page - 1) * $perPage, $perPage)->values(),
-            $plazos->count(),
-            $perPage,
-            $page,
-            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => request()->query()]
-        );
+        $plazosPaginated = Paginacion::deColeccion($plazos);
 
         return view('abogado.plazos', [
             'pageTitle' => 'Plazos y términos',

@@ -172,7 +172,5 @@
             <div class="empty">No hay notificaciones.</div>
         @endforelse
     </div>
-    @if($avisos->hasPages())
-        <div style="margin-top:16px;">{{ $avisos->links() }}</div>
-    @endif
+    @include('partials.paginacion', ['paginador' => $avisos])
 @endsection

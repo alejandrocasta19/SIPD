@@ -6,6 +6,7 @@ use App\Models\Aviso;
 use App\Models\PermisoSolicitud;
 use App\Models\ProcesoDisciplinario;
 use App\Models\User;
+use App\Support\Paginacion;
 use App\Support\RhPermisos;
 use Illuminate\Http\Request;
 
@@ -15,10 +16,11 @@ class CoordinadoraController extends Controller
     {
         abort_unless(auth()->user()->esCoordinadora(), 403);
 
-        $procesos = ProcesoDisciplinario::with('user')
-            ->where('estado', 'En Proceso')
-            ->latest('updated_at')
-            ->paginate(10);
+        $procesos = Paginacion::deQuery(
+            ProcesoDisciplinario::with('user')
+                ->where('estado', 'En Proceso')
+                ->latest('updated_at')
+        );
 
         return view('coordinadora.veredictos', [
             'pageTitle' => 'Veredictos',
@@ -35,10 +37,11 @@ class CoordinadoraController extends Controller
             ->latest()
             ->get();
 
-        $historial = PermisoSolicitud::with(['user', 'respondente'])
-            ->where('estado', '!=', PermisoSolicitud::PENDIENTE)
-            ->latest('responded_at')
-            ->paginate(12);
+        $historial = Paginacion::deQuery(
+            PermisoSolicitud::with(['user', 'respondente'])
+                ->where('estado', '!=', PermisoSolicitud::PENDIENTE)
+                ->latest('responded_at')
+        );
 
         return view('coordinadora.solicitudes', [
             'pageTitle' => 'Solicitudes de permiso',

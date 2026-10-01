@@ -302,6 +302,80 @@ class ProcesoDisciplinario extends Model
         return 'PRO-' . str_pad((string) $this->id, 3, '0', STR_PAD_LEFT);
     }
 
+    public function vencimientoPlazo()
+    {
+        $inicio = $this->created_at
+            ? $this->created_at->copy()->startOfDay()
+            : now()->startOfDay();
+
+        return $inicio->copy()->addDays(5);
+    }
+
+    public function diasPlazo(): int
+    {
+        return (int) now()->startOfDay()->diffInDays($this->vencimientoPlazo(), false);
+    }
+
+    public function semaforoPlazo(): string
+    {
+        $dias = $this->diasPlazo();
+        if ($dias <= 0) {
+            return 'vencido';
+        }
+        if ($dias <= 2) {
+            return 'por_vencer';
+        }
+
+        return 'vigente';
+    }
+
+    public function siguienteAccion(): array
+    {
+        $abierto = in_array($this->estado, ['Pendiente', 'En Proceso'], true);
+        $dias = $this->diasPlazo();
+
+        if ($abierto && $dias <= 0) {
+            return ['texto' => 'Plazo vencido', 'tono' => 'late'];
+        }
+        if ($abierto && $dias <= 2) {
+            return [
+                'texto' => $dias === 1 ? 'Vence mañana' : 'Vence en ' . $dias . ' días',
+                'tono' => 'warn',
+            ];
+        }
+
+        if ($this->estado === 'Pendiente') {
+            if (!$this->tieneDocumentoGenerado()) {
+                return ['texto' => 'Diligenciar Autos y Actas', 'tono' => 'info'];
+            }
+            if (!filled($this->descargos)) {
+                return ['texto' => 'Registrar descargos', 'tono' => 'warn'];
+            }
+
+            return ['texto' => 'Listo para enviar a proceso', 'tono' => 'ok'];
+        }
+
+        if ($this->estado === 'En Proceso') {
+            if ($this->varianteDelSlot('resolucion') === 'terminacion') {
+                $anexos = $this->relationLoaded('anexos') ? $this->anexos : $this->anexos()->get();
+                $firmado = $anexos->contains(function ($anexo) {
+                    return $anexo->tipoDocumento() === 'terminacion';
+                });
+                if (!$firmado) {
+                    return ['texto' => 'Cargar terminación firmada', 'tono' => 'warn'];
+                }
+            }
+
+            return ['texto' => 'Pendiente de veredicto', 'tono' => 'info'];
+        }
+
+        if ($this->estado === 'Sancionado') {
+            return ['texto' => 'Resuelto · sanción', 'tono' => 'sanc'];
+        }
+
+        return ['texto' => 'Archivado', 'tono' => 'arch'];
+    }
+
     public function etiquetaTipoProceso(): string
     {
         return match ($this->tipo_proceso) {

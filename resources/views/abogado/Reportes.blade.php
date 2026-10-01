@@ -27,17 +27,16 @@
 
     /* ── CHARTS ──────────────────────────────────── */
     .charts-wrap { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3, minmax(0,1fr)); gap:10px; margin-bottom:16px; }
-    .ch-card     { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; min-width:0; }
+    .ch-card     { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; min-width:0; display:flex; flex-direction:column; }
     .ch-card h3  { margin:0 0 1px; font-size:12px; font-weight:700; color:#0f172a; }
     .ch-card p   { color:#64748b; font-size:10px; margin:0 0 8px; }
-    .ch-wrap     { position:relative; height:160px; }
-    .ch-wrap.ch-rank { height:auto; min-height:160px; }
+    .ch-wrap     { position:relative; height:160px; flex:0 0 160px; }
+    .ch-wrap.ch-rank { display:flex; flex-direction:column; overflow:hidden; }
     .ch-empty    { display:none; color:#94a3b8; text-align:center; padding:40px 8px; font-size:12px; }
-    .ch-head     { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-    .top-more    { border:0; background:#f1f5f9; color:#334155; border-radius:7px; padding:4px 8px; font-size:10px; font-weight:700; cursor:pointer; display:none; white-space:nowrap; }
-    .top-more:hover { background:#e2e8f0; }
-    .top-list    { list-style:none; margin:0; padding:0; }
-    .top-list li { padding:6px 0; border-bottom:1px solid #f1f5f9; }
+    .top-more    { border:1px solid #dbeafe; background:#f8fafc; color:#1d4ed8; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer; display:none; width:100%; margin-top:auto; justify-content:center; flex-shrink:0; }
+    .top-more:hover { background:#eff6ff; }
+    .top-list    { list-style:none; margin:0; padding:0; flex:1; min-height:0; overflow:hidden; }
+    .top-list li { padding:4px 0; border-bottom:1px solid #f1f5f9; }
     .top-list li:last-child { border-bottom:0; }
     .top-row     { display:flex; align-items:center; gap:8px; }
     .top-rank    { width:18px; height:18px; border-radius:50%; background:#f1f5f9; color:#475569; font-size:9px; font-weight:800; display:grid; place-items:center; flex-shrink:0; }
@@ -107,7 +106,7 @@
     <div class="proc-head">
         <div>
             <h1>Estadísticas y reportes</h1>
-            <p>Panorama de procesos disciplinarios y de los anexos Word o PDF del expediente.</p>
+            <p>Panorama de procesos disciplinarios y de los anexos del expediente.</p>
         </div>
         <div class="proc-head-side rp-actions">
             <form method="POST" action="{{ route('abogado.reportes.global', 'pdf') }}" class="export-form">
@@ -149,7 +148,6 @@
 <div class="kpi-row">
     <div class="kpi-card" style="border-left:3px solid var(--cth-green-text);"><small>Anexos</small><strong id="card-anexos">0</strong></div>
     <div class="kpi-card"><small>Archivo previo</small><strong id="card-anexos-previo">0</strong></div>
-    <div class="kpi-card" style="border-left:3px solid #d97706;"><small>Pendiente firma</small><strong id="card-anexos-pendiente">0</strong></div>
     <div class="kpi-card" style="border-left:3px solid var(--cth-green-bright);"><small>Firmados</small><strong id="card-anexos-firmado">0</strong></div>
 </div>
 
@@ -163,28 +161,20 @@
         </div>
     </div>
     <div class="ch-card">
-        <div class="ch-head">
-            <div>
-                <h3>Cargo del trabajador</h3>
-                <p>Top 5 oficios con más procesos (conductor, taquillero…).</p>
-            </div>
-            <button type="button" class="top-more" id="cargo-more">Ver más</button>
-        </div>
+        <h3>Cargo del trabajador</h3>
+        <p>Top 3 oficios con más procesos.</p>
         <div class="ch-wrap ch-rank" id="cargo-wrap">
             <ol class="top-list" id="cargo-list"></ol>
+            <button type="button" class="top-more" id="cargo-more">Ampliar vista</button>
             <div class="ch-empty">Sin cargos registrados.</div>
         </div>
     </div>
     <div class="ch-card">
-        <div class="ch-head">
-            <div>
-                <h3>Tipo de falta</h3>
-                <p>Top 5 faltas con más casos en el período.</p>
-            </div>
-            <button type="button" class="top-more" id="fault-more">Ver más</button>
-        </div>
+        <h3>Tipo de falta</h3>
+        <p>Top 3 faltas con más casos.</p>
         <div class="ch-wrap ch-rank" id="fault-wrap">
             <ol class="top-list" id="fault-list"></ol>
+            <button type="button" class="top-more" id="fault-more">Ampliar vista</button>
             <div class="ch-empty">Sin faltas.</div>
         </div>
     </div>
@@ -254,14 +244,9 @@
             @endforelse
             </tbody>
         </table>
-        @if($casos->hasPages())
-            <div class="tbl-pager">
-                <span>{{ $casos->firstItem() }}–{{ $casos->lastItem() }} de {{ $casos->total() }}</span>
-                <span>{{ $casos->links() }}</span>
-            </div>
-        @endif
     </div>
 </form>
+        @include('partials.paginacion', ['paginador' => $casos])
 
 {{-- ═══════════════════════════════════════════════ --}}
 {{-- HISTORIAL DE CASOS CERRADOS                     --}}
@@ -419,18 +404,19 @@ document.addEventListener('DOMContentLoaded', function () {
         var list = document.getElementById(listId);
         var btn = document.getElementById(btnId);
         var all = items || [];
-        list.innerHTML = rankItemsHtml(all.slice(0, 5), color);
+        list.innerHTML = rankItemsHtml(all.slice(0, 3), color);
         list.style.display = all.length ? 'block' : 'none';
         showEmpty(emptyWrapId, !all.length);
         if (!btn) return;
-        btn.style.display = all.length > 5 ? 'inline-flex' : 'none';
+        btn.style.display = all.length ? 'inline-flex' : 'none';
+        btn.textContent = 'Ampliar vista';
         btn.onclick = function () { openRankPop(modalTitle, modalSub, all, color); };
     }
 
     var pop = document.getElementById('rank-pop');
     function openRankPop(title, sub, items, color) {
         document.getElementById('rank-pop-title').textContent = title;
-        document.getElementById('rank-pop-sub').textContent = sub;
+        document.getElementById('rank-pop-sub').textContent = sub + ' ' + items.length + ' en total.';
         document.getElementById('rank-pop-list').innerHTML = rankItemsHtml(items, color);
         pop.classList.add('open');
     }
@@ -450,7 +436,6 @@ document.addEventListener('DOMContentLoaded', function () {
         var anexos = data.anexos || {};
         document.getElementById('card-anexos').textContent = anexos.total||0;
         document.getElementById('card-anexos-previo').textContent = anexos.archivo_previo||0;
-        document.getElementById('card-anexos-pendiente').textContent = anexos.pendiente_firma||0;
         document.getElementById('card-anexos-firmado').textContent = anexos.firmado||0;
 
         /* línea mensual: solo volumen, el estado ya está en las tarjetas */

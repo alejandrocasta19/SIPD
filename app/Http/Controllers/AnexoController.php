@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\CasoAnexo;
+use App\Models\CasoDocumentoEstado;
 use App\Models\ProcesoDisciplinario;
+use App\Support\Paginacion;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -13,7 +15,7 @@ class AnexoController extends Controller
     public function __construct()
     {
         $this->middleware('permiso:ver_anexos')->only(['index', 'download']);
-        $this->middleware('permiso:subir_anexos')->only(['store', 'guardarCopiaFirmada']);
+        $this->middleware('permiso:subir_anexos')->only(['store', 'firmar']);
         $this->middleware('permiso:eliminar_anexos')->only(['destroy']);
     }
 
@@ -47,12 +49,17 @@ class AnexoController extends Controller
         $query = $this->visibleAnexos()->latest();
         $filtro = $request->get('filtro', 'todos');
 
-        if ($filtro === 'existente') {
-            $query->where('tipo', CasoAnexo::TIPO_ARCHIVO_PREVIO);
+        if (isset(CasoDocumentoEstado::SLOTS[$filtro])) {
+            $query->whereIn('tipo', CasoAnexo::tiposDelSlot($filtro));
         } elseif ($filtro === 'pendiente') {
             $query->where('estado', CasoAnexo::ESTADO_PENDIENTE_FIRMA);
         } elseif ($filtro === 'firmado') {
-            $query->where('estado', CasoAnexo::ESTADO_FIRMADO);
+            $query->where(function ($sub) {
+                $sub->where('estado', CasoAnexo::ESTADO_FIRMADO)
+                    ->orWhereIn('tipo', ['terminacion', CasoAnexo::TIPO_FIRMA_GERENTE]);
+            });
+        } elseif ($filtro === 'existente') {
+            $query->where('tipo', CasoAnexo::TIPO_ARCHIVO_PREVIO);
         }
 
         if ($request->filled('q')) {
@@ -77,15 +84,22 @@ class AnexoController extends Controller
             'todos' => (clone $base)->count(),
             'existente' => (clone $base)->where('tipo', CasoAnexo::TIPO_ARCHIVO_PREVIO)->count(),
             'pendiente' => (clone $base)->where('estado', CasoAnexo::ESTADO_PENDIENTE_FIRMA)->count(),
-            'firmado' => (clone $base)->where('estado', CasoAnexo::ESTADO_FIRMADO)->count(),
+            'firmado' => (clone $base)->where(function ($sub) {
+                $sub->where('estado', CasoAnexo::ESTADO_FIRMADO)
+                    ->orWhereIn('tipo', ['terminacion', CasoAnexo::TIPO_FIRMA_GERENTE]);
+            })->count(),
         ];
+        foreach (array_keys(CasoDocumentoEstado::SLOTS) as $slot) {
+            $conteos[$slot] = (clone $base)->whereIn('tipo', CasoAnexo::tiposDelSlot($slot))->count();
+        }
 
         return view('abogado.anexos', [
             'pageTitle' => 'Anexos escaneados',
-            'anexos' => $query->paginate(12)->withQueryString(),
+            'anexos' => Paginacion::deQuery($query),
             'casos' => $this->visibleProcesses()->latest()->get(['id', 'nombre', 'cedula', 'estado']),
             'conteos' => $conteos,
             'filtro' => $filtro,
+            'casoSeleccionado' => $request->get('caso', old('caso_id')),
         ]);
     }
 
@@ -93,19 +107,22 @@ class AnexoController extends Controller
     {
         $validated = $request->validate([
             'caso_id' => 'required|integer',
-            'tipo' => 'required|in:archivo_previo,firma_gerente',
+            'tipo' => 'required|in:' . implode(',', array_merge(CasoAnexo::clavesTipo(), [CasoAnexo::TIPO_FIRMA_GERENTE])),
             'archivo' => ['required', 'file', 'max:10240'],
         ]);
 
         $caso = $this->visibleProcesses()->findOrFail($validated['caso_id']);
         $resuelto = CasoAnexo::resolverTipo($validated['tipo']);
+        $esTerminacion = CasoAnexo::requiereEscaneo($resuelto['tipo']);
         $meta = $this->storeFile(
             $request->file('archivo'),
             $caso->id,
-            $resuelto['tipo'] === CasoAnexo::TIPO_FIRMA_GERENTE ? 'tc' : 'ax',
-            CasoAnexo::ALLOWED_EXTENSIONS,
-            CasoAnexo::ALLOWED_MIMES,
-            'Solo se aceptan documentos Word o PDF.'
+            $esTerminacion ? 'tc' : 'ax',
+            $esTerminacion ? CasoAnexo::SCAN_EXTENSIONS : CasoAnexo::ALLOWED_EXTENSIONS,
+            $esTerminacion ? CasoAnexo::SCAN_MIMES : CasoAnexo::ALLOWED_MIMES,
+            $esTerminacion
+                ? 'El escaneo de la terminación firmada debe ser PDF, JPG o PNG.'
+                : 'Solo se aceptan documentos Word o PDF.'
         );
 
         CasoAnexo::create(array_merge($meta, [
@@ -113,38 +130,40 @@ class AnexoController extends Controller
             'user_id' => auth()->id(),
             'tipo' => $resuelto['tipo'],
             'estado' => $resuelto['estado'],
-            'titulo' => $resuelto['titulo'] ?: $meta['nombre_original'],
+            'titulo' => $resuelto['titulo'],
+            'firmado_at' => $esTerminacion ? now() : null,
         ]));
 
-        $mensaje = $resuelto['tipo'] === CasoAnexo::TIPO_FIRMA_GERENTE
-            ? 'Terminación por justas causas lista para imprimir. Cuando el gerente firme, carga el escaneo en la misma fila.'
-            : 'El documento quedó en el expediente.';
+        $slot = CasoDocumentoEstado::slotDe($resuelto['tipo']);
+        $mensaje = $esTerminacion
+            ? 'Se archivó el escaneo firmado en ' . $resuelto['titulo'] . '.'
+            : 'El documento quedó en ' . $resuelto['titulo'] . '.';
 
         return redirect()
-            ->route('abogado.anexos', [
-                'filtro' => $resuelto['tipo'] === CasoAnexo::TIPO_FIRMA_GERENTE ? 'pendiente' : 'existente',
-            ])
+            ->route('abogado.anexos', array_filter([
+                'filtro' => $slot,
+                'caso' => $request->get('caso'),
+            ]))
             ->with('success', $mensaje);
     }
 
-    public function download(Request $request, int $id)
+    public function download(int $id)
     {
         $anexo = $this->accessibleAnexo($id);
-        $version = $request->get('v') === 'firmado' ? 'firmado' : 'original';
-        $relativa = $anexo->rutaDescarga($version);
+        $relativa = $anexo->rutaDescarga();
         abort_unless($relativa, 404);
 
         $ruta = storage_path('app/' . $relativa);
         abort_unless(is_file($ruta), 404);
 
-        return response()->download($ruta, $anexo->nombreDescarga($version));
+        return response()->download($ruta, $anexo->nombreDescarga());
     }
 
     public function firmar(Request $request, int $id)
     {
         $anexo = $this->accessibleAnexo($id);
         abort_unless(
-            $anexo->tipo === CasoAnexo::TIPO_FIRMA_GERENTE,
+            CasoAnexo::requiereEscaneo((string) $anexo->tipo),
             422,
             'Solo la terminación por justas causas recibe el escaneo firmado por gerencia.'
         );
@@ -162,23 +181,36 @@ class AnexoController extends Controller
             'El escaneo firmado debe ser PDF, JPG o PNG.'
         );
 
-        if ($anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura) {
-            Storage::disk('local')->delete($anexo->ruta_firmada);
-        }
+        $anteriores = array_filter([
+            $anexo->ruta_segura,
+            $anexo->ruta_firmada,
+        ]);
 
         $anexo->update([
-            'ruta_firmada' => $meta['ruta_segura'],
-            'nombre_firmado' => $meta['nombre_original'],
-            'extension_firmada' => $meta['extension'],
-            'mime_firmado' => $meta['mime_type'],
-            'tamano_firmado' => $meta['tamano'],
+            'ruta_segura' => $meta['ruta_segura'],
+            'nombre_original' => $meta['nombre_original'],
+            'nombre_almacenado' => $meta['nombre_almacenado'],
+            'extension' => $meta['extension'],
+            'mime_type' => $meta['mime_type'],
+            'tamano' => $meta['tamano'],
+            'ruta_firmada' => null,
+            'nombre_firmado' => null,
+            'extension_firmada' => null,
+            'mime_firmado' => null,
+            'tamano_firmado' => null,
             'estado' => CasoAnexo::ESTADO_FIRMADO,
             'firmado_at' => now(),
         ]);
 
+        foreach ($anteriores as $ruta) {
+            if ($ruta !== $meta['ruta_segura']) {
+                Storage::disk('local')->delete($ruta);
+            }
+        }
+
         return redirect()
             ->route('abogado.anexos', ['filtro' => 'firmado'])
-            ->with('success', 'Se archivó el escaneo firmado. La terminación original se conservó.');
+            ->with('success', 'Se archivó el escaneo firmado. Ese es el documento del expediente.');
     }
 
     public function destroy(int $id)

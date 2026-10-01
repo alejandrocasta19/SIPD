@@ -58,7 +58,13 @@
 .phpword-document-container table { width: 100% !important; height: auto !important; }
 .phpword-document-container textarea.doc-interactive-field { max-width: 100%; box-sizing: border-box; }
 .phpword-document-container textarea.js-inline { height: 2em !important; min-height: 2em !important; overflow: hidden !important; vertical-align: baseline; white-space: nowrap; }
-.phpword-document-container .doc-header-field { font-weight: 700; border-bottom: 1px solid #0f172a; padding: 0 4px; }
+.phpword-document-container .doc-optional-clause,
+.phpword-document-container .doc-optional-bar,
+.phpword-document-container .doc-optional-bar input,
+.phpword-document-container .doc-optional-bar label {
+    pointer-events: auto;
+}
+.phpword-document-container .doc-optional-bar label { cursor: pointer; }
 </style>
 @endsection
 
@@ -132,7 +138,7 @@
         @if(!empty($requiereFirmaGerente))
             <div class="sipd-alert sipd-alert-warning" style="margin:16px 24px 0;">
                 <i class="fas fa-print"></i>
-                <div>Este formato se llena y queda registrado igual que los demás. Después hay que imprimirlo para firma del gerente y subir el escaneo en Anexos escaneados.</div>
+                <div>Este formato se llena y queda registrado igual que los demás. Después hay que imprimirlo para firma del gerente y subir el escaneo en <a href="{{ route('abogado.anexos', ['caso' => $caso->id]) }}">Anexos escaneados</a>.</div>
             </div>
         @endif
         
@@ -176,6 +182,14 @@
     </div>
 </form>
 
+<div class="panel-card" style="margin-top:24px;padding:18px 24px;">
+    <h3 style="margin:0 0 10px;font-size:15px;"><i class="fas fa-file-upload" style="color:var(--c-green);"></i> Anexos del expediente</h3>
+    @include('partials.anexos-expediente', [
+        'anexos' => $caso->anexos,
+        'casoId' => $caso->id,
+    ])
+</div>
+
 <script>
 function autosizeTextareas(root) {
     (root || document).querySelectorAll('textarea.js-autosize, textarea[name^="yellow_blocks_"], textarea[name^="yellow_blocks"]').forEach(function(el) {
@@ -216,6 +230,9 @@ function previewFirma(input) {
 
 document.addEventListener('DOMContentLoaded', function () {
     autosizeTextareas(document);
+    if (typeof window.initSipdOptionalClauses === 'function') {
+        window.initSipdOptionalClauses(document);
+    }
 });
 
 @if(session('autodownload'))

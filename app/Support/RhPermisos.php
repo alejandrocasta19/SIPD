@@ -50,7 +50,7 @@ class RhPermisos
             'cuenta' => [
                 'label' => 'Cuenta',
                 'items' => [
-                    self::EDITAR_PERFIL => 'Editar perfil',
+                    self::EDITAR_PERFIL => 'Editar perfil y contraseña',
                     self::ELIMINAR_NOTIFICACIONES => 'Borrar notificaciones',
                 ],
             ],
@@ -108,7 +108,7 @@ class RhPermisos
     public static function solicitables(): array
     {
         return [
-            self::EDITAR_PERFIL => 'Editar perfil',
+            self::EDITAR_PERFIL => 'Editar perfil y contraseña',
             self::EDITAR_CASOS => 'Editar procesos',
             self::ELIMINAR_CASOS => 'Eliminar procesos',
             self::EDITAR_DOCUMENTOS => 'Generar y editar documentos',

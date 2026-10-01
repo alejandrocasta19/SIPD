@@ -283,6 +283,9 @@
                     <tr>
                         <td>
                             <a class="id" href="{{ route('abogado.detalleproceso', $proceso->id) }}">{{ $codigo($proceso) }}</a>
+                            @if(($proceso->anexos_count ?? 0) > 0)
+                                <span style="display:block;color:#64748b;font-size:12px;margin-top:3px;">{{ $proceso->anexos_count }} anexo{{ $proceso->anexos_count === 1 ? '' : 's' }}</span>
+                            @endif
                         </td>
                         <td class="name">{{ $proceso->nombre }}</td>
                         <td>{{ $proceso->cedula ?: '—' }}</td>
@@ -334,34 +337,6 @@
             </tbody>
         </table>
 
-        @if($procesos->total() > 0)
-            <div class="pager">
-                <div>
-                    {{ $procesos->firstItem() }}-{{ $procesos->lastItem() }} de {{ $procesos->total() }}
-                    · {{ $procesos->perPage() }} por página
-                </div>
-                <div class="pager-pages">
-                    @if($procesos->onFirstPage())
-                        <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">‹</span>
-                    @else
-                        <a href="{{ $procesos->previousPageUrl() }}">‹</a>
-                    @endif
-
-                    @foreach($procesos->getUrlRange(1, $procesos->lastPage()) as $page => $url)
-                        @if($page == $procesos->currentPage())
-                            <span class="current">{{ $page }}</span>
-                        @else
-                            <a href="{{ $url }}">{{ $page }}</a>
-                        @endif
-                    @endforeach
-
-                    @if($procesos->hasMorePages())
-                        <a href="{{ $procesos->nextPageUrl() }}">›</a>
-                    @else
-                        <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">›</span>
-                    @endif
-                </div>
-            </div>
-        @endif
+        @include('partials.paginacion', ['paginador' => $procesos])
     </div>
 @endsection

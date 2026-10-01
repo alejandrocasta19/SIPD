@@ -413,6 +413,19 @@
                     @if($tipoSlot === 'terminacion')
                         <div class="doc-meta" style="margin-top:10px;">Se imprime para firma del gerente y el escaneo se carga en Anexos escaneados.</div>
                     @endif
+                    @php $anexosSlot = $caso->anexos->filter(fn ($anexo) => $anexo->slot() === $slot); @endphp
+                    @if($anexosSlot->isNotEmpty())
+                        <div class="doc-meta" style="margin-top:10px;">
+                            @foreach($anexosSlot as $anexo)
+                                <div style="margin-top:4px;">
+                                    <a href="{{ route('abogado.anexos.download', $anexo->id) }}">{{ $anexo->nombreVisible() }}</a>
+                                    @if($anexo->nombre_original && $anexo->nombre_original !== $anexo->nombreVisible())
+                                        <span> · {{ $anexo->nombre_original }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
                 <div class="doc-card-footer">
                     <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" class="btn-doc btn-edit">
@@ -500,49 +513,12 @@
 
     <div class="ev-section">
         <h3><i class="fas fa-file-upload" style="color:var(--c-green);"></i> Anexos del expediente</h3>
-        <p class="ev-meta" style="margin:-8px 0 16px;">Word o PDF del caso. La firma del gerente solo aplica a la terminación de contrato.</p>
+        <p class="ev-meta" style="margin:-8px 0 16px;">Escaneo firmado por gerencia y documentos de un caso anterior. Se cargan en Anexos escaneados.</p>
 
-        @if($caso->anexos->isEmpty())
-            <div class="ev-empty">
-                <i class="fas fa-inbox" style="font-size:32px;opacity:.3;display:block;margin-bottom:8px;"></i>
-                Aún no hay anexos en este expediente.
-            </div>
-        @else
-            <div class="ev-list">
-                @foreach($caso->anexos as $anexo)
-                    <div class="ev-item">
-                        <div class="ev-item-info">
-                            <div class="ev-icon-placeholder"><i class="fas fa-file-word"></i></div>
-                            <div>
-                                <div class="ev-name">{{ $anexo->titulo ?: $anexo->nombre_original }}</div>
-                                <div class="ev-meta">
-                                    {{ $anexo->etiquetaTipo() }} · {{ $anexo->etiquetaEstado() }}
-                                    · {{ strtoupper($anexo->extension) }} · {{ $anexo->tamanoLegible() }}
-                                    <br>Cargado {{ optional($anexo->created_at)->format('d/m/Y') }} por {{ $anexo->user->name ?? '—' }}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="ev-actions">
-                            <a href="{{ route('abogado.anexos.download', $anexo->id) }}" class="btn-ev btn-ev-download">
-                                <i class="fas fa-download"></i>
-                                {{ $anexo->requiereFirma() ? 'Imprimir' : 'Descargar' }}
-                            </a>
-                            @if($anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura)
-                                <a href="{{ route('abogado.anexos.download', ['id' => $anexo->id, 'v' => 'firmado']) }}" class="btn-ev btn-ev-download">
-                                    <i class="fas fa-file-signature"></i> Firmado
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @endif
-
-        <div class="ev-upload" style="margin-top:16px;">
-            <a href="{{ route('abogado.anexos') }}" class="btn-ev-upload" style="display:inline-flex;text-decoration:none;">
-                <i class="fas fa-upload"></i> Cargar en Anexos escaneados
-            </a>
-        </div>
+        @include('partials.anexos-expediente', [
+            'anexos' => $caso->anexos,
+            'casoId' => $caso->id,
+        ])
     </div>
 
     {{-- LINK VOLVER --}}

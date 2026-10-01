@@ -87,6 +87,7 @@ class ConsultaPublicaTest extends TestCase
             ->assertSee('Carlos Pérez')
             ->assertSee('Proceso disciplinario')
             ->assertSee('En Proceso')
+            ->assertSee('Ver trámite')
             ->assertSee('Línea de tiempo')
             ->assertSee('Apertura')
             ->assertSee('Descargos')

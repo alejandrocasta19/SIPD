@@ -8,7 +8,7 @@
     <div class="proc-head">
         <div>
             <h1>Anexos escaneados</h1>
-            <p>Carga Word o PDF al expediente. Solo la terminación por justas causas pasa por firma del gerente.</p>
+            <p>Elige el formato oficial. El archivo queda en ese espacio del expediente. La terminación entra ya firmada por gerencia.</p>
         </div>
         <div class="proc-head-side">
             <span class="stat-chip">{{ $conteos['todos'] }} total</span>
@@ -62,19 +62,32 @@
     .name { font-weight: 600; color: #0f172a; }
     .hub-sub { display: block; color: #64748b; font-size: 12px; margin-top: 3px; }
     .empty { text-align: center; padding: 40px 16px; color: #94a3b8; }
-    .acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+    .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
     .acts form { margin: 0; }
     .acts .action-btn {
         background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;
-        padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 700;
-        text-decoration: none; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+        padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+        white-space: nowrap; line-height: 1;
     }
-    .acts .action-btn.danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+    .acts .action-btn:hover { background: #e2e8f0; color: #0f172a; }
+    .acts .action-btn.download {
+        background: var(--cth-green);
+        color: #fff;
+        border-color: transparent;
+        padding: 8px 16px;
+        box-shadow: 0 1px 2px rgba(0, 104, 55, .22);
+    }
+    .acts .action-btn.download i { font-size: 12px; }
+    .acts .action-btn.download:hover { filter: brightness(1.08); color: #fff; }
+    .acts .action-btn.danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; padding: 8px 10px; }
     .acts .action-btn.veredicto { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+    table.proc th:last-child,
+    table.proc td:last-child { width: 1%; white-space: nowrap; }
 
     .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #94a3b8; font-size: 13px; border-top: 1px solid #e2e8f0; }
 
-    @media (max-width: 900px) {
+    @media (max-width: 640px) {
         .anexo-grid { grid-template-columns: 1fr; }
         .table-card { overflow-x: auto; }
     }
@@ -85,7 +98,7 @@
 <form class="anexo-upload" id="anexo-upload-form" action="{{ route('abogado.anexos.store') }}" method="POST" enctype="multipart/form-data">
     @csrf
     <h3>Cargar documento</h3>
-    <p>Word o PDF. La firma del gerente aplica únicamente a la terminación por justas causas.</p>
+    <p>Selecciona el documento. Terminación: PDF, JPG o PNG firmado. Los demás: Word o PDF de un caso anterior.</p>
 
     <div class="anexo-grid">
         <div>
@@ -93,17 +106,18 @@
             <select id="anexo-caso" name="caso_id" required>
                 <option value="">Selecciona un proceso…</option>
                 @foreach($casos as $caso)
-                    <option value="{{ $caso->id }}" @if((string) old('caso_id') === (string) $caso->id) selected @endif>
+                    <option value="{{ $caso->id }}" @if((string) old('caso_id', $casoSeleccionado ?? '') === (string) $caso->id) selected @endif>
                         PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }} · {{ $caso->nombre }}
                     </option>
                 @endforeach
             </select>
         </div>
         <div>
-            <label class="field" for="anexo-tipo">Tipo</label>
+            <label class="field" for="anexo-tipo">Documento</label>
             <select id="anexo-tipo" name="tipo" required>
+                <option value="">Selecciona el documento…</option>
                 @foreach(\App\Models\CasoAnexo::tipos() as $valor => $etiqueta)
-                    <option value="{{ $valor }}" @if(old('tipo', 'archivo_previo') === $valor) selected @endif>{{ $etiqueta }}</option>
+                    <option value="{{ $valor }}" @if(old('tipo') === $valor) selected @endif>{{ $etiqueta }}</option>
                 @endforeach
             </select>
         </div>
@@ -118,18 +132,24 @@
 </form>
 
 <div class="chips">
-    <a class="chip {{ $filtro === 'todos' ? 'active' : '' }}" href="{{ route('abogado.anexos') }}">
+    <a class="chip {{ $filtro === 'todos' ? 'active' : '' }}" href="{{ route('abogado.anexos', array_filter(['per_page' => request('per_page'), 'caso' => request('caso')])) }}">
         Todos <span class="n">({{ $conteos['todos'] }})</span>
     </a>
-    <a class="chip {{ $filtro === 'existente' ? 'active' : '' }}" href="{{ route('abogado.anexos', ['filtro' => 'existente']) }}">
-        <i class="fas fa-circle" style="color:#64748b;"></i> Archivo previo <span class="n">({{ $conteos['existente'] }})</span>
+    @foreach(\App\Models\CasoDocumentoEstado::SLOT_LABELS as $slot => $etiqueta)
+        <a class="chip {{ $filtro === $slot ? 'active' : '' }}" href="{{ route('abogado.anexos', array_filter(['filtro' => $slot, 'per_page' => request('per_page'), 'caso' => request('caso')])) }}">
+            {{ $etiqueta }} <span class="n">({{ $conteos[$slot] ?? 0 }})</span>
+        </a>
+    @endforeach
+    @if(($conteos['existente'] ?? 0) > 0 || $filtro === 'existente')
+    <a class="chip {{ $filtro === 'existente' ? 'active' : '' }}" href="{{ route('abogado.anexos', array_filter(['filtro' => 'existente', 'per_page' => request('per_page'), 'caso' => request('caso')])) }}">
+        Archivo previo <span class="n">({{ $conteos['existente'] }})</span>
     </a>
-    <a class="chip {{ $filtro === 'pendiente' ? 'active' : '' }}" href="{{ route('abogado.anexos', ['filtro' => 'pendiente']) }}">
+    @endif
+    @if(($conteos['pendiente'] ?? 0) > 0 || $filtro === 'pendiente')
+    <a class="chip {{ $filtro === 'pendiente' ? 'active' : '' }}" href="{{ route('abogado.anexos', array_filter(['filtro' => 'pendiente', 'per_page' => request('per_page'), 'caso' => request('caso')])) }}">
         <i class="fas fa-circle" style="color:#d97706;"></i> Pendiente firma <span class="n">({{ $conteos['pendiente'] }})</span>
     </a>
-    <a class="chip {{ $filtro === 'firmado' ? 'active' : '' }}" href="{{ route('abogado.anexos', ['filtro' => 'firmado']) }}">
-        <i class="fas fa-circle" style="color:var(--cth-green-bright);"></i> Firmados <span class="n">({{ $conteos['firmado'] }})</span>
-    </a>
+    @endif
 </div>
 
 <form class="toolbar" method="GET" action="{{ route('abogado.anexos') }}">
@@ -148,7 +168,7 @@
             <tr>
                 <th>Proceso</th>
                 <th>Documento</th>
-                <th>Tipo</th>
+                <th>Lugar</th>
                 <th>Estado</th>
                 <th>Cargado</th>
                 <th style="text-align:right;">Acciones</th>
@@ -169,15 +189,15 @@
                     <span class="hub-sub">{{ $anexo->caso->nombre ?? '—' }}</span>
                 </td>
                 <td>
-                    <span class="name">{{ $anexo->titulo ?: $anexo->nombre_original }}</span>
+                    <span class="name">{{ $anexo->nombreVisible() }}</span>
                     <span class="hub-sub">
-                        {{ strtoupper($anexo->extension) }} · {{ $anexo->tamanoLegible() }}
-                        @if($anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura)
-                            · firmado {{ strtoupper($anexo->extension_firmada ?: '') }}
+                        {{ strtoupper($anexo->extensionVigente()) }} · {{ $anexo->tamanoVigente() }}
+                        @if($anexo->nombre_original && $anexo->nombre_original !== $anexo->nombreVisible())
+                            · {{ $anexo->nombre_original }}
                         @endif
                     </span>
                 </td>
-                <td>{{ $anexo->etiquetaTipo() }}</td>
+                <td>{{ $anexo->etiquetaLugar() }}</td>
                 <td>
                     <span class="st"><i class="fas fa-circle {{ $estadoDot }}"></i> {{ $anexo->etiquetaEstado() }}</span>
                     @if($anexo->firmado_at)
@@ -190,10 +210,11 @@
                 </td>
                 <td>
                     <div class="acts">
+                        <a class="action-btn download" href="{{ route('abogado.anexos.download', $anexo->id) }}" title="Descargar archivo">
+                            <i class="fas fa-download"></i>
+                            <span>Descargar</span>
+                        </a>
                         @if($anexo->requiereFirma())
-                            <a class="action-btn" href="{{ route('abogado.anexos.download', $anexo->id) }}">
-                                <i class="fas fa-print"></i> Imprimir
-                            </a>
                             <form action="{{ route('abogado.anexos.firmar', $anexo->id) }}" method="POST" enctype="multipart/form-data">
                                 @csrf
                                 @method('PUT')
@@ -202,23 +223,10 @@
                                     <i class="fas fa-file-signature"></i> Cargar firmado
                                 </label>
                             </form>
-                        @else
-                            @if($anexo->tipo === 'firma_gerente' && $anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura)
-                                <a class="action-btn" href="{{ route('abogado.anexos.download', $anexo->id) }}">
-                                    <i class="fas fa-print"></i> Original
-                                </a>
-                                <a class="action-btn veredicto" href="{{ route('abogado.anexos.download', ['id' => $anexo->id, 'v' => 'firmado']) }}">
-                                    <i class="fas fa-download"></i> Firmado
-                                </a>
-                            @else
-                                <a class="action-btn" href="{{ route('abogado.anexos.download', $anexo->id) }}">
-                                    <i class="fas fa-download"></i> Descargar
-                                </a>
-                            @endif
                         @endif
                         @if(in_array(auth()->user()->role, ['admin','coordinadora'], true) || $anexo->user_id === auth()->id())
                             <form action="{{ route('abogado.anexos.destroy', $anexo->id) }}" method="POST"
-                                  data-confirm="Se eliminará el anexo y, si existe, también el escaneo firmado."
+                                  data-confirm="Se eliminará el anexo del expediente."
                                   data-confirm-title="Eliminar anexo"
                                   data-confirm-ok="Eliminar"
                                   data-confirm-danger="1"
@@ -238,12 +246,7 @@
         @endforelse
         </tbody>
     </table>
-    @if($anexos->hasPages())
-        <div class="pager">
-            <div>{{ $anexos->firstItem() }}-{{ $anexos->lastItem() }} de {{ $anexos->total() }}</div>
-            <div>{{ $anexos->links() }}</div>
-        </div>
-    @endif
+    @include('partials.paginacion', ['paginador' => $anexos])
 </div>
 @endsection
 
@@ -258,18 +261,24 @@
         var file = document.getElementById('anexo-file');
         var cargar = document.getElementById('anexo-cargar');
         var hints = {
-            archivo_previo: 'Word o PDF que ya tienes. Queda archivado en el expediente.',
-            firma_gerente: 'Word o PDF de la terminación por justas causas. Imprimes, el gerente firma y cargas el escaneo en la fila.'
+            disciplinario: 'Word o PDF de 1.1 GA-FT-045 Apertura disciplinaria. Queda en 1. Apertura.',
+            comprobacion: 'Word o PDF de 1.1 GA-FT-045 Apertura de comprobación. Queda en 1. Apertura.',
+            acta: 'Word o PDF del acta de cargos y descargos. Queda en 2. Acta.',
+            sancion: 'Word o PDF de la sanción. Queda en 3. Sanción / llamado / terminación.',
+            llamado: 'Word o PDF del llamado de atención. Queda en 3. Sanción / llamado / terminación.',
+            terminacion: 'PDF, JPG o PNG de la terminación ya firmada por gerencia. Queda en 3. Sanción / llamado / terminación.',
+            archivo: 'Word o PDF de la decisión de archivo. Queda en 4. Decisión de archivo.'
         };
         function syncHint() {
-            hint.textContent = hints[tipo.value] || hints.archivo_previo;
+            hint.textContent = hints[tipo.value] || 'Selecciona el formato oficial para que el archivo quede en ese espacio.';
+            file.accept = tipo.value === 'terminacion' ? '.pdf,.jpg,.jpeg,.png' : '.pdf,.doc,.docx';
         }
         tipo.addEventListener('change', syncHint);
         syncHint();
         cargar.addEventListener('click', function () {
             if (!caso.value || !tipo.value) {
                 if (window.SIPD && SIPD.toast) {
-                    SIPD.toast({ icon: 'warning', text: 'Selecciona el proceso y el tipo.' });
+                    SIPD.toast({ icon: 'warning', text: 'Selecciona el proceso y el documento.' });
                 }
                 return;
             }

@@ -57,26 +57,49 @@ class CasoAnexo extends Model
 
     public static function tipos(): array
     {
-        return [
-            self::TIPO_ARCHIVO_PREVIO => 'Archivo previo',
-            self::TIPO_FIRMA_GERENTE => 'Terminación por justas causas',
-        ];
+        return CasoDocumentoEstado::ETIQUETAS;
+    }
+
+    public static function clavesTipo(): array
+    {
+        return array_keys(self::tipos());
+    }
+
+    public static function normalizarTipo(string $tipo): string
+    {
+        if ($tipo === self::TIPO_FIRMA_GERENTE) {
+            return 'terminacion';
+        }
+
+        return $tipo;
+    }
+
+    public static function requiereEscaneo(string $tipo): bool
+    {
+        return self::normalizarTipo($tipo) === 'terminacion';
+    }
+
+    public static function tiposDelSlot(string $slot): array
+    {
+        $tipos = CasoDocumentoEstado::variantesDe($slot);
+        if ($slot === 'resolucion') {
+            $tipos[] = self::TIPO_FIRMA_GERENTE;
+        }
+
+        return $tipos;
     }
 
     public static function resolverTipo(string $tipo): array
     {
-        if ($tipo === self::TIPO_FIRMA_GERENTE) {
-            return [
-                'tipo' => self::TIPO_FIRMA_GERENTE,
-                'estado' => self::ESTADO_PENDIENTE_FIRMA,
-                'titulo' => 'Terminación por justas causas',
-            ];
-        }
+        $tipo = self::normalizarTipo($tipo);
+        abort_unless(in_array($tipo, self::clavesTipo(), true), 422, 'Selecciona un documento oficial.');
+
+        $esTerminacion = self::requiereEscaneo($tipo);
 
         return [
-            'tipo' => self::TIPO_ARCHIVO_PREVIO,
-            'estado' => self::ESTADO_CARGADO,
-            'titulo' => null,
+            'tipo' => $tipo,
+            'estado' => $esTerminacion ? self::ESTADO_FIRMADO : self::ESTADO_CARGADO,
+            'titulo' => CasoDocumentoEstado::etiqueta($tipo),
         ];
     }
 
@@ -104,7 +127,38 @@ class CasoAnexo extends Model
 
     public function etiquetaTipo(): string
     {
-        return self::tipos()[$this->tipo] ?? 'Archivo previo';
+        $tipo = $this->tipoDocumento();
+        if (isset(self::tipos()[$tipo])) {
+            return self::tipos()[$tipo];
+        }
+
+        return 'Archivo previo';
+    }
+
+    public function nombreVisible(): string
+    {
+        if (isset(self::tipos()[$this->tipoDocumento()])) {
+            return $this->etiquetaTipo();
+        }
+
+        return $this->titulo ?: $this->nombre_original ?: 'Archivo previo';
+    }
+
+    public function etiquetaLugar(): string
+    {
+        $slot = $this->slot();
+
+        return CasoDocumentoEstado::SLOT_LABELS[$slot] ?? 'Archivo previo';
+    }
+
+    public function tipoDocumento(): string
+    {
+        return self::normalizarTipo((string) $this->tipo);
+    }
+
+    public function slot(): ?string
+    {
+        return CasoDocumentoEstado::slotDe($this->tipoDocumento());
     }
 
     public function etiquetaEstado(): string
@@ -120,25 +174,43 @@ class CasoAnexo extends Model
 
     public function requiereFirma(): bool
     {
-        return $this->tipo === self::TIPO_FIRMA_GERENTE
+        return self::requiereEscaneo((string) $this->tipo)
             && $this->estado === self::ESTADO_PENDIENTE_FIRMA;
     }
 
-    public function rutaDescarga(string $version = 'original'): ?string
+    public function rutaDescarga(): ?string
     {
-        if ($version === 'firmado') {
-            return $this->ruta_firmada ?: ($this->estado === self::ESTADO_FIRMADO ? $this->ruta_segura : null);
+        if ($this->estado === self::ESTADO_FIRMADO && $this->ruta_firmada) {
+            return $this->ruta_firmada;
         }
 
         return $this->ruta_segura;
     }
 
-    public function nombreDescarga(string $version = 'original'): string
+    public function nombreDescarga(): string
     {
-        if ($version === 'firmado') {
-            return $this->nombre_firmado ?: $this->nombre_original;
+        if ($this->estado === self::ESTADO_FIRMADO && $this->nombre_firmado) {
+            return $this->nombre_firmado;
         }
 
-        return $this->nombre_original;
+        return (string) $this->nombre_original;
+    }
+
+    public function extensionVigente(): string
+    {
+        if ($this->estado === self::ESTADO_FIRMADO && $this->extension_firmada) {
+            return $this->extension_firmada;
+        }
+
+        return (string) $this->extension;
+    }
+
+    public function tamanoVigente(): string
+    {
+        $bytes = $this->estado === self::ESTADO_FIRMADO && $this->tamano_firmado
+            ? (int) $this->tamano_firmado
+            : (int) $this->tamano;
+
+        return $this->tamanoLegible($bytes);
     }
 }

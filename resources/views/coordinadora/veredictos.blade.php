@@ -81,11 +81,6 @@
             <div class="empty">No hay casos esperando veredicto.</div>
         @endforelse
 
-        @if($procesos->hasPages())
-            <div class="pager">
-                <span>{{ $procesos->firstItem() }}-{{ $procesos->lastItem() }} de {{ $procesos->total() }}</span>
-                <span>{{ $procesos->links() }}</span>
-            </div>
-        @endif
+        @include('partials.paginacion', ['paginador' => $procesos])
     </div>
 @endsection

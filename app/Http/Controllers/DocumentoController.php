@@ -6,9 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use App\Models\ProcesoDisciplinario;
-use App\Models\CasoAnexo;
 use App\Models\CasoEvidencia;
 use App\Models\CasoDocumentoEstado;
+use App\Support\Paginacion;
 use App\Services\OfficialDocumentService;
 use Throwable;
 
@@ -64,7 +64,7 @@ class DocumentoController extends Controller
      */
     public function hub(Request $request)
     {
-        $query = $this->visibleProcesses()->with(['documentoEstados', 'user']);
+        $query = $this->visibleProcesses()->with(['documentoEstados', 'user'])->withCount('anexos');
         
         if ($request->filled('q')) {
             $q = $request->q;
@@ -80,8 +80,7 @@ class DocumentoController extends Controller
             });
         }
 
-        $casos = $query->latest()->paginate(15);
-        $casos->withQueryString();
+        $casos = Paginacion::deQuery($query->latest());
 
         return view('documents.hub', [
             'pageTitle' => 'Autos y Actas',
@@ -171,6 +170,11 @@ class DocumentoController extends Controller
 
         $data = $caso->datos_oficiales ?: [];
         $data['yellow_blocks'][$tipo] = $bloques;
+        if ($tipo === 'sancion') {
+            $data['optional_clauses'][$tipo]['descargos_fuera_de_termino'] = OfficialDocumentService::normalizeClauseMode(
+                $request->input('optional_clauses.sancion.descargos_fuera_de_termino')
+            );
+        }
         $caso->update(['datos_oficiales' => $data]);
 
         $allFilled = collect($bloques)->every(fn ($v) => trim((string) $v) !== '');
@@ -268,12 +272,6 @@ class DocumentoController extends Controller
                 'estado'      => 'generado',
                 'generado_en' => now(),
             ]);
-
-            if ($tipo === 'terminacion') {
-                $copia = $documents->materializeDocx($caso, $tipo);
-                $this->registrarAnexoTerminacion($caso, $copia);
-                @unlink($copia);
-            }
 
             return $response;
         } catch (ValidationException $e) {
@@ -400,37 +398,6 @@ class DocumentoController extends Controller
         return redirect()->route('documentos.edit', [$id, $tipo]);
     }
 
-    private function registrarAnexoTerminacion(ProcesoDisciplinario $caso, string $docxPath): void
-    {
-        $existe = $caso->anexos()
-            ->where('tipo', CasoAnexo::TIPO_FIRMA_GERENTE)
-            ->exists();
-        if ($existe || !is_file($docxPath)) {
-            return;
-        }
-
-        $nombre = 'tc_' . $caso->id . '_' . uniqid() . '.docx';
-        $relativa = 'anexos/' . $caso->id . '/' . $nombre;
-        Storage::disk('local')->put($relativa, file_get_contents($docxPath));
-
-        CasoAnexo::create([
-            'caso_id' => $caso->id,
-            'user_id' => auth()->id(),
-            'tipo' => CasoAnexo::TIPO_FIRMA_GERENTE,
-            'estado' => CasoAnexo::ESTADO_PENDIENTE_FIRMA,
-            'titulo' => 'Terminación por justas causas',
-            'nombre_original' => 'terminacion-por-justas-causas.docx',
-            'nombre_almacenado' => $nombre,
-            'extension' => 'docx',
-            'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'tamano' => filesize($docxPath) ?: 0,
-            'ruta_segura' => $relativa,
-        ]);
-    }
-
-    /**
-     * Lee únicamente los bloques del documento que se está diligenciando.
-     */
     private function bloquesDesdeRequest(Request $request, string $tipo, int $esperados): array
     {
         $bloques = $request->input('yellow_blocks');

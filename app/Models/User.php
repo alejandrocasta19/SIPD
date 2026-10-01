@@ -69,6 +69,14 @@ class User extends Authenticatable
         return $this->cargo ?: 'Equipo de RH';
     }
 
+    public function primerNombre(): string
+    {
+        $partes = preg_split('/\s+/', trim((string) $this->name)) ?: [];
+        $primero = $partes[0] ?? (string) $this->name;
+
+        return mb_convert_case(mb_strtolower($primero), MB_CASE_TITLE, 'UTF-8');
+    }
+
     public function permisos()
     {
         return $this->hasMany(UserPermiso::class);

@@ -100,9 +100,7 @@
                 · {{ optional($item->responded_at)->format('d/m H:i') }}
             </div>
         @endforeach
-        @if($historial->hasPages())
-            <div style="margin-top:12px;">{{ $historial->links() }}</div>
-        @endif
+        @include('partials.paginacion', ['paginador' => $historial])
     @endif
 @endsection
 

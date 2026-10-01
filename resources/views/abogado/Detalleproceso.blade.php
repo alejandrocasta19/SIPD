@@ -144,6 +144,19 @@
                                                 <i class="fas fa-file-pdf mr-1"></i> PDF
                                             </a>
                                         </div>
+                                        @php $anexosSlot = $proceso->anexos->filter(fn ($anexo) => $anexo->slot() === $slot); @endphp
+                                        @if($anexosSlot->isNotEmpty())
+                                            <div class="text-left mt-3">
+                                                @foreach($anexosSlot as $anexo)
+                                                    <div class="small mb-1">
+                                                        <a href="{{ route('abogado.anexos.download', $anexo->id) }}">{{ $anexo->nombreVisible() }}</a>
+                                                        @if($anexo->nombre_original && $anexo->nombre_original !== $anexo->nombreVisible())
+                                                            <span class="d-block text-muted">{{ $anexo->nombre_original }}</span>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -414,28 +427,10 @@
                             <h4><i class="fas fa-file-upload"></i> Anexos del expediente</h4>
                         </div>
                         <div class="info-content">
-                            @if($proceso->anexos && $proceso->anexos->count() > 0)
-                                @foreach($proceso->anexos as $anexo)
-                                    <p class="mb-2">
-                                        <a href="{{ route('abogado.anexos.download', $anexo->id) }}">
-                                            <i class="fas fa-paperclip"></i>
-                                            {{ $anexo->titulo ?: $anexo->nombre_original }}
-                                        </a>
-                                        <span class="hub-sub" style="display:inline;margin-left:6px;">
-                                            {{ $anexo->etiquetaTipo() }} · {{ $anexo->etiquetaEstado() }}
-                                            · {{ strtoupper($anexo->extension) }}
-                                        </span>
-                                        @if($anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura)
-                                            · <a href="{{ route('abogado.anexos.download', ['id' => $anexo->id, 'v' => 'firmado']) }}">Firmado</a>
-                                        @endif
-                                    </p>
-                                @endforeach
-                            @else
-                                <p>Aún no hay anexos Word o PDF en este expediente.</p>
-                            @endif
-                            <p class="mb-0">
-                                <a href="{{ route('abogado.anexos') }}">Ir a Anexos escaneados</a>
-                            </p>
+                            @include('partials.anexos-expediente', [
+                                'anexos' => $proceso->anexos,
+                                'casoId' => $proceso->id,
+                            ])
                         </div>
                     </div>
 

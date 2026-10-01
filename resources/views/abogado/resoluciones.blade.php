@@ -124,31 +124,6 @@
             </tbody>
         </table>
 
-        @if($resoluciones->total() > 0)
-            <div class="pager">
-                <div>
-                    {{ $resoluciones->firstItem() }}-{{ $resoluciones->lastItem() }} de {{ $resoluciones->total() }} · {{ $resoluciones->perPage() }} por página
-                </div>
-                <div class="pager-pages">
-                    @if($resoluciones->onFirstPage())
-                        <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">‹</span>
-                    @else
-                        <a href="{{ $resoluciones->previousPageUrl() }}">‹</a>
-                    @endif
-                    @foreach($resoluciones->getUrlRange(1, $resoluciones->lastPage()) as $p => $url)
-                        @if($p == $resoluciones->currentPage())
-                            <span class="current">{{ $p }}</span>
-                        @else
-                            <a href="{{ $url }}">{{ $p }}</a>
-                        @endif
-                    @endforeach
-                    @if($resoluciones->hasMorePages())
-                        <a href="{{ $resoluciones->nextPageUrl() }}">›</a>
-                    @else
-                        <span class="current" style="background:#fff;color:#cbd5e1;border-color:#e2e8f0;">›</span>
-                    @endif
-                </div>
-            </div>
-        @endif
+        @include('partials.paginacion', ['paginador' => $resoluciones])
     </div>
 @endsection

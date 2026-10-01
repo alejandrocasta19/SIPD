@@ -61,14 +61,17 @@ class AnexoTest extends TestCase
             ->get(route('abogado.anexos'))
             ->assertOk()
             ->assertSee('Anexos escaneados')
-            ->assertSee('Terminación por justas causas')
+            ->assertSee('5. Terminación por justas causas')
+            ->assertSee('1.1 GA-FT-045')
+            ->assertSee('2. Acta de cargos y descargos')
+            ->assertSee('Decisión de archivo')
             ->assertDontSee('Hay que firmarlo')
             ->assertDontSee('Título (opcional)')
             ->assertDontSee('Partes involucradas');
     }
 
     /** @test */
-    public function abogado_carga_archivo_previo_en_su_caso()
+    public function abogado_carga_un_formato_oficial_en_su_caso()
     {
         Storage::fake('local');
         $user = $this->makeUser();
@@ -77,16 +80,16 @@ class AnexoTest extends TestCase
         $this->actingAs($user)
             ->post(route('abogado.anexos.store'), [
                 'caso_id' => $caso->id,
-                'tipo' => 'archivo_previo',
+                'tipo' => 'acta',
                 'archivo' => $this->word('oficio.docx'),
             ])
             ->assertRedirect();
 
         $this->assertDatabaseHas('caso_anexos', [
             'caso_id' => $caso->id,
-            'tipo' => 'archivo_previo',
+            'tipo' => 'acta',
             'estado' => 'cargado',
-            'titulo' => 'oficio.docx',
+            'titulo' => '2. Acta de cargos y descargos (grabación)',
         ]);
     }
 
@@ -100,7 +103,7 @@ class AnexoTest extends TestCase
         $this->actingAs($user)
             ->post(route('abogado.anexos.store'), [
                 'caso_id' => $caso->id,
-                'tipo' => 'archivo_previo',
+                'tipo' => 'acta',
                 'archivo' => $this->word('oficio.docx'),
             ]);
 
@@ -109,17 +112,32 @@ class AnexoTest extends TestCase
             ->assertOk()
             ->assertSee('Anexos del expediente')
             ->assertSee('oficio.docx')
-            ->assertSee('Archivo previo');
+            ->assertSee('2. Acta de cargos y descargos (grabación)');
 
         $this->actingAs($user)
             ->get(route('documentos.index', $caso->id))
             ->assertOk()
             ->assertSee('Anexos del expediente')
             ->assertSee('oficio.docx');
+
+        $this->actingAs($user)
+            ->get(route('documentos.edit', [$caso->id, 'disciplinario']))
+            ->assertOk()
+            ->assertSee('oficio.docx');
+
+        $this->actingAs($user)
+            ->get(route('abogado.consultarproceso'))
+            ->assertOk()
+            ->assertSee('1 anexo');
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee('1 anexo');
     }
 
     /** @test */
-    public function terminacion_de_contrato_conserva_el_original_al_cargar_el_escaneo()
+    public function terminacion_se_carga_ya_firmada()
     {
         Storage::fake('local');
         $user = $this->makeUser();
@@ -128,29 +146,41 @@ class AnexoTest extends TestCase
         $this->actingAs($user)
             ->post(route('abogado.anexos.store'), [
                 'caso_id' => $caso->id,
-                'tipo' => 'firma_gerente',
+                'tipo' => 'terminacion',
                 'archivo' => $this->word('terminacion.docx'),
+            ])
+            ->assertStatus(422);
+
+        $this->actingAs($user)
+            ->post(route('abogado.anexos.store'), [
+                'caso_id' => $caso->id,
+                'tipo' => 'terminacion',
+                'archivo' => $this->pdf('terminacion-firmada.pdf', 90),
             ])
             ->assertRedirect();
 
         $anexo = CasoAnexo::first();
-        $this->assertSame('pendiente_firma', $anexo->estado);
-        $this->assertSame('Terminación por justas causas', $anexo->titulo);
-        $original = $anexo->ruta_segura;
+        $this->assertSame('firmado', $anexo->estado);
+        $this->assertSame('terminacion', $anexo->tipo);
+        $this->assertSame('5. Terminación por justas causas', $anexo->titulo);
+        $this->assertSame('terminacion-firmada.pdf', $anexo->nombre_original);
+        $this->assertNull($anexo->ruta_firmada);
+        $this->assertNotNull($anexo->firmado_at);
+        Storage::disk('local')->assertExists($anexo->ruta_segura);
 
         $this->actingAs($user)
-            ->put(route('abogado.anexos.firmar', $anexo->id), [
-                'archivo' => $this->pdf('firmado.pdf', 90),
-            ])
-            ->assertRedirect();
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('5. Terminación por justas causas')
+            ->assertSee('terminacion-firmada.pdf');
 
-        $anexo = $anexo->fresh();
-        $this->assertSame('firmado', $anexo->estado);
-        $this->assertSame($original, $anexo->ruta_segura);
-        $this->assertNotNull($anexo->ruta_firmada);
-        $this->assertNotSame($original, $anexo->ruta_firmada);
-        Storage::disk('local')->assertExists($original);
-        Storage::disk('local')->assertExists($anexo->ruta_firmada);
+        $this->actingAs($user)
+            ->get(route('abogado.anexos', ['filtro' => 'resolucion']))
+            ->assertOk()
+            ->assertSee('Descargar')
+            ->assertDontSee('Original')
+            ->assertDontSee('Imprimir')
+            ->assertDontSee('Cargar firmado');
     }
 
     /** @test */
@@ -163,7 +193,7 @@ class AnexoTest extends TestCase
         $this->actingAs($user)
             ->post(route('abogado.anexos.store'), [
                 'caso_id' => $caso->id,
-                'tipo' => 'archivo_previo',
+                'tipo' => 'acta',
                 'archivo' => $this->pdf('oficio.pdf'),
             ]);
 
@@ -186,7 +216,7 @@ class AnexoTest extends TestCase
         $this->actingAs($abogado)
             ->post(route('abogado.anexos.store'), [
                 'caso_id' => $caso->id,
-                'tipo' => 'archivo_previo',
+                'tipo' => 'acta',
                 'archivo' => $this->pdf('secreto.pdf'),
             ])
             ->assertStatus(404);
@@ -202,7 +232,7 @@ class AnexoTest extends TestCase
         $this->actingAs($user)
             ->post(route('abogado.anexos.store'), [
                 'caso_id' => $caso->id,
-                'tipo' => 'archivo_previo',
+                'tipo' => 'acta',
                 'archivo' => $this->word('oficio.docx'),
             ]);
 
@@ -218,11 +248,13 @@ class AnexoTest extends TestCase
         $this->actingAs($user)
             ->get(route('abogado.reportes'))
             ->assertOk()
-            ->assertSee('Pendiente firma')
+            ->assertSee('Archivo previo')
+            ->assertSee('Firmados')
             ->assertSee('Anexos')
             ->assertSee('Cargo del trabajador')
             ->assertSee('Tipo de falta')
-            ->assertSee('Ver más')
+            ->assertSee('Ampliar vista')
+            ->assertDontSee('Pendiente firma')
             ->assertDontSee('Por estado')
             ->assertDontSee('Faltas activas');
 

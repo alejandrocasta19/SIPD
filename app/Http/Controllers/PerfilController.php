@@ -56,6 +56,12 @@ class PerfilController extends Controller
 
     public function password()
     {
+        $user = auth()->user();
+        if (!$user->esCoordinadora() && !$user->puede('editar_perfil')) {
+            return back()
+                ->with('error', 'Pide permiso a la coordinadora para cambiar tu contraseña.');
+        }
+
         return redirect()
             ->back()
             ->with('open_password', true);
@@ -63,9 +69,20 @@ class PerfilController extends Controller
 
     public function updatePassword(Request $request)
     {
+        $user = auth()->user();
+        if (!$user->esCoordinadora() && !$user->puede('editar_perfil')) {
+            return back()
+                ->with('error', 'Pide permiso a la coordinadora para cambiar tu contraseña.');
+        }
+
         $validator = Validator::make($request->all(), [
             'current_password' => ['required'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ], [
+            'current_password.required' => 'Indica tu contraseña actual.',
+            'password.required' => 'Indica la nueva contraseña.',
+            'password.min' => 'La nueva contraseña debe tener al menos :min caracteres.',
+            'password.confirmed' => 'La confirmación de la contraseña no coincide.',
         ]);
 
         if ($validator->fails()) {
@@ -74,8 +91,6 @@ class PerfilController extends Controller
                 ->withErrors($validator)
                 ->withInput();
         }
-
-        $user = auth()->user();
 
         if (!Hash::check($request->current_password, $user->password)) {
             return back()
