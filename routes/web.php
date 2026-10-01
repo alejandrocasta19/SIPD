@@ -151,6 +151,10 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
         [AnexoController::class, 'firmar']
     )->name('abogado.anexos.firmar');
 
+    Route::put('/abogado/anexos/{id}',
+        [AnexoController::class, 'update']
+    )->name('abogado.anexos.update');
+
     Route::delete('/abogado/anexos/{id}',
         [AnexoController::class, 'destroy']
     )->name('abogado.anexos.destroy');

@@ -180,6 +180,8 @@ class AnexoTest extends TestCase
             ->get(route('abogado.anexos', ['filtro' => 'resolucion']))
             ->assertOk()
             ->assertSee('Descargar')
+            ->assertSee('Editar')
+            ->assertSee('Eliminar')
             ->assertDontSee('Original')
             ->assertDontSee('Imprimir')
             ->assertDontSee('Cargar firmado');
@@ -222,6 +224,133 @@ class AnexoTest extends TestCase
                 'archivo' => $this->pdf('secreto.pdf'),
             ])
             ->assertStatus(404);
+    }
+
+    /** @test */
+    public function rh_ve_editar_eliminar_y_descargar_y_pide_permiso_si_no_los_tiene()
+    {
+        Storage::fake('local');
+        $rh = $this->makeUser();
+        $coord = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($rh);
+
+        $this->actingAs($coord)
+            ->post(route('abogado.anexos.store'), [
+                'caso_id' => $caso->id,
+                'tipo' => 'acta',
+                'archivo' => $this->word('acta-coord.docx'),
+            ]);
+
+        $this->actingAs($rh)
+            ->get(route('abogado.anexos'))
+            ->assertOk()
+            ->assertSee('Editar')
+            ->assertSee('Eliminar')
+            ->assertSee('Descargar')
+            ->assertSee("SIPD_abrirPermiso('editar_anexos')", false)
+            ->assertSee("SIPD_abrirPermiso('eliminar_anexos')", false)
+            ->assertSee("SIPD_abrirPermiso('descargar_anexos')", false)
+            ->assertDontSee('<h3>Editar anexo</h3>', false);
+
+        $rh->otorgarPermiso('editar_anexos', null);
+        $rh->otorgarPermiso('eliminar_anexos', null);
+        $rh->otorgarPermiso('descargar_anexos', null);
+
+        $this->actingAs($rh)
+            ->get(route('abogado.anexos'))
+            ->assertOk()
+            ->assertSee('anexo-editar')
+            ->assertSee('Editar anexo')
+            ->assertSee(route('abogado.anexos.download', CasoAnexo::first()->id), false)
+            ->assertDontSee("SIPD_abrirPermiso('editar_anexos')", false);
+    }
+
+    /** @test */
+    public function rh_sin_permiso_no_edita_ni_borra_anexo()
+    {
+        Storage::fake('local');
+        $rh = $this->makeUser();
+        $coord = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($rh);
+
+        $this->actingAs($coord)
+            ->post(route('abogado.anexos.store'), [
+                'caso_id' => $caso->id,
+                'tipo' => 'acta',
+                'archivo' => $this->word('acta-coord.docx'),
+            ]);
+
+        $anexo = CasoAnexo::first();
+
+        $this->actingAs($rh)
+            ->put(route('abogado.anexos.update', $anexo->id), [
+                'tipo' => 'sancion',
+            ])
+            ->assertRedirect(route('abogado.dashboard'));
+
+        $this->actingAs($rh)
+            ->delete(route('abogado.anexos.destroy', $anexo->id))
+            ->assertRedirect(route('abogado.dashboard'));
+
+        $this->assertDatabaseHas('caso_anexos', ['id' => $anexo->id, 'tipo' => 'acta']);
+    }
+
+    /** @test */
+    public function rh_edita_tipo_y_archivo_de_anexo_de_su_caso()
+    {
+        Storage::fake('local');
+        $rh = $this->makeUser();
+        $coord = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($rh);
+
+        $this->actingAs($coord)
+            ->post(route('abogado.anexos.store'), [
+                'caso_id' => $caso->id,
+                'tipo' => 'acta',
+                'archivo' => $this->word('acta-coord.docx'),
+            ]);
+
+        $anexo = CasoAnexo::first();
+        $rutaVieja = $anexo->ruta_segura;
+        $rh->otorgarPermiso('editar_anexos', null);
+
+        $this->actingAs($rh)
+            ->put(route('abogado.anexos.update', $anexo->id), [
+                'tipo' => 'sancion',
+                'archivo' => $this->pdf('sancion.pdf'),
+            ])
+            ->assertRedirect();
+
+        $anexo->refresh();
+        $this->assertSame('sancion', $anexo->tipo);
+        $this->assertSame('sancion.pdf', $anexo->nombre_original);
+        Storage::disk('local')->assertMissing($rutaVieja);
+        Storage::disk('local')->assertExists($anexo->ruta_segura);
+    }
+
+    /** @test */
+    public function rh_con_permiso_elimina_anexo_de_su_caso()
+    {
+        Storage::fake('local');
+        $rh = $this->makeUser();
+        $coord = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($rh);
+
+        $this->actingAs($coord)
+            ->post(route('abogado.anexos.store'), [
+                'caso_id' => $caso->id,
+                'tipo' => 'acta',
+                'archivo' => $this->word('acta-coord.docx'),
+            ]);
+
+        $anexo = CasoAnexo::first();
+        $rh->otorgarPermiso('eliminar_anexos', null);
+
+        $this->actingAs($rh)
+            ->delete(route('abogado.anexos.destroy', $anexo->id))
+            ->assertRedirect(route('abogado.anexos'));
+
+        $this->assertDatabaseMissing('caso_anexos', ['id' => $anexo->id]);
     }
 
     /** @test */

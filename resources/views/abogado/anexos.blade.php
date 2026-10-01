@@ -80,10 +80,11 @@
     }
     .acts .action-btn.download i { font-size: 12px; }
     .acts .action-btn.download:hover { filter: brightness(1.08); color: #fff; }
-    .acts .action-btn.danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; padding: 8px 10px; }
+    .acts .action-btn.danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
     .acts .action-btn.veredicto { background: #2563eb; color: #fff; border-color: #1d4ed8; }
     table.proc th:last-child,
     table.proc td:last-child { width: 1%; white-space: nowrap; }
+    #modalEditarAnexo .sipd-dialog { max-width: 480px; }
 
     .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #94a3b8; font-size: 13px; border-top: 1px solid var(--cth-line); }
 
@@ -209,12 +210,25 @@
                     <span class="hub-sub">{{ $anexo->user->name ?? '—' }}</span>
                 </td>
                 <td>
+                    @php
+                        $esDuenioCaso = (int) optional($anexo->caso)->user_id === (int) auth()->id();
+                        $puedeEditar = auth()->user()->puede('editar_anexos');
+                        $puedeDescargar = auth()->user()->puede('descargar_anexos');
+                        $puedeBorrarEste = auth()->user()->esCoordinadora()
+                            || (auth()->user()->puede('eliminar_anexos') && ($anexo->user_id === auth()->id() || $esDuenioCaso));
+                    @endphp
                     <div class="acts">
-                        @if(auth()->user()->puede('descargar_anexos'))
-                        <a class="action-btn download" href="{{ route('abogado.anexos.download', $anexo->id) }}" title="Descargar archivo">
-                            <i class="fas fa-download"></i>
-                            <span>Descargar</span>
-                        </a>
+                        @if($puedeEditar)
+                            <button type="button" class="action-btn anexo-editar"
+                                data-action="{{ route('abogado.anexos.update', $anexo->id) }}"
+                                data-tipo="{{ $anexo->tipoDocumento() }}"
+                                data-titulo="{{ $anexo->nombreVisible() }}">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                        @else
+                            <button type="button" class="action-btn" onclick="SIPD_abrirPermiso('editar_anexos')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
                         @endif
                         @if($anexo->requiereFirma() && auth()->user()->puede('subir_anexos'))
                             <form action="{{ route('abogado.anexos.firmar', $anexo->id) }}" method="POST" enctype="multipart/form-data">
@@ -226,7 +240,7 @@
                                 </label>
                             </form>
                         @endif
-                        @if(auth()->user()->puede('eliminar_anexos') && (auth()->user()->esCoordinadora() || $anexo->user_id === auth()->id()))
+                        @if($puedeBorrarEste)
                             <form action="{{ route('abogado.anexos.destroy', $anexo->id) }}" method="POST"
                                   data-confirm="Se eliminará el anexo del expediente."
                                   data-confirm-title="Eliminar anexo"
@@ -235,8 +249,25 @@
                                   data-confirm-icon="warning">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="action-btn danger" title="Eliminar"><i class="far fa-trash-alt"></i></button>
+                                <button type="submit" class="action-btn danger">
+                                    <i class="far fa-trash-alt"></i> Eliminar
+                                </button>
                             </form>
+                        @else
+                            <button type="button" class="action-btn danger" onclick="SIPD_abrirPermiso('eliminar_anexos')">
+                                <i class="far fa-trash-alt"></i> Eliminar
+                            </button>
+                        @endif
+                        @if($puedeDescargar)
+                        <a class="action-btn download" href="{{ route('abogado.anexos.download', $anexo->id) }}" title="Descargar archivo">
+                            <i class="fas fa-download"></i>
+                            <span>Descargar</span>
+                        </a>
+                        @else
+                        <button type="button" class="action-btn download" onclick="SIPD_abrirPermiso('descargar_anexos')">
+                            <i class="fas fa-download"></i>
+                            <span>Descargar</span>
+                        </button>
                         @endif
                     </div>
                 </td>
@@ -250,18 +281,37 @@
     </table>
     @include('partials.paginacion', ['paginador' => $anexos])
 </div>
+
+@if(auth()->user()->puede('editar_anexos'))
+<div class="sipd-dialog-bg" id="modalEditarAnexo">
+    <div class="sipd-dialog">
+        <h3>Editar anexo</h3>
+        <p class="sipd-dialog-lead" id="edit-anexo-lead">Cambia el documento o reemplaza el archivo.</p>
+        <form id="formEditarAnexo" method="POST" enctype="multipart/form-data">
+            @csrf
+            @method('PUT')
+            <label for="edit-anexo-tipo">Documento</label>
+            <select id="edit-anexo-tipo" name="tipo" required>
+                @foreach(\App\Models\CasoAnexo::tipos() as $valor => $etiqueta)
+                    <option value="{{ $valor }}">{{ $etiqueta }}</option>
+                @endforeach
+            </select>
+            <label for="edit-anexo-file">Reemplazar archivo (opcional)</label>
+            <input id="edit-anexo-file" type="file" name="archivo" accept=".pdf,.doc,.docx">
+            <p class="hint" id="edit-anexo-hint"></p>
+            <div class="sipd-dialog-actions">
+                <button type="button" class="btn-ghost" id="edit-anexo-cerrar">Cancelar</button>
+                <button type="submit" class="btn-ok">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 @endsection
 
 @section('scripts')
 <script>
     (function () {
-        var form = document.getElementById('anexo-upload-form');
-        if (!form) return;
-        var hint = document.getElementById('anexo-hint');
-        var tipo = document.getElementById('anexo-tipo');
-        var caso = document.getElementById('anexo-caso');
-        var file = document.getElementById('anexo-file');
-        var cargar = document.getElementById('anexo-cargar');
         var hints = {
             disciplinario: 'Word o PDF de 1.1 GA-FT-045 Apertura disciplinaria. Queda en 1. Apertura.',
             comprobacion: 'Word o PDF de 1.1 GA-FT-045 Apertura de comprobación. Queda en 1. Apertura.',
@@ -271,25 +321,73 @@
             terminacion: 'PDF, JPG o PNG de la terminación ya firmada por gerencia. Queda en 3. Sanción / llamado / terminación.',
             archivo: 'Word o PDF de la decisión de archivo. Queda en 4. Decisión de archivo.'
         };
-        function syncHint() {
-            hint.textContent = hints[tipo.value] || 'Selecciona el formato oficial para que el archivo quede en ese espacio.';
-            file.accept = tipo.value === 'terminacion' ? '.pdf,.jpg,.jpeg,.png' : '.pdf,.doc,.docx';
-        }
-        tipo.addEventListener('change', syncHint);
-        syncHint();
-        cargar.addEventListener('click', function () {
-            if (!caso.value || !tipo.value) {
-                if (window.SIPD && SIPD.toast) {
-                    SIPD.toast({ icon: 'warning', text: 'Selecciona el proceso y el documento.' });
+        var acceptOf = function (tipo) {
+            return tipo === 'terminacion' ? '.pdf,.jpg,.jpeg,.png' : '.pdf,.doc,.docx';
+        };
+
+        var form = document.getElementById('anexo-upload-form');
+        if (form) {
+            var hint = document.getElementById('anexo-hint');
+            var tipo = document.getElementById('anexo-tipo');
+            var caso = document.getElementById('anexo-caso');
+            var file = document.getElementById('anexo-file');
+            var cargar = document.getElementById('anexo-cargar');
+            function syncHint() {
+                hint.textContent = hints[tipo.value] || 'Selecciona el formato oficial para que el archivo quede en ese espacio.';
+                file.accept = acceptOf(tipo.value);
+            }
+            tipo.addEventListener('change', syncHint);
+            syncHint();
+            cargar.addEventListener('click', function () {
+                if (!caso.value || !tipo.value) {
+                    if (window.SIPD && SIPD.toast) {
+                        SIPD.toast({ icon: 'warning', text: 'Selecciona el proceso y el documento.' });
+                    }
+                    return;
                 }
-                return;
-            }
-            file.click();
+                file.click();
+            });
+            file.addEventListener('change', function () {
+                if (file.files && file.files.length) {
+                    form.submit();
+                }
+            });
+        }
+
+        var modal = document.getElementById('modalEditarAnexo');
+        var formEdit = document.getElementById('formEditarAnexo');
+        if (!modal || !formEdit) return;
+        var tipoEdit = document.getElementById('edit-anexo-tipo');
+        var fileEdit = document.getElementById('edit-anexo-file');
+        var hintEdit = document.getElementById('edit-anexo-hint');
+        var leadEdit = document.getElementById('edit-anexo-lead');
+
+        function syncEditHint() {
+            hintEdit.textContent = hints[tipoEdit.value] || 'Si no eliges archivo, se conserva el actual.';
+            fileEdit.accept = acceptOf(tipoEdit.value);
+        }
+
+        function cerrarEdit() {
+            modal.style.display = 'none';
+            fileEdit.value = '';
+        }
+
+        function abrirEdit(btn) {
+            formEdit.action = btn.getAttribute('data-action');
+            tipoEdit.value = btn.getAttribute('data-tipo') || '';
+            leadEdit.textContent = btn.getAttribute('data-titulo') || 'Cambia el documento o reemplaza el archivo.';
+            fileEdit.value = '';
+            syncEditHint();
+            modal.style.display = 'flex';
+        }
+
+        tipoEdit.addEventListener('change', syncEditHint);
+        document.querySelectorAll('.anexo-editar').forEach(function (btn) {
+            btn.addEventListener('click', function () { abrirEdit(this); });
         });
-        file.addEventListener('change', function () {
-            if (file.files && file.files.length) {
-                form.submit();
-            }
+        document.getElementById('edit-anexo-cerrar').addEventListener('click', cerrarEdit);
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) cerrarEdit();
         });
     })();
 </script>

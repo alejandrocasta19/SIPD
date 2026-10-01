@@ -162,7 +162,9 @@
 
     .st i { font-size: 8px; }
 
-    .acts { display: flex; gap: 8px; }
+    table.proc th.col-acts,
+    table.proc td.col-acts { text-align: center; }
+    .acts { display: flex; gap: 8px; justify-content: center; }
     .acts a, .acts button {
         width: 30px;
         height: 30px;
@@ -275,7 +277,7 @@
                         <th>RH</th>
                     @endif
                     <th>ESTADO</th>
-                    <th>ACCIONES</th>
+                    <th class="col-acts">ACCIONES</th>
                 </tr>
             </thead>
             <tbody>
@@ -307,7 +309,7 @@
                                 <span class="st"><i class="fas fa-circle dot-arch"></i> Archivado</span>
                             @endif
                         </td>
-                        <td>
+                        <td class="col-acts">
                             <div class="acts">
                                 <a href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}" title="Ver proceso">
                                     <i class="far fa-eye"></i>

@@ -16,6 +16,7 @@ class RhPermisos
 
     public const VER_ANEXOS = 'ver_anexos';
     public const SUBIR_ANEXOS = 'subir_anexos';
+    public const EDITAR_ANEXOS = 'editar_anexos';
     public const DESCARGAR_ANEXOS = 'descargar_anexos';
     public const ELIMINAR_ANEXOS = 'eliminar_anexos';
 
@@ -65,16 +66,18 @@ class RhPermisos
             ],
             'anexos' => [
                 'label' => 'Anexos escaneados',
-                'desc' => 'Ver el listado no permite bajar ni subir archivos.',
+                'desc' => 'Ver el listado no permite subir, editar, bajar ni borrar. Cada acción se pide aparte.',
                 'items' => [
                     self::VER_ANEXOS => 'Ver anexos',
                     self::SUBIR_ANEXOS => 'Subir anexos',
+                    self::EDITAR_ANEXOS => 'Editar anexos',
                     self::DESCARGAR_ANEXOS => 'Descargar anexos',
                     self::ELIMINAR_ANEXOS => 'Eliminar anexos',
                 ],
                 'hints' => [
                     self::VER_ANEXOS => 'Consulta los archivos del expediente.',
-                    self::SUBIR_ANEXOS => 'Cargar el escaneo o el firmado.',
+                    self::SUBIR_ANEXOS => 'Cargar un archivo nuevo o el firmado.',
+                    self::EDITAR_ANEXOS => 'Cambiar el tipo o reemplazar un archivo ya cargado.',
                     self::DESCARGAR_ANEXOS => 'Bajar el archivo adjunto.',
                     self::ELIMINAR_ANEXOS => 'Quitar un anexo del expediente.',
                 ],
@@ -122,6 +125,7 @@ class RhPermisos
             self::GENERAR_DOCUMENTOS => [self::VER_DOCUMENTOS],
             self::DESCARGAR_DOCUMENTOS => [self::VER_DOCUMENTOS],
             self::SUBIR_ANEXOS => [self::VER_ANEXOS],
+            self::EDITAR_ANEXOS => [self::VER_ANEXOS],
             self::DESCARGAR_ANEXOS => [self::VER_ANEXOS],
             self::ELIMINAR_ANEXOS => [self::VER_ANEXOS],
             self::EXPORTAR_REPORTES => [self::VER_REPORTES],
@@ -234,6 +238,7 @@ class RhPermisos
             self::GENERAR_DOCUMENTOS,
             self::DESCARGAR_DOCUMENTOS,
             self::SUBIR_ANEXOS,
+            self::EDITAR_ANEXOS,
             self::DESCARGAR_ANEXOS,
             self::ELIMINAR_ANEXOS,
             self::EXPORTAR_REPORTES,

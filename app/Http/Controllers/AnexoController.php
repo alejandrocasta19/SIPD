@@ -17,6 +17,7 @@ class AnexoController extends Controller
         $this->middleware('permiso:ver_anexos')->only(['index']);
         $this->middleware('permiso:descargar_anexos')->only(['download']);
         $this->middleware('permiso:subir_anexos')->only(['store', 'firmar']);
+        $this->middleware('permiso:editar_anexos')->only(['update']);
         $this->middleware('permiso:eliminar_anexos')->only(['destroy']);
     }
 
@@ -214,20 +215,107 @@ class AnexoController extends Controller
             ->with('success', 'Se archivó el escaneo firmado. Ese es el documento del expediente.');
     }
 
+    public function update(Request $request, int $id)
+    {
+        $anexo = $this->accessibleAnexo($id);
+        $validated = $request->validate([
+            'tipo' => 'required|in:' . implode(',', array_merge(CasoAnexo::clavesTipo(), [CasoAnexo::TIPO_FIRMA_GERENTE])),
+            'archivo' => ['nullable', 'file', 'max:10240'],
+        ]);
+
+        $resuelto = CasoAnexo::resolverTipo($validated['tipo']);
+        $esTerminacion = CasoAnexo::requiereEscaneo($resuelto['tipo']);
+        $extensiones = $esTerminacion ? CasoAnexo::SCAN_EXTENSIONS : CasoAnexo::ALLOWED_EXTENSIONS;
+        $mimes = $esTerminacion ? CasoAnexo::SCAN_MIMES : CasoAnexo::ALLOWED_MIMES;
+        $mensaje = $esTerminacion
+            ? 'El escaneo de la terminación firmada debe ser PDF, JPG o PNG.'
+            : 'Solo se aceptan documentos Word o PDF.';
+
+        $payload = [
+            'tipo' => $resuelto['tipo'],
+            'titulo' => $resuelto['titulo'],
+            'estado' => $resuelto['estado'],
+        ];
+
+        $archivo = $request->file('archivo');
+        if ($archivo) {
+            $meta = $this->storeFile(
+                $archivo,
+                $anexo->caso_id,
+                $esTerminacion ? 'tc' : 'ax',
+                $extensiones,
+                $mimes,
+                $mensaje
+            );
+            $this->borrarArchivos($anexo, $meta['ruta_segura']);
+            $payload = array_merge($payload, $meta, [
+                'ruta_firmada' => null,
+                'nombre_firmado' => null,
+                'extension_firmada' => null,
+                'mime_firmado' => null,
+                'tamano_firmado' => null,
+            ]);
+        } else {
+            abort_unless(
+                in_array(strtolower((string) $anexo->extension), $extensiones, true),
+                422,
+                $mensaje
+            );
+        }
+
+        if ($esTerminacion) {
+            $payload['firmado_at'] = $anexo->firmado_at ?: now();
+        } else {
+            $payload['firmado_at'] = null;
+            $payload['ruta_firmada'] = null;
+            $payload['nombre_firmado'] = null;
+            $payload['extension_firmada'] = null;
+            $payload['mime_firmado'] = null;
+            $payload['tamano_firmado'] = null;
+        }
+
+        $anexo->update($payload);
+
+        return redirect()
+            ->route('abogado.anexos', array_filter([
+                'filtro' => CasoDocumentoEstado::slotDe($resuelto['tipo']),
+                'caso' => $request->get('caso'),
+            ]))
+            ->with('success', 'Se actualizó el anexo de ' . $resuelto['titulo'] . '.');
+    }
+
     public function destroy(int $id)
     {
         $anexo = $this->accessibleAnexo($id);
-        $canDelete = auth()->user()->esCoordinadora()
-            || (auth()->user()->puede('eliminar_anexos') && $anexo->user_id === auth()->id());
-        abort_unless($canDelete, 403, 'No tienes permiso para eliminar este anexo.');
+        abort_unless($this->puedeBorrarAnexo($anexo), 403, 'No tienes permiso para eliminar este anexo.');
 
-        Storage::disk('local')->delete($anexo->ruta_segura);
-        if ($anexo->ruta_firmada && $anexo->ruta_firmada !== $anexo->ruta_segura) {
-            Storage::disk('local')->delete($anexo->ruta_firmada);
-        }
+        $this->borrarArchivos($anexo);
         $anexo->delete();
 
         return redirect()->route('abogado.anexos')->with('success', 'Anexo eliminado.');
+    }
+
+    private function puedeBorrarAnexo(CasoAnexo $anexo): bool
+    {
+        $user = auth()->user();
+        if ($user->esCoordinadora()) {
+            return true;
+        }
+        if (!$user->puede('eliminar_anexos')) {
+            return false;
+        }
+
+        return (int) $anexo->user_id === (int) $user->id
+            || (int) optional($anexo->caso)->user_id === (int) $user->id;
+    }
+
+    private function borrarArchivos(CasoAnexo $anexo, ?string $excepto = null): void
+    {
+        foreach (array_unique(array_filter([$anexo->ruta_segura, $anexo->ruta_firmada])) as $ruta) {
+            if ($ruta !== $excepto) {
+                Storage::disk('local')->delete($ruta);
+            }
+        }
     }
 
     private function storeFile(

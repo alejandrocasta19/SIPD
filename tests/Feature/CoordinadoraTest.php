@@ -259,6 +259,14 @@ class CoordinadoraTest extends TestCase
         $otro = $this->makeUser('abogado', ['name' => 'Otro RH']);
 
         $this->actingAs($coord)
+            ->get(route('coordinadora.notificar'))
+            ->assertOk()
+            ->assertSee('Avisar al equipo')
+            ->assertSee('Destinatarios')
+            ->assertDontSee('Así lo verá el equipo')
+            ->assertDontSee('Asunto del aviso');
+
+        $this->actingAs($coord)
             ->post(route('coordinadora.notificar.enviar'), [
                 'destinatarios' => [$kelly->id],
                 'titulo' => 'Revisar descargos',
@@ -446,6 +454,7 @@ class CoordinadoraTest extends TestCase
             ->assertSee('Guardar borrador')
             ->assertSee('Generar documento')
             ->assertSee('Descargar anexos')
+            ->assertSee('Editar anexos')
             ->assertSee('Exportar reportes')
             ->assertSee('Tiempo del módulo')
             ->assertSee('name="duracion[expedientes]"', false)

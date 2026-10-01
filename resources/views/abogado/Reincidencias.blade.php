@@ -42,9 +42,11 @@
     .dot-sanc { color: #f43f5e; }
     .dot-arch { color: #94a3b8; }
 
-    .acts { display: flex; gap: 8px; }
+    .acts { display: flex; gap: 8px; justify-content: center; }
     .acts a { width: 30px; height: 30px; border: 0; background: #f1f5f9; color: #64748b; border-radius: 8px; display: grid; place-items: center; text-decoration: none; cursor: pointer; }
     .acts a:hover { background: #ecfdf5; color: var(--cth-green-text); }
+    table.proc th.col-acts,
+    table.proc td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 
     .empty { text-align: center; padding: 40px 16px; color: #94a3b8; background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
     
@@ -163,7 +165,7 @@
                             <th>FECHA FALTA</th>
                             <th>TIPO DE FALTA</th>
                             <th>ESTADO</th>
-                            <th>ACCIONES</th>
+                            <th class="col-acts">ACCIONES</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -188,7 +190,7 @@
                                         <span class="st"><i class="fas fa-circle dot-arch"></i> Archivado</span>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="col-acts">
                                     <div class="acts">
                                         <a href="{{ route('abogado.detalleproceso', $p->id) }}" title="Ver Expediente"><i class="far fa-eye"></i></a>
                                         <a href="{{ route('documentos.index', $p->id) }}" title="Documentos"><i class="far fa-file-alt"></i></a>
