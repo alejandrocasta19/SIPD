@@ -17,11 +17,8 @@
             <h1>Coordinación de RH</h1>
             <p>
                 {{ $saludo }}, {{ $user->primerNombre() }}.
-                @if($enProceso > 0 || $sinAbogado > 0)
-                    {{ $enProceso }} pendiente{{ $enProceso === 1 ? '' : 's' }} de veredicto
-                    @if($sinAbogado > 0)
-                        · {{ $sinAbogado }} sin responsable
-                    @endif
+                @if($enProceso > 0)
+                    {{ $enProceso }} pendiente{{ $enProceso === 1 ? '' : 's' }} de veredicto.
                 @else
                     Supervisión de expedientes, equipo y veredictos.
                 @endif
@@ -31,7 +28,6 @@
             <span class="stat-chip">{{ $total }} total</span>
             <span class="stat-chip green">{{ $tasaResolucion }}% resolución</span>
             @if($enProceso > 0)<span class="stat-chip">{{ $enProceso }} veredicto</span>@endif
-            @if($sinAbogado > 0)<span class="stat-chip yellow">{{ $sinAbogado }} sin RH</span>@endif
             @if($plazosVencidos > 0)<span class="stat-chip red">{{ $plazosVencidos }} vencidos</span>@endif
             <a class="btn-add" href="{{ route('coordinadora.veredictos') }}"><i class="fas fa-gavel"></i> Veredictos</a>
             <a class="btn-alt" href="{{ route('coordinadora.solicitudes') }}"><i class="fas fa-key"></i> Solicitudes</a>
@@ -171,77 +167,38 @@
         </div>
     </div>
 
-    <div class="dash-grid">
-        <div class="dash-col">
-            <section class="dash-card">
-                <div class="dash-card-title">
-                    <span>Sin responsable de RH</span>
-                    @if($sinAbogado > 0)
-                        <span class="dash-chip yellow">{{ $sinAbogado }}</span>
-                    @endif
-                </div>
-
-                @forelse($procesosSinAsignar as $proceso)
-                    <div class="dash-stack">
-                        <div class="dash-row" style="padding:0;border:0;">
-                            <span class="dash-dot warn">{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</span>
-                            <div class="dash-main">
-                                <b>{{ $proceso->nombre }}</b>
-                                <small>{{ $proceso->tipo_falta ?: 'Sin tipificar' }} · {{ $proceso->estado }}</small>
-                            </div>
-                            <a href="{{ route('abogado.detalleproceso', $proceso->id) }}" style="font-size:12px;font-weight:700;">Ver</a>
-                        </div>
-                        <form class="dash-assign" method="POST" action="{{ route('coordinadora.asignar', $proceso->id) }}">
-                            @csrf
-                            @method('PUT')
-                            <select name="user_id" required>
-                                <option value="">Asignar a…</option>
-                                @foreach($equipoRh as $rh)
-                                    <option value="{{ $rh->id }}">{{ $rh->name }}</option>
-                                @endforeach
-                            </select>
-                            <button type="submit">Asignar</button>
-                        </form>
-                    </div>
-                @empty
-                    <div class="dash-empty">Todos los expedientes tienen responsable.</div>
-                @endforelse
-            </section>
+    <section class="dash-card dash-card-wide">
+        <div class="dash-card-title">
+            <span>Carga del equipo</span>
+            <a href="{{ route('coordinadora.abogados') }}">Permisos &rarr;</a>
         </div>
-
-        <div class="dash-col">
-            <section class="dash-card">
-                <div class="dash-card-title">
-                    <span>Carga del equipo</span>
-                    <a href="{{ route('coordinadora.abogados') }}">Permisos &rarr;</a>
-                </div>
-                @forelse($cargaAbogados as $abogado)
-                    @php
-                        $ini = collect(preg_split('/\s+/', trim($abogado->name)))->filter()->take(2)->map(function ($p) { return strtoupper(substr($p, 0, 1)); })->implode('');
-                    @endphp
-                    <div class="dash-team">
-                        <span class="dash-ava">{{ $ini }}</span>
-                        <div>
-                            <b>{{ $abogado->name }}</b>
-                            <small>
-                                {{ $abogado->cargo ?: 'Equipo de RH' }}
-                                @php
-                                    $vigentes = ($abogado->permisos ?? collect())->filter(function ($p) { return $p->estaVigente(); });
-                                    $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
-                                @endphp
-                                · {{ $vigentes->count() }} permiso{{ $vigentes->count() === 1 ? '' : 's' }}
-                                @if($temps > 0) · {{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }} @endif
-                            </small>
-                        </div>
-                        <div class="n">
-                            {{ $abogado->procesos_count }} caso{{ $abogado->procesos_count === 1 ? '' : 's' }}
-                            <em>{{ $abogado->procesos_abiertos_count }} abierto{{ $abogado->procesos_abiertos_count === 1 ? '' : 's' }}</em>
-                        </div>
+        <div class="dash-team-grid">
+            @forelse($cargaAbogados as $abogado)
+                @php
+                    $ini = collect(preg_split('/\s+/', trim($abogado->name)))->filter()->take(2)->map(function ($p) { return strtoupper(substr($p, 0, 1)); })->implode('');
+                @endphp
+                <div class="dash-team">
+                    <span class="dash-ava">{{ $ini }}</span>
+                    <div>
+                        <b>{{ $abogado->name }}</b>
+                        <small>
+                            {{ $abogado->cargo ?: 'Equipo de RH' }}
+                            @php
+                                $vigentes = ($abogado->permisos ?? collect())->filter(function ($p) { return $p->estaVigente(); });
+                                $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
+                            @endphp
+                            · {{ $vigentes->count() }} permiso{{ $vigentes->count() === 1 ? '' : 's' }}
+                            @if($temps > 0) · {{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }} @endif
+                        </small>
                     </div>
-                @empty
-                    <div class="dash-empty">Sin personal de RH.</div>
-                @endforelse
-            </section>
+                    <div class="n">
+                        {{ $abogado->procesos_count }} caso{{ $abogado->procesos_count === 1 ? '' : 's' }}
+                        <em>{{ $abogado->procesos_abiertos_count }} abierto{{ $abogado->procesos_abiertos_count === 1 ? '' : 's' }}</em>
+                    </div>
+                </div>
+            @empty
+                <div class="dash-empty">Sin personal de RH.</div>
+            @endforelse
         </div>
-    </div>
+    </section>
 @endsection

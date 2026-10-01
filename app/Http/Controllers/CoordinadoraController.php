@@ -114,6 +114,33 @@ class CoordinadoraController extends Controller
         return back()->with('success', 'Permiso otorgado a ' . $solicitud->user->name . ' por ' . $horas . ' hora(s).');
     }
 
+    public function eliminarSolicitud($id)
+    {
+        abort_unless(auth()->user()->esCoordinadora(), 403);
+
+        $solicitud = PermisoSolicitud::findOrFail($id);
+        abort_if($solicitud->estaPendiente(), 422, 'Resuelve la solicitud antes de quitarla del historial.');
+
+        $solicitud->delete();
+
+        return back()->with('success', 'Se quitó del historial.');
+    }
+
+    public function vaciarHistorial()
+    {
+        abort_unless(auth()->user()->esCoordinadora(), 403);
+
+        $borradas = PermisoSolicitud::query()
+            ->where('estado', '!=', PermisoSolicitud::PENDIENTE)
+            ->delete();
+
+        if ($borradas === 0) {
+            return back()->with('info', 'El historial ya estaba vacío.');
+        }
+
+        return back()->with('success', 'Se vació el historial de solicitudes.');
+    }
+
     public function notificarForm()
     {
         abort_unless(auth()->user()->esCoordinadora(), 403);

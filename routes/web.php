@@ -240,6 +240,10 @@ Route::middleware(['auth', 'role:admin,coordinadora'])->group(function () {
         ->name('coordinadora.solicitudes');
     Route::put('/coordinadora/solicitudes/{id}', [CoordinadoraController::class, 'responderSolicitud'])
         ->name('coordinadora.solicitudes.responder');
+    Route::delete('/coordinadora/solicitudes/historial', [CoordinadoraController::class, 'vaciarHistorial'])
+        ->name('coordinadora.solicitudes.historial');
+    Route::delete('/coordinadora/solicitudes/{id}', [CoordinadoraController::class, 'eliminarSolicitud'])
+        ->name('coordinadora.solicitudes.destroy');
     Route::get('/coordinadora/avisos', [CoordinadoraController::class, 'notificarForm'])
         ->name('coordinadora.notificar');
     Route::post('/coordinadora/avisos', [CoordinadoraController::class, 'notificarEquipo'])

@@ -10,13 +10,12 @@ use Illuminate\Support\Facades\Route;
 class AlertasSistema
 {
     public const PLAZOS = 'plazos_vencidos';
-    public const SIN_RH = 'sin_rh';
     public const VEREDICTOS = 'veredictos';
     public const DESCARGOS = 'descargos';
 
     public static function tipos(): array
     {
-        return [self::PLAZOS, self::SIN_RH, self::VEREDICTOS, self::DESCARGOS];
+        return [self::PLAZOS, self::VEREDICTOS, self::DESCARGOS];
     }
 
     public static function visibles(User $user): array
@@ -75,12 +74,6 @@ class AlertasSistema
                     : "{$n} procesos superaron el término de 5 días",
                 Route::has('abogado.plazos') ? route('abogado.plazos', ['estado' => 'vencido']) : '#'
             ),
-            self::item($user, self::SIN_RH, 'Sin RH asignado', 'fas fa-user-slash', 'info',
-                fn (int $n) => $n === 1
-                    ? '1 proceso sin responsable'
-                    : "{$n} procesos sin responsable",
-                Route::has('abogado.consultarproceso') ? route('abogado.consultarproceso') : '#'
-            ),
             self::item($user, self::VEREDICTOS, 'Pendientes de veredicto', 'fas fa-gavel', 'info',
                 fn (int $n) => $n === 1
                     ? '1 expediente en proceso'
@@ -115,7 +108,7 @@ class AlertasSistema
 
     private static function idsVisibles(User $user, string $tipo): array
     {
-        if (!$user->esCoordinadora() && in_array($tipo, [self::SIN_RH, self::VEREDICTOS], true)) {
+        if (!$user->esCoordinadora() && $tipo === self::VEREDICTOS) {
             return [];
         }
 
@@ -145,10 +138,6 @@ class AlertasSistema
         if ($tipo === self::PLAZOS) {
             return $query->whereIn('estado', ['Pendiente', 'En Proceso'])
                 ->whereDate('created_at', '<=', now()->subDays(5)->toDateString());
-        }
-
-        if ($tipo === self::SIN_RH) {
-            return $query->whereNull('user_id');
         }
 
         if ($tipo === self::VEREDICTOS) {

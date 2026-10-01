@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\PermisoSolicitud;
 use App\Models\ProcesoDisciplinario;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,7 +26,6 @@ class CoordinadoraTest extends TestCase
         $coord = $this->makeUser('coordinadora');
         $rh = $this->makeUser('abogado', ['name' => 'Kelly RH']);
         $this->makeCaso($rh, ['estado' => 'En Proceso', 'nombre' => 'Conductor Veredicto']);
-        $this->makeCaso(null, ['estado' => 'Pendiente', 'nombre' => 'Conductor Sin RH']);
 
         $this->actingAs($coord)
             ->get(route('abogado.dashboard'))
@@ -33,9 +33,9 @@ class CoordinadoraTest extends TestCase
             ->assertSee('Coordinación de RH')
             ->assertSee('Pendientes de veredicto')
             ->assertSee('Conductor Veredicto')
-            ->assertSee('Sin responsable de RH')
-            ->assertSee('Conductor Sin RH')
-            ->assertSee('Equipo de RH');
+            ->assertSee('Carga del equipo')
+            ->assertSee('Kelly RH')
+            ->assertDontSee('Sin responsable de RH');
     }
 
     /** @test */
@@ -55,16 +55,17 @@ class CoordinadoraTest extends TestCase
     public function coordinadora_puede_asignar_un_proceso()
     {
         $coord = $this->makeUser('coordinadora');
-        $rh = $this->makeUser('abogado', ['name' => 'Analista RH']);
-        $caso = $this->makeCaso(null, ['nombre' => 'Sin Dueño']);
+        $origen = $this->makeUser('abogado', ['name' => 'Kelly RH']);
+        $destino = $this->makeUser('abogado', ['name' => 'Analista RH']);
+        $caso = $this->makeCaso($origen, ['nombre' => 'Caso de Kelly']);
 
         $this->actingAs($coord)
             ->put(route('coordinadora.asignar', $caso->id), [
-                'user_id' => $rh->id,
+                'user_id' => $destino->id,
             ])
             ->assertRedirect();
 
-        $this->assertSame($rh->id, $caso->fresh()->user_id);
+        $this->assertSame($destino->id, $caso->fresh()->user_id);
     }
 
     /** @test */
@@ -177,6 +178,77 @@ class CoordinadoraTest extends TestCase
             'user_id' => $rh->id,
             'tipo' => 'permiso_respuesta',
         ]);
+    }
+
+    /** @test */
+    public function coordinadora_elimina_solicitudes_del_historial()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+        $resuelta = PermisoSolicitud::create([
+            'user_id' => $rh->id,
+            'permiso' => 'editar_casos',
+            'que_hara' => 'Corregir un dato',
+            'motivo' => 'Quedó mal',
+            'horas' => 1,
+            'estado' => PermisoSolicitud::OTORGADA,
+            'responded_by' => $coord->id,
+            'responded_at' => now(),
+        ]);
+        $pendiente = PermisoSolicitud::create([
+            'user_id' => $rh->id,
+            'permiso' => 'editar_perfil',
+            'que_hara' => 'Cambiar contraseña',
+            'motivo' => 'La olvidó',
+            'horas' => 1,
+            'estado' => PermisoSolicitud::PENDIENTE,
+        ]);
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.solicitudes'))
+            ->delete(route('coordinadora.solicitudes.destroy', $resuelta->id))
+            ->assertRedirect(route('coordinadora.solicitudes'));
+
+        $this->assertDatabaseMissing('permiso_solicitudes', ['id' => $resuelta->id]);
+        $this->assertDatabaseHas('permiso_solicitudes', ['id' => $pendiente->id]);
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.solicitudes'))
+            ->delete(route('coordinadora.solicitudes.destroy', $pendiente->id))
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function coordinadora_vacia_el_historial_sin_tocar_pendientes()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+        PermisoSolicitud::create([
+            'user_id' => $rh->id,
+            'permiso' => 'editar_casos',
+            'que_hara' => 'Corregir',
+            'motivo' => 'Error',
+            'horas' => 1,
+            'estado' => PermisoSolicitud::OTORGADA,
+            'responded_by' => $coord->id,
+            'responded_at' => now(),
+        ]);
+        $pendiente = PermisoSolicitud::create([
+            'user_id' => $rh->id,
+            'permiso' => 'editar_perfil',
+            'que_hara' => 'Perfil',
+            'motivo' => 'Cambio',
+            'horas' => 1,
+            'estado' => PermisoSolicitud::PENDIENTE,
+        ]);
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.solicitudes'))
+            ->delete(route('coordinadora.solicitudes.historial'))
+            ->assertRedirect(route('coordinadora.solicitudes'));
+
+        $this->assertDatabaseMissing('permiso_solicitudes', ['estado' => PermisoSolicitud::OTORGADA]);
+        $this->assertDatabaseHas('permiso_solicitudes', ['id' => $pendiente->id]);
     }
 
     /** @test */

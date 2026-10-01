@@ -34,7 +34,24 @@
     .sol-form button { height:40px; border:0; border-radius:10px; padding:0 14px; font-weight:700; cursor:pointer; }
     .ok { background:var(--cth-green); color:#fff; }
     .no { background:#fff1f2; color:#e11d48; }
-    .hist { color:#64748b; font-size:13px; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+    .hist {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        color:#64748b;
+        font-size:13px;
+        padding:10px 4px 10px 0;
+        border-bottom:1px solid #f1f5f9;
+    }
+    .hist b { color:#334155; }
+    .hist-del {
+        border:0; background:#f8fafc; color:#64748b;
+        width:34px; height:34px; border-radius:10px; cursor:pointer; flex-shrink:0;
+    }
+    .hist-del:hover { background:#fee2e2; color:#be123c; }
+    .hist-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 12px; }
+    .hist-head h3 { margin:0; font-size:16px; }
     .empty { text-align:center; color:#94a3b8; padding:32px 8px; }
     @media (max-width: 900px) { .sol-form { grid-template-columns: 1fr; } }
 </style>
@@ -90,14 +107,38 @@
     @endforelse
 
     @if($historial->count() > 0)
-        <h3 style="margin:24px 0 12px;font-size:16px;">Historial</h3>
+        <div class="hist-head">
+            <h3>Historial</h3>
+            <form method="POST" action="{{ route('coordinadora.solicitudes.historial') }}"
+                  data-confirm="Se borrará el historial de solicitudes ya resueltas. Las pendientes no se tocan."
+                  data-confirm-title="Vaciar historial"
+                  data-confirm-ok="Vaciar"
+                  data-confirm-danger="1">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn-alt">
+                    <i class="far fa-trash-alt"></i> Vaciar historial
+                </button>
+            </form>
+        </div>
         @foreach($historial as $item)
             <div class="hist">
-                <b>{{ $item->user->name }}</b> · {{ $item->etiquetaPermiso() }} ·
-                {{ $item->estado === 'otorgada' ? 'Otorgada' : 'Rechazada' }}
-                ({{ $item->horas }} h)
-                @if($item->respondente) · {{ $item->respondente->name }} @endif
-                · {{ optional($item->responded_at)->format('d/m H:i') }}
+                <div>
+                    <b>{{ $item->user->name }}</b> · {{ $item->etiquetaPermiso() }} ·
+                    {{ $item->estado === 'otorgada' ? 'Otorgada' : 'Rechazada' }}
+                    ({{ $item->horas }} h)
+                    @if($item->respondente) · {{ $item->respondente->name }} @endif
+                    · {{ optional($item->responded_at)->format('d/m/Y H:i') }}
+                </div>
+                <form method="POST" action="{{ route('coordinadora.solicitudes.destroy', $item->id) }}"
+                      data-confirm="Se quitará este registro del historial."
+                      data-confirm-title="Eliminar del historial"
+                      data-confirm-ok="Eliminar"
+                      data-confirm-danger="1">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="hist-del" title="Eliminar"><i class="far fa-trash-alt"></i></button>
+                </form>
             </div>
         @endforeach
         @include('partials.paginacion', ['paginador' => $historial])

@@ -2277,6 +2277,12 @@ a.dash-stat:hover { color: var(--cth-green-text); }
 
 .dash-team { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
 .dash-team:last-child { border-bottom: 0; }
+.dash-team-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 36px;
+}
+.dash-team-grid .dash-team { min-width: 0; }
 .dash-ava {
     width: 32px; height: 32px; border-radius: 50%;
     background: #f0fdf4; color: var(--cth-green-text);
@@ -2351,6 +2357,7 @@ body.theme-cootranshuila .content-wrapper {
 }
 @media (max-width: 900px) {
     .dash-recent { grid-template-columns: 1fr; }
+    .dash-team-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
     .dash-pipeline { grid-template-columns: 1fr; }

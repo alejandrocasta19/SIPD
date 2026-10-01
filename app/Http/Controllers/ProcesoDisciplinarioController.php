@@ -58,7 +58,6 @@ class ProcesoDisciplinarioController extends Controller
         $sancionados = (clone $visible)->where('estado', 'Sancionado')->count();
         $archivados = (clone $visible)->where('estado', 'Archivado')->count();
         $total = (clone $visible)->count();
-        $sinAbogado = (clone $visible)->whereNull('user_id')->count();
         $resueltos = $sancionados + $archivados;
         $tasaResolucion = $total > 0 ? (int) round(($resueltos / $total) * 100) : 0;
         $abiertos = $pendientes + $enProceso;
@@ -82,11 +81,6 @@ class ProcesoDisciplinarioController extends Controller
         $plazosVencidos = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'vencido')->count();
         $plazosPorVencer = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'por_vencer')->count();
 
-        $procesosSinAsignar = (clone $visible)->whereNull('user_id')
-            ->latest()
-            ->take($user->esCoordinadora() ? 8 : 4)
-            ->get();
-
         $descargosPendientes = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso'])
             ->where(function ($query) {
                 $query->whereNull('descargos')->orWhere('descargos', '');
@@ -100,7 +94,6 @@ class ProcesoDisciplinarioController extends Controller
         $alertasActivas = collect([
             $plazosVencidos > 0,
             $plazosPorVencer > 0,
-            $sinAbogado > 0,
             $descargosPendientes > 0,
         ])->filter()->count();
 
@@ -126,10 +119,6 @@ class ProcesoDisciplinarioController extends Controller
             ->take($user->esCoordinadora() ? 12 : 4)
             ->get();
 
-        $equipoRh = $user->esCoordinadora()
-            ? User::where('role', 'abogado')->orderBy('name')->get()
-            : collect();
-
         $pendientesVeredicto = (clone $visible)->where('estado', 'En Proceso')
             ->with('user')
             ->latest()
@@ -152,7 +141,6 @@ class ProcesoDisciplinarioController extends Controller
             'archivados' => $archivados,
             'total' => $total,
             'abiertos' => $abiertos,
-            'sinAbogado' => $sinAbogado,
             'tasaResolucion' => $tasaResolucion,
             'pctPendiente' => $pct($pendientes),
             'pctProceso' => $pct($enProceso),
@@ -162,7 +150,6 @@ class ProcesoDisciplinarioController extends Controller
             'diasVencer' => $diasVencer,
             'plazosVencidos' => $plazosVencidos,
             'plazosPorVencer' => $plazosPorVencer,
-            'procesosSinAsignar' => $procesosSinAsignar,
             'alertaDescargos' => $alertaDescargos,
             'descargosPendientes' => $descargosPendientes,
             'alertasActivas' => $alertasActivas,
@@ -170,7 +157,6 @@ class ProcesoDisciplinarioController extends Controller
             'recientes' => $recientes,
             'anexosTotal' => $anexosTotal,
             'cargaAbogados' => $cargaAbogados,
-            'equipoRh' => $equipoRh,
             'pendientesVeredicto' => $pendientesVeredicto,
             'solicitudesPendientes' => $solicitudesPendientes,
         ]);
@@ -1052,17 +1038,10 @@ class ProcesoDisciplinarioController extends Controller
 
         $proceso = $this->accessibleProcess($id);
         $validated = $request->validate([
-            'user_id' => 'nullable|integer',
+            'user_id' => 'required|integer',
         ]);
 
-        $userId = $validated['user_id'] ?? null;
-        if ($userId === null || $userId === '') {
-            $proceso->update(['user_id' => null]);
-
-            return redirect()->back()->with('success', 'El proceso quedó sin responsable de RH.');
-        }
-
-        $responsable = User::whereKey($userId)->where('role', 'abogado')->firstOrFail();
+        $responsable = User::whereKey($validated['user_id'])->where('role', 'abogado')->firstOrFail();
         $proceso->update(['user_id' => $responsable->id]);
 
         return redirect()->back()->with('success', 'Proceso asignado a ' . $responsable->name . '.');

@@ -408,8 +408,7 @@
                                     @if(auth()->user()->esCoordinadora())
                                         <div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
                                             <label class="mb-0 small text-muted font-weight-bold" for="asignar-rh">Responsable RH</label>
-                                            <select id="asignar-rh" name="user_id" form="form-asignar-rh" class="form-control form-control-sm" style="max-width:260px">
-                                                <option value="">Sin asignar</option>
+                                            <select id="asignar-rh" name="user_id" form="form-asignar-rh" class="form-control form-control-sm" style="max-width:260px" required>
                                                 @foreach($equipoRh as $rh)
                                                     <option value="{{ $rh->id }}" {{ (int) $proceso->user_id === (int) $rh->id ? 'selected' : '' }}>{{ $rh->name }}</option>
                                                 @endforeach
