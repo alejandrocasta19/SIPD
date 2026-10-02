@@ -1162,12 +1162,17 @@ class ProcesoDisciplinarioController extends Controller
                 'name' => Formatos::reglasNombre(),
                 'email' => Formatos::reglasEmail(true, $abogado->id),
                 'cargo' => Formatos::reglasCargo(),
+                'nueva_password' => 'nullable|min:8|confirmed',
+            ] + Formatos::mensajes());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->back()
                 ->withErrors($e->validator)
                 ->withInput()
                 ->with('abrir_editar_rh', $editarUrl);
         }
 
-            ] + Formatos::mensajes());
+        $data = [
             'name' => $validated['name'],
             'email' => $validated['email'],
             'cargo' => $validated['cargo'],
@@ -1203,6 +1208,15 @@ class ProcesoDisciplinarioController extends Controller
             'user_id' => 'required|integer',
         ]);
 
+        $responsable = User::whereKey($validated['user_id'])
+            ->where('role', 'equipo')
+            ->activos()
+            ->firstOrFail();
+        $proceso->update(['user_id' => $responsable->id]);
+
+        return redirect()->back()->with('success', 'Proceso asignado a ' . $responsable->name . '.');
+    }
+
     private function validarDatosTrabajador(Request $request, string $seleccion, ?string $modalidad): void
     {
         $request->merge([
@@ -1226,14 +1240,5 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         $request->validate($reglas, Formatos::mensajes());
-    }
-
-        $responsable = User::whereKey($validated['user_id'])
-            ->where('role', 'equipo')
-            ->activos()
-            ->firstOrFail();
-        $proceso->update(['user_id' => $responsable->id]);
-
-        return redirect()->back()->with('success', 'Proceso asignado a ' . $responsable->name . '.');
     }
 }

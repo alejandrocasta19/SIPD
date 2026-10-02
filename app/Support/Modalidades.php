@@ -61,6 +61,16 @@ class Modalidades
      *
      * @var list<string>
      */
+    /**
+     * Modalidades/selecciones que requieren un campo de cargo libre.
+     *
+     * @var list<string>
+     */
+    private const CON_CARGO = [
+        'Administrativos',
+        'Estación toma',
+    ];
+
     private const CON_PLACA = [
         'Doble Yo',
         'Premium',
@@ -166,12 +176,17 @@ class Modalidades
                 'cargo' => $seleccion === 'Estación toma' && $cargoLibre !== '' ? $cargoLibre : null,
             ];
         }
-        if (in_array($seleccion, self::ESTACIONES, true)
-            || ($seleccion !== 'Administrativos' && $seleccion !== 'Estaciones' && in_array($seleccion, self::todas(), true))) {
+        if ($seleccion !== 'Administrativos' && $seleccion !== 'Estaciones' && in_array($seleccion, self::todas(), true)) {
             return [
                 'modalidad' => $seleccion,
                 'cargo' => $cargoLibre !== '' ? $cargoLibre : null,
             ];
+        }
+
+        return null;
+    }
+
+    public static function userPuede(User $user, string $seleccion): bool
     {
         $clave = self::claveDeSeleccion($seleccion);
         if ($clave === null) {
@@ -182,6 +197,11 @@ class Modalidades
         }
 
         return $user->puede($clave);
+    }
+
+    public static function permiteSeleccion(User $user, string $seleccion): bool
+    {
+        return self::userPuede($user, $seleccion);
     }
 
     public static function claveDeSeleccion(string $seleccion): ?string
@@ -306,7 +326,7 @@ class Modalidades
         return $placa !== '' ? $placa : '—';
     }
 
-            return 'N/A';
+    public static function porCargo(?string $cargo): array
     {
         return self::POR_CARGO[self::claveCargo($cargo)] ?? [];
     }

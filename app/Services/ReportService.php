@@ -334,12 +334,6 @@ class ReportService
         foreach (array_values($data['by_modalidad'] ?? []) as $i => $row) {
             $cargoRows[] = [$i + 1, $row['label'], $row['total'], $pct($row['total'])];
         }
-            ];
-        }
-        $cargoRows = [];
-        foreach (array_values($data['by_modalidad'] ?? []) as $i => $row) {
-            $cargoRows[] = [$i + 1, $row['label'], $row['total'], $pct($row['total'])];
-        }
         $faltaRows = [];
         foreach (array_values($data['pending_faults'] ?? []) as $i => $row) {
             $faltaRows[] = [$i + 1, $row['label'], $row['total'], $pct($row['total'])];
@@ -389,6 +383,17 @@ class ReportService
                 'title' => '4. Modalidad y cargo',
                 'note' => 'Modalidad del proceso y cargo del trabajador.',
                 'headers' => ['#', 'Modalidad', 'Casos', 'Participación'],
+                'rows' => $cargoRows,
+                'empty' => 'Sin modalidades registradas.',
+            ],
+            [
+                'title' => '5. Faltas más frecuentes',
+                'note' => 'Tipos de falta registrados en el período.',
+                'headers' => ['#', 'Tipo de falta', 'Casos', 'Participación'],
+                'rows' => $faltaRows,
+                'empty' => 'Sin tipos de falta registrados.',
+            ],
+            [
                 'title' => '6. Rutas',
                 'headers' => ['Ruta', 'Casos', 'Participación'],
                 'rows' => $rutaRows,
@@ -456,15 +461,6 @@ class ReportService
                 $case->ruta ?: '—',
                 \App\Support\Modalidades::etiquetaCaso($case->modalidad, $case->cargo),
                 $case->tipo_falta ?: 'No especificada',
-                $case->estado,
-                $case->fecha_falta ? $case->fecha_falta->format('d/m/Y') : '—',
-                $case->created_at ? $case->created_at->format('d/m/Y') : '—',
-                optional($case->user)->name ?: 'Sin asignar',
-                (int) ($case->anexos_count ?? 0),
-            ];
-                $case->ruta ?: '—',
-                \App\Support\Modalidades::etiquetaCaso($case->modalidad, $case->cargo),
-                $case->tipo_falta ?: 'No especificada',
                 $case->estadoVisible(),
                 $case->fecha_falta ? $case->fecha_falta->format('d/m/Y') : '—',
                 $case->created_at ? $case->created_at->format('d/m/Y') : '—',
@@ -483,7 +479,18 @@ class ReportService
         $blocks = [[
             'title' => '',
             'headers' => [
-                'Proceso', 'Radicado', 'Trabajador', 'Cédula', 'Ruta', 'Cargo',
+                'Proceso', 'Radicado', 'Trabajador', 'Cédula', 'Placa/Ruta', 'Ruta',
+                'Cargo', 'Tipo de falta', 'Estado', 'Fecha falta', 'Fecha registro', 'Abogado', 'Anexos',
+            ],
+            'rows' => $rows,
+            'empty' => 'Sin expedientes en la selección.',
+        ]];
+        if ($notas) {
+            $blocks[] = [
+                'title' => 'Notas y observaciones',
+                'headers' => ['Proceso', 'Descargos', 'Decisión / Observación'],
+                'rows' => $notas,
+            ];
         }
 
         return [

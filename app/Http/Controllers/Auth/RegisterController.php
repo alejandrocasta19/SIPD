@@ -58,17 +58,17 @@ class RegisterController extends Controller
                 'string',
                 'email',
                 'max:255',
-                'unique:users'
+                'unique:users',
             ],
 
             'password' => [
-        ], Formatos::mensajes());
+                'required',
                 'string',
                 'min:8',
-                'confirmed'
+                'confirmed',
             ],
 
-        ]);
+        ], Formatos::mensajes());
     }
 
     /**
