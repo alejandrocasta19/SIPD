@@ -117,7 +117,7 @@
 <div class="case-info-bar">
     <div>
         <div class="ci-main" id="ci-worker-name">{{ $caso->nombre }} · C.C. {{ $caso->cedula }}</div>
-        <div class="ci-sub" id="ci-worker-sub">{{ $caso->modalidad ?: '—' }} · {{ $labelTipo }}</div>
+        <div class="ci-sub" id="ci-worker-sub">{{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) }} · {{ $labelTipo }}</div>
     </div>
     <div class="ci-badges">
         @if($estadoDoc->estaDescargado())
@@ -132,7 +132,7 @@
     </div>
 </div>
 
-<form action="{{ route('documentos.save', [$caso->id, $tipo]) }}" method="POST" id="edit-form">
+<form action="{{ route('documentos.save', [$caso->id, $tipo]) }}" method="POST" id="edit-form"@if(!$puedeEscribir) data-lock="1"@endif>
     @csrf
     @method('PUT')
 
@@ -148,9 +148,24 @@
             <div class="doc-yellow-hint">
                 <i class="fas fa-highlighter"></i>
                 <div>
-                    <strong>Las zonas amarillas son editables.</strong>
-                    Las que no se rellenen no se generan en el documento.
-                    <small>Genera y descárgalo en Generar documentos.</small>
+                    @if(!empty($bloqueado))
+                        <strong>Este proceso está {{ $caso->estado === 'Archivado' ? 'archivado' : 'sancionado' }}.</strong>
+                        Solo la coordinadora puede modificarlo.
+                    @elseif($yaGenerado)
+                        @if($puedeEscribir)
+                            <strong>El documento ya se generó.</strong>
+                            Guardar edición cambia las zonas amarillas.
+                            <small>No es continuar un borrador.</small>
+                        @else
+                            <strong>El documento ya se generó.</strong>
+                            Las zonas amarillas no se pueden cambiar.
+                            <small>La edición se otorga aparte y con tiempo.</small>
+                        @endif
+                    @else
+                        <strong>Las zonas amarillas son editables.</strong>
+                        Las que no se rellenen no se generan en el documento.
+                        <small>Genera y descárgalo en Generar documentos.</small>
+                    @endif
                 </div>
             </div>
         </div>
@@ -192,12 +207,17 @@
                 <a href="{{ route('documentos.hub') }}" class="btn-toolbar btn-ghost" style="text-decoration:none;">
                     <i class="fas fa-arrow-left"></i> Generar documentos
                 </a>
-                @if(auth()->user()->puede('editar_documentos'))
+                @if(!$yaGenerado && $puedeEscribir && auth()->user()->puede('editar_documentos'))
                 <button type="submit" class="btn-toolbar btn-ghost" title="Guarda el avance sin generar el documento">
                     <i class="fas fa-save"></i> Guardar borrador
                 </button>
                 @endif
-                @if(auth()->user()->puede('generar_documentos'))
+                @if($yaGenerado && $puedeEscribir)
+                <button type="submit" class="btn-toolbar btn-ghost" title="Guarda cambios en un documento ya generado">
+                    <i class="fas fa-save"></i> Guardar edición
+                </button>
+                @endif
+                @if(!$yaGenerado && $puedeEscribir && auth()->user()->puede('generar_documentos'))
                 <button type="submit" name="formato" value="generar" class="btn-toolbar btn-save" title="Marca el documento como generado. La descarga queda en Generar documentos.">
                     <i class="fas fa-file-signature"></i> Generar
                 </button>
@@ -265,6 +285,21 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof window.initSipdOptionalClauses === 'function') {
         window.initSipdOptionalClauses(document);
     }
+    var form = document.getElementById('edit-form');
+    if (!form || form.getAttribute('data-lock') !== '1') {
+        return;
+    }
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+    });
+    form.querySelectorAll('textarea, input, select').forEach(function (el) {
+        if (el.type === 'hidden' || el.name === '_token' || el.name === '_method') {
+            return;
+        }
+        el.readOnly = true;
+        el.disabled = el.tagName === 'SELECT';
+        el.style.cursor = 'not-allowed';
+    });
 });
 </script>
 @endsection

@@ -41,7 +41,6 @@
             <th>Radicado</th>
             <th>Trabajador</th>
             <th>Cédula</th>
-            <th>Placa</th>
             <th>Ruta</th>
             <th>Cargo</th>
             <th>Tipo de falta</th>
@@ -59,9 +58,9 @@
             <td>{{ $case->numeroRadicado() }}</td>
             <td>{{ $case->nombre }}</td>
             <td>{{ $case->cedula ?: 'Pendiente' }}</td>
-            <td>{{ $case->placa ?: '—' }}</td>
+            <td>{{ \App\Support\Modalidades::textoPlaca($case->modalidad, $case->placa) }}</td>
             <td>{{ $case->ruta ?: '—' }}</td>
-            <td>{{ $case->modalidad ?: '—' }}</td>
+            <td>{{ \App\Support\Modalidades::etiquetaCaso($case->modalidad, $case->cargo) }}</td>
             <td>{{ $case->tipo_falta ?: 'No especificada' }}</td>
             <td>{{ $case->estado }}</td>
             <td>{{ $case->fecha_falta ? $case->fecha_falta->format('d/m/Y') : '—' }}</td>

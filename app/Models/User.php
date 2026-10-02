@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Modalidades;
 use App\Support\RhPermisos;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -234,7 +235,8 @@ class User extends Authenticatable
 
     public function otorgarPermisosPorDefecto(?int $grantedBy = null): void
     {
-        foreach (RhPermisos::porDefecto() as $clave) {
+        $claves = array_merge(RhPermisos::porDefecto(), Modalidades::porDefectoDeCargo($this->cargo));
+        foreach ($claves as $clave) {
             $this->permisos()->updateOrCreate(
                 ['permiso' => $clave],
                 ['granted_by' => $grantedBy, 'expires_at' => null]
@@ -247,6 +249,10 @@ class User extends Authenticatable
     {
         abort_unless(in_array($clave, RhPermisos::claves(), true), 422);
 
+        if (!RhPermisos::esTemporalizable($clave)) {
+            $horas = null;
+        }
+
         $expires = $horas ? now()->addHours($horas) : null;
 
         foreach (RhPermisos::expandir([$clave]) as $item) {
@@ -256,7 +262,10 @@ class User extends Authenticatable
             if (!$this->puede($item)) {
                 $this->permisos()->updateOrCreate(
                     ['permiso' => $item],
-                    ['granted_by' => $grantedBy, 'expires_at' => $expires]
+                    [
+                        'granted_by' => $grantedBy,
+                        'expires_at' => RhPermisos::esTemporalizable($item) ? $expires : null,
+                    ]
                 );
             }
         }
@@ -279,11 +288,14 @@ class User extends Authenticatable
         $this->permisos()->whereNotIn('permiso', $validas)->delete();
 
         foreach ($validas as $clave) {
-            $grupo = RhPermisos::grupoDe($clave);
-            $horas = RhPermisos::resolverHoras(
-                $duraciones[$grupo] ?? $duraciones[$clave] ?? 'permanente',
-                $horasCustom[$grupo] ?? $horasCustom[$clave] ?? null
-            );
+            $horas = null;
+            if (RhPermisos::esTemporalizable($clave)) {
+                $grupo = RhPermisos::grupoDe($clave);
+                $horas = RhPermisos::resolverHoras(
+                    $duraciones[$clave] ?? $duraciones[$grupo] ?? 'permanente',
+                    $horasCustom[$clave] ?? $horasCustom[$grupo] ?? null
+                );
+            }
             $this->permisos()->updateOrCreate(
                 ['permiso' => $clave],
                 [
@@ -302,10 +314,15 @@ class User extends Authenticatable
             if (!$grant->estaVigente()) {
                 continue;
             }
+            $duracion = $this->duracionDesdeVencimiento($grant->expires_at);
             $mapa[$grant->permiso] = [
                 'on' => true,
                 'temporal' => $grant->esTemporal(),
                 'vence' => $grant->expires_at ? $grant->expires_at->format('Y-m-d H:i') : null,
+                'duracion' => $duracion,
+                'horas' => $duracion === 'custom' && $grant->expires_at
+                    ? max(1, (int) now()->diffInHours($grant->expires_at, false))
+                    : '',
             ];
         }
 

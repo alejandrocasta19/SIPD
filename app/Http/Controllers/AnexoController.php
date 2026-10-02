@@ -114,6 +114,9 @@ class AnexoController extends Controller
         ]);
 
         $caso = $this->visibleProcesses()->findOrFail($validated['caso_id']);
+        if ($respuesta = $caso->redireccionSiBloqueado()) {
+            return $respuesta;
+        }
         $resuelto = CasoAnexo::resolverTipo($validated['tipo']);
         $esTerminacion = CasoAnexo::requiereEscaneo($resuelto['tipo']);
         $meta = $this->storeFile(
@@ -164,6 +167,9 @@ class AnexoController extends Controller
     public function firmar(Request $request, int $id)
     {
         $anexo = $this->accessibleAnexo($id);
+        if ($respuesta = optional($anexo->caso)->redireccionSiBloqueado()) {
+            return $respuesta;
+        }
         abort_unless(
             CasoAnexo::requiereEscaneo((string) $anexo->tipo),
             422,

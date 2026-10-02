@@ -92,71 +92,120 @@
         cursor: pointer;
     }
 
-    .table-card {
-        background: #fff;
-        border-radius: 18px;
-        overflow-x: auto;
-        box-shadow: 0 1px 2px rgba(15,23,42,.04);
+    .eq-board { margin-top: 4px; }
+    .eq-board-title {
+        margin: 0 0 6px;
+        text-align: center;
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--cth-ink);
+        letter-spacing: -.02em;
     }
-
-    table.abg {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    table.abg th {
-        text-align: left;
-        padding: 16px 18px;
-        color: #94a3b8;
-        font-size: 11px;
-        letter-spacing: .06em;
-        font-weight: 700;
-        border: 1px solid var(--cth-border);
-    }
-
-    table.abg td {
-        padding: 16px 18px;
-        border: 1px solid var(--cth-border);
-        color: #334155;
+    .eq-board-lead {
+        margin: 0 0 22px;
+        text-align: center;
+        color: #64748b;
         font-size: 14px;
-        vertical-align: middle;
     }
-
-    .who {
+    .eq-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+    }
+    .eq-card {
+        position: relative;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 12px;
-        font-weight: 600;
-        color: #0f172a;
-        white-space: nowrap;
+        text-align: center;
+        background: #fff;
+        border: 1px solid var(--cth-border);
+        border-radius: 22px;
+        padding: 28px 22px 22px;
+        box-shadow: var(--cth-shadow);
+        min-height: 320px;
     }
-
-    .ava {
-        width: 36px;
-        height: 36px;
+    .eq-card:hover { border-color: #9cbcab; }
+    .eq-card.is-inactive { opacity: .72; background: #f8fafc; }
+    .eq-card-icon {
+        width: 56px;
+        height: 56px;
         border-radius: 50%;
-        background: #ecfdf5;
-        color: var(--cth-green-text);
+        background: var(--cth-green-soft);
+        color: var(--cth-green);
         display: grid;
         place-items: center;
-        font-size: 12px;
-        font-weight: 700;
-        flex-shrink: 0;
+        font-size: 22px;
+        margin-bottom: 14px;
     }
-
-    .st {
+    .eq-card h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--cth-ink);
+        letter-spacing: -.02em;
+    }
+    .eq-badge {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        font-weight: 600;
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: #ecfdf5;
         color: var(--cth-green-text);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
     }
-
-    .st i { font-size: 8px; color: var(--cth-green-bright); }
-
-    .acts { display: flex; gap: 8px; }
-
-    .acts button {
+    .eq-badge.off { background: #f1f5f9; color: #64748b; }
+    .eq-card hr {
+        width: 100%;
+        border: 0;
+        border-top: 1px solid var(--cth-line);
+        margin: 18px 0 16px;
+    }
+    .eq-assign {
+        margin: 0 0 6px;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.4;
+    }
+    .eq-assign small {
+        display: block;
+        margin-top: 4px;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .eq-lock {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: var(--cth-green);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 18px 8px 4px;
+    }
+    .eq-lock:hover { color: var(--cth-green-dark); }
+    .eq-lock i { font-size: 16px; }
+    .eq-board .sipd-pager { margin-top: 22px; }
+    .eq-card-acts {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        gap: 4px;
+    }
+    .eq-card-acts button {
         width: 32px;
         height: 32px;
         border: 0;
@@ -165,23 +214,95 @@
         cursor: pointer;
         border-radius: 8px;
     }
+    .eq-card-acts button.edit-rh:hover { background: #ecfdf5; color: var(--cth-green-text); }
+    .eq-card-acts button.danger:hover { background: #fff1f2; color: #e11d48; }
+    .eq-empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 48px 16px;
+        color: #94a3b8;
+        background: #fff;
+        border: 1px dashed var(--cth-border);
+        border-radius: 22px;
+    }
 
-    .acts button.key:hover { background: #eff6ff; color: #2563eb; }
-    .acts button.edit-rh:hover { background: #ecfdf5; color: var(--cth-green-text); }
-    .perm-chip { font-size: 12px; color: #475569; }
-    .perm-chip em { font-style: normal; color: #d97706; font-weight: 600; }
+    @media (max-width: 900px) {
+        .form-grid { grid-template-columns: 1fr; }
+        .eq-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+        .eq-grid { grid-template-columns: 1fr; }
+    }
     .perm-lead { margin: 0 0 16px; color: #64748b; font-size: 13px; line-height: 1.45; }
-    .perm-group { margin-bottom: 18px; padding-bottom: 6px; border-bottom: 1px solid var(--cth-line); }
-    .perm-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
+    .perm-back {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 14px;
+        border: 0;
+        background: transparent;
+        color: var(--cth-green);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0;
+    }
+    .perm-back.is-on { display: inline-flex; }
+    .perm-mod-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px;
-        flex-wrap: wrap;
         margin-bottom: 8px;
     }
-    .perm-group h4 { margin: 0 0 4px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
-    .perm-group p { margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.4; max-width: 380px; }
+    .perm-mod-grid.is-off { display: none; }
+    .perm-mod-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 8px;
+        min-height: 132px;
+        background: #fff;
+        border: 1px solid var(--cth-border);
+        border-radius: 16px;
+        padding: 16px 10px 14px;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+        box-shadow: var(--cth-shadow);
+    }
+    .sipd-dialog .perm-mod-card { background: #fff; }
+    .perm-mod-card:hover { border-color: #9cbcab; }
+    .perm-mod-card.is-on { border-color: var(--cth-green-bright); background: #f7fbf8; }
+    .perm-mod-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: var(--cth-green-soft);
+        color: var(--cth-green);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+    }
+    .perm-mod-card b {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--cth-ink);
+        line-height: 1.3;
+    }
+    .perm-mod-card small {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .perm-group { display: none; margin-bottom: 8px; }
+    .perm-group.is-open { display: block; }
+    .perm-head {
+        margin-bottom: 8px;
+    }
+    .perm-group h4 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: var(--cth-ink); letter-spacing: -.02em; text-transform: none; }
+    .perm-group p { margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.4; max-width: 520px; }
     .perm-time { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .perm-time span { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; }
     .perm-time select, .perm-time input[type="number"] {
@@ -197,17 +318,68 @@
         border-bottom: 1px solid var(--cth-line);
         font-size: 14px;
     }
+    .sipd-dialog .perm-row { display: grid; }
     .perm-row:last-child { border-bottom: 0; }
     .perm-row input[type="checkbox"] { margin-top: 4px; }
+    .perm-row .perm-time { grid-column: 2; margin-top: 2px; }
     .perm-copy b { display: block; color: #0f172a; font-weight: 600; }
     .perm-copy small { display: block; margin-top: 2px; color: #94a3b8; font-size: 12px; font-weight: 400; line-height: 1.35; }
-    .sipd-dialog.modal-perm { max-width: 720px; max-height: 88vh; overflow: auto; }
-    .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
-
-    .empty {
-        text-align: center;
-        padding: 40px 16px;
+    .perm-flag {
+        display: inline-block;
+        margin-top: 4px;
+        font-size: 11px;
+        font-weight: 700;
         color: #94a3b8;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .perm-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+    }
+    .perm-chips > p {
+        flex: 1 0 100%;
+        width: 100%;
+        max-width: none;
+        margin: 0 0 2px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+    }
+    .sipd-dialog label.perm-chip {
+        display: inline-flex;
+        align-items: center;
+        margin: 0;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.2;
+        cursor: pointer;
+    }
+    .perm-chip input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        border: 0;
+    }
+    .sipd-dialog label.perm-chip.is-on {
+        background: var(--cth-green-soft);
+        border-color: var(--cth-green-bright);
+        color: var(--cth-green);
+    }
+    .sipd-dialog.modal-perm { max-width: 760px; max-height: 88vh; overflow: auto; }
+    @media (max-width: 700px) {
+        .perm-mod-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     .modal-bg {
@@ -335,11 +507,6 @@
     .toggle-copy { display: block; }
     .toggle-copy b { display: block; font-size: 14px; }
     .toggle-copy small { display: block; color: #64748b; font-size: 12px; font-weight: 500; margin-top: 2px; }
-
-    @media (max-width: 900px) {
-        .form-grid { grid-template-columns: 1fr; }
-        .table-card { overflow-x: auto; }
-    }
 </style>
 @endsection
 
@@ -357,7 +524,7 @@
                 </div>
                 <div>
                     <label>Correo sipd</label>
-                    <input type="email" name="email" required placeholder="nombreapellido@sipd.co" autocomplete="off">
+                    <input type="email" name="email" required placeholder="nombreapellido@sipd.co" pattern="[A-Za-z]+@sipd\.co" title="texto@sipd.co" autocomplete="off">
                 </div>
                 <div>
                     <label>Contraseña</label>
@@ -377,95 +544,73 @@
         </form>
     </div>
 
-    <div class="table-card">
-        <table class="abg">
-            <thead>
-                <tr>
-                    <th>NOMBRE</th>
-                    <th>CORREO</th>
-                    <th>CARGO</th>
-                    <th>ESTADO</th>
-                    <th>CARGA</th>
-                    <th>PERMISOS</th>
-                    <th>ACCIONES</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($abogados as $abogado)
-                    <tr class="{{ $abogado->estaActivo() ? '' : 'is-inactive' }}">
-                        <td>
-                            <div class="who">
-                                <span class="ava">{{ $abogado->inicialesCortas() }}</span>
-                                {{ $abogado->name }}
-                            </div>
-                        </td>
-                        <td>{{ $abogado->email }}</td>
-                        <td>{{ $abogado->cargo ?: 'Equipo de RH' }}</td>
-                        <td>
-                            @if($abogado->estaActivo())
-                                <span class="estado-chip on"><i class="fas fa-circle"></i> Activo</span>
-                            @else
-                                <span class="estado-chip off"><i class="fas fa-circle"></i> Inactivo</span>
+    <section class="eq-board">
+        <h2 class="eq-board-title">Distribuye cargos y permisos</h2>
+        <p class="eq-board-lead">Asignados por la coordinadora a cada integrante del equipo.</p>
+        <div class="eq-grid">
+            @forelse($abogados as $abogado)
+                @php
+                    $vigentes = $abogado->permisos->filter(function ($p) { return $p->estaVigente(); });
+                    $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
+                @endphp
+                <article class="eq-card{{ $abogado->estaActivo() ? '' : ' is-inactive' }}">
+                    <div class="eq-card-acts">
+                        <button type="button" class="edit-rh" title="Editar"
+                            data-name="{{ $abogado->name }}"
+                            data-email="{{ $abogado->email }}"
+                            data-cargo="{{ $abogado->cargo }}"
+                            data-activo="{{ $abogado->estaActivo() ? '1' : '0' }}"
+                            data-action="{{ route('coordinadora.abogados.editar', $abogado->id) }}">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <form action="{{ route('coordinadora.abogados.eliminar', $abogado->id) }}" method="POST"
+                              data-confirm="Se eliminará este registro de recursos humanos."
+                              data-confirm-title="Eliminar registro"
+                              data-confirm-ok="Eliminar"
+                              data-confirm-danger="1"
+                              data-confirm-icon="warning">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="danger" title="Eliminar">
+                                <i class="far fa-trash-alt"></i>
+                            </button>
+                        </form>
+                    </div>
+                    <div class="eq-card-icon" aria-hidden="true">
+                        <i class="far fa-user"></i>
+                    </div>
+                    <h3 title="{{ $abogado->name }}">{{ $abogado->nombreCorto() }}</h3>
+                    @if($abogado->estaActivo())
+                        <span class="eq-badge">Equipo RH</span>
+                    @else
+                        <span class="eq-badge off">Inactivo</span>
+                    @endif
+                    <hr>
+                    <p class="eq-assign">
+                        {{ $abogado->cargo ?: 'Equipo de RH' }}
+                        <small>
+                            Cargo asignado por la coordinadora
+                            · {{ $vigentes->count() }} permiso{{ $vigentes->count() === 1 ? '' : 's' }}
+                            @if($temps > 0)
+                                · {{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }}
                             @endif
-                        </td>
-                        <td>{{ $abogado->procesos_count }} caso{{ $abogado->procesos_count === 1 ? '' : 's' }}
-                            @if(($abogado->procesos_abiertos_count ?? 0) > 0)
-                                · {{ $abogado->procesos_abiertos_count }} abierto{{ $abogado->procesos_abiertos_count === 1 ? '' : 's' }}
-                            @endif
-                        </td>
-                        <td>
-                            @php
-                                $vigentes = $abogado->permisos->filter(function ($p) { return $p->estaVigente(); });
-                                $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
-                            @endphp
-                            <span class="perm-chip">
-                                {{ $vigentes->count() }} activo{{ $vigentes->count() === 1 ? '' : 's' }}
-                                @if($temps > 0)
-                                    · <em>{{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }}</em>
-                                @endif
-                            </span>
-                        </td>
-                        <td>
-                            <div class="acts">
-                                <button type="button" class="key" title="Permisos"
-                                    data-name="{{ $abogado->name }}"
-                                    data-action="{{ route('coordinadora.abogados.permisos', $abogado->id) }}"
-                                    data-permisos='@json($abogado->permisosParaFormulario())'
-                                    data-modulos='@json($abogado->duracionesModuloParaFormulario())'
-                                    onclick="abrirPermisos(this)">
-                                    <i class="fas fa-key"></i>
-                                </button>
-                                <button type="button" class="edit-rh" title="Editar"
-                                    data-name="{{ $abogado->name }}"
-                                    data-email="{{ $abogado->email }}"
-                                    data-cargo="{{ $abogado->cargo }}"
-                                    data-activo="{{ $abogado->estaActivo() ? '1' : '0' }}"
-                                    data-action="{{ route('coordinadora.abogados.editar', $abogado->id) }}">
-                                    <i class="fas fa-pen"></i>
-                                </button>
-                                <form action="{{ route('coordinadora.abogados.eliminar', $abogado->id) }}" method="POST"
-                                      data-confirm="Se eliminará este registro de recursos humanos."
-                                      data-confirm-title="Eliminar registro"
-                                      data-confirm-ok="Eliminar"
-                                      data-confirm-danger="1"
-                                      data-confirm-icon="warning">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="danger" title="Eliminar">
-                                        <i class="far fa-trash-alt"></i>
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="empty">No hay personal de RH registrado</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+                        </small>
+                    </p>
+                    <button type="button" class="eq-lock" title="Permisos"
+                        data-name="{{ $abogado->name }}"
+                        data-action="{{ route('coordinadora.abogados.permisos', $abogado->id) }}"
+                        data-permisos='@json($abogado->permisosParaFormulario())'
+                        onclick="abrirPermisos(this)">
+                        <i class="fas fa-lock"></i>
+                        Configurar permisos
+                    </button>
+                </article>
+            @empty
+                <div class="eq-empty">No hay personal de RH registrado</div>
+            @endforelse
+        </div>
+        @include('partials.paginacion', ['paginador' => $abogados, 'etiqueta' => 'integrantes'])
+    </section>
 
     <div class="sipd-dialog-bg" id="modalEditar">
         <div class="sipd-dialog">
@@ -508,41 +653,70 @@
     <div class="sipd-dialog-bg" id="modalPermisos">
         <div class="sipd-dialog modal-perm">
             <h3>Permisos · <span id="permNombre"></span></h3>
-            <p class="perm-lead">Ver, editar y eliminar van cada uno por su lado. El tiempo es uno por módulo y cubre las funciones que marques.</p>
+            <p class="perm-lead" id="permLead">Elige un módulo para configurar sus opciones. Inicio lo ve todo el equipo, por eso no aparece aquí.</p>
+            <button type="button" class="perm-back" id="permBack" onclick="mostrarModulos()">
+                <i class="fas fa-arrow-left"></i> Módulos
+            </button>
             <form id="formPermisos" method="POST">
                 @csrf
                 @method('PUT')
+                <div class="perm-mod-grid" id="permModGrid">
+                    @foreach($catalogoPermisos as $grupoKey => $grupo)
+                        <button type="button" class="perm-mod-card" data-grupo="{{ $grupoKey }}" onclick="abrirModulo('{{ $grupoKey }}')">
+                            <span class="perm-mod-icon" aria-hidden="true">
+                                <i class="{{ $grupo['icon'] ?? 'fas fa-folder' }}"></i>
+                            </span>
+                            <b>{{ $grupo['label'] }}</b>
+                            <small class="perm-mod-count">0 de {{ count($grupo['items']) }}</small>
+                        </button>
+                    @endforeach
+                </div>
                 @foreach($catalogoPermisos as $grupoKey => $grupo)
-                    <div class="perm-group" data-grupo="{{ $grupoKey }}">
+                    <div class="perm-group" data-grupo="{{ $grupoKey }}" data-lead="{{ $grupo['lead'] ?? '' }}">
                         <div class="perm-head">
-                            <div>
-                                <h4>{{ $grupo['label'] }}</h4>
-                                @if(!empty($grupo['desc']))
-                                    <p>{{ $grupo['desc'] }}</p>
-                                @endif
-                            </div>
-                            <div class="perm-time">
-                                <span>Tiempo del módulo</span>
-                                <select name="duracion[{{ $grupoKey }}]" class="mod-dur">
-                                    <option value="permanente">Permanente</option>
-                                    @foreach($duracionesPermiso as $valor => $texto)
-                                        <option value="{{ $valor }}">{{ $texto }}</option>
-                                    @endforeach
-                                </select>
-                                <input type="number" name="horas[{{ $grupoKey }}]" min="1" max="168" placeholder="Horas" class="mod-hrs" style="display:none;">
-                            </div>
+                            <h4>{{ $grupo['label'] }}</h4>
+                            @if(!empty($grupo['desc']))
+                                <p>{{ $grupo['desc'] }}</p>
+                            @endif
                         </div>
                         @foreach($grupo['items'] as $clave => $etiqueta)
-                            <label class="perm-row">
+                            @php $conTiempo = \App\Support\RhPermisos::esTemporalizable($clave); @endphp
+                            <label class="perm-row{{ $conTiempo ? ' has-time' : '' }}">
                                 <input type="checkbox" name="permisos[]" value="{{ $clave }}">
                                 <span class="perm-copy">
                                     <b>{{ $etiqueta }}</b>
                                     @if(!empty($grupo['hints'][$clave]))
                                         <small>{{ $grupo['hints'][$clave] }}</small>
                                     @endif
+                                    @unless($conTiempo)
+                                        <span class="perm-flag">Permanente</span>
+                                    @endunless
                                 </span>
+                                @if($conTiempo)
+                                    <div class="perm-time">
+                                        <span>Tiempo</span>
+                                        <select name="duracion[{{ $clave }}]" class="fn-dur" data-clave="{{ $clave }}">
+                                            <option value="permanente">Permanente</option>
+                                            @foreach($duracionesPermiso as $valor => $texto)
+                                                <option value="{{ $valor }}">{{ $texto }}</option>
+                                            @endforeach
+                                        </select>
+                                        <input type="number" name="horas[{{ $clave }}]" min="1" max="168" placeholder="Horas" class="fn-hrs" style="display:none;">
+                                    </div>
+                                @endif
                             </label>
                         @endforeach
+                        @if($grupoKey === 'registro')
+                            <div class="perm-chips">
+                                <p>Modalidades</p>
+                                @foreach(\App\Support\Modalidades::permisos() as $clave => $etiqueta)
+                                    <label class="perm-chip">
+                                        <input type="checkbox" name="permisos[]" value="{{ $clave }}">
+                                        <span>{{ $etiqueta }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 @endforeach
                 <div class="sipd-dialog-actions">
@@ -605,36 +779,73 @@
         document.getElementById('modalEditar').style.display = 'flex';
     @endif
 
+    function refrescarResumenModulos() {
+        document.querySelectorAll('.perm-mod-card').forEach(function (card) {
+            var key = card.getAttribute('data-grupo');
+            var group = document.querySelector('#formPermisos .perm-group[data-grupo="' + key + '"]');
+            if (!group) return;
+            var cbs = group.querySelectorAll('.perm-row input[type="checkbox"]');
+            var on = group.querySelectorAll('.perm-row input[type="checkbox"]:checked').length;
+            var count = card.querySelector('.perm-mod-count');
+            if (count) count.textContent = on + ' de ' + cbs.length;
+            card.classList.toggle('is-on', on > 0);
+        });
+    }
+
+    function mostrarModulos() {
+        document.getElementById('permModGrid').classList.remove('is-off');
+        document.getElementById('permBack').classList.remove('is-on');
+        document.getElementById('permLead').textContent = 'Elige un módulo para configurar sus opciones. Inicio lo ve todo el equipo, por eso no aparece aquí.';
+        document.querySelectorAll('#formPermisos .perm-group').forEach(function (group) {
+            group.classList.remove('is-open');
+        });
+        refrescarResumenModulos();
+    }
+
+    function abrirModulo(grupo) {
+        document.getElementById('permModGrid').classList.add('is-off');
+        document.getElementById('permBack').classList.add('is-on');
+        var lead = 'Ver, registrar, guardar borrador y descargar se activan o se apagan y quedan permanentes. El tiempo solo aplica a editar y eliminar.';
+        document.querySelectorAll('#formPermisos .perm-group').forEach(function (group) {
+            var abierto = group.getAttribute('data-grupo') === grupo;
+            group.classList.toggle('is-open', abierto);
+            if (!abierto) return;
+            if (group.getAttribute('data-lead')) lead = group.getAttribute('data-lead');
+            syncTodasDuraciones();
+        });
+        document.getElementById('permLead').textContent = lead;
+    }
+
     function abrirPermisos(btn) {
         var data = {};
-        var mods = {};
         try { data = JSON.parse(btn.getAttribute('data-permisos') || '{}'); } catch (e) { data = {}; }
-        try { mods = JSON.parse(btn.getAttribute('data-modulos') || '{}'); } catch (e) { mods = {}; }
         document.getElementById('permNombre').textContent = btn.getAttribute('data-name') || '';
         document.getElementById('formPermisos').action = btn.getAttribute('data-action') || '';
         document.querySelectorAll('#formPermisos input[type="checkbox"]').forEach(function (cb) {
             var grant = data[cb.value];
             cb.checked = !!(grant && grant.on);
         });
-        document.querySelectorAll('#formPermisos .perm-group').forEach(function (group) {
-            var info = mods[group.getAttribute('data-grupo')] || {};
-            var sel = group.querySelector('.mod-dur');
-            var hrs = group.querySelector('.mod-hrs');
-            if (sel) sel.value = info.duracion || 'permanente';
-            if (hrs) hrs.value = info.horas || '';
-            syncModuloDuracion(group);
+        document.querySelectorAll('#formPermisos .fn-dur').forEach(function (sel) {
+            var grant = data[sel.getAttribute('data-clave')] || {};
+            var hrs = sel.parentNode.querySelector('.fn-hrs');
+            sel.value = grant.duracion || 'permanente';
+            if (hrs) hrs.value = grant.horas || '';
         });
+        syncTodasDuraciones();
+        syncChips();
+        mostrarModulos();
         document.getElementById('modalPermisos').style.display = 'flex';
     }
 
     function cerrarPermisos() {
         document.getElementById('modalPermisos').style.display = 'none';
+        mostrarModulos();
     }
 
     var REQUIERE = @json($requierePermisos ?? []);
 
-    function permCb(clave) {
-        return document.querySelector('#formPermisos input[type="checkbox"][value="' + clave + '"]');
+    function permCbs(clave) {
+        return document.querySelectorAll('#formPermisos input[type="checkbox"][value="' + clave + '"]');
     }
 
     function hijosDe(padre) {
@@ -643,50 +854,85 @@
         });
     }
 
-    function syncModuloDuracion(group) {
-        if (!group) return;
-        var alguna = group.querySelector('input[type="checkbox"]:checked');
-        var sel = group.querySelector('.mod-dur');
-        var hrs = group.querySelector('.mod-hrs');
-        if (sel) sel.disabled = !alguna;
+    function syncFilaDuracion(row) {
+        if (!row) return;
+        var cb = row.querySelector('input[type="checkbox"]');
+        var on = !!(cb && cb.checked);
+        var sel = row.querySelector('.fn-dur');
+        var hrs = row.querySelector('.fn-hrs');
+        if (sel) sel.disabled = !on;
         if (hrs) {
             var custom = sel && sel.value === 'custom';
             hrs.style.display = custom ? '' : 'none';
-            hrs.disabled = !alguna || !custom;
+            hrs.disabled = !on || !custom;
         }
+    }
+
+    function syncTodasDuraciones() {
+        document.querySelectorAll('#formPermisos .perm-row.has-time').forEach(syncFilaDuracion);
+    }
+
+    function syncChips() {
+        document.querySelectorAll('#formPermisos .perm-chip').forEach(function (chip) {
+            var cb = chip.querySelector('input[type="checkbox"]');
+            chip.classList.toggle('is-on', !!(cb && cb.checked));
+        });
     }
 
     function marcarPadres(clave) {
         (REQUIERE[clave] || []).forEach(function (padre) {
-            var cb = permCb(padre);
-            if (cb && !cb.checked) {
+            var encender = false;
+            permCbs(padre).forEach(function (cb) {
+                if (!cb.checked) encender = true;
                 cb.checked = true;
-                marcarPadres(padre);
-            }
+            });
+            if (encender) marcarPadres(padre);
         });
     }
 
     function desmarcarHijos(padre) {
         hijosDe(padre).forEach(function (hijo) {
-            var cb = permCb(hijo);
-            if (cb && cb.checked) {
+            var apagar = false;
+            permCbs(hijo).forEach(function (cb) {
+                if (cb.checked) apagar = true;
                 cb.checked = false;
-                desmarcarHijos(hijo);
-            }
+            });
+            if (apagar) desmarcarHijos(hijo);
+        });
+    }
+
+    function syncGemelos(clave, checked) {
+        permCbs(clave).forEach(function (cb) { cb.checked = checked; });
+    }
+
+    function syncDuracionGemela(origen) {
+        var clave = origen.getAttribute('data-clave');
+        if (!clave) return;
+        document.querySelectorAll('#formPermisos .fn-dur[data-clave="' + clave + '"]').forEach(function (sel) {
+            if (sel !== origen) sel.value = origen.value;
+            var hrs = sel.parentNode.querySelector('.fn-hrs');
+            var origenHrs = origen.parentNode.querySelector('.fn-hrs');
+            if (hrs && origenHrs && hrs !== origenHrs) hrs.value = origenHrs.value;
         });
     }
 
     document.getElementById('formPermisos').addEventListener('change', function (e) {
-        var group = e.target.closest('.perm-group');
         var row = e.target.closest('.perm-row');
         if (row && e.target.type === 'checkbox') {
+            syncGemelos(e.target.value, e.target.checked);
             if (e.target.checked) {
                 marcarPadres(e.target.value);
             } else {
                 desmarcarHijos(e.target.value);
             }
         }
-        syncModuloDuracion(group);
+        if (e.target.classList.contains('fn-dur') || e.target.classList.contains('fn-hrs')) {
+            var sel = e.target.classList.contains('fn-dur') ? e.target : e.target.parentNode.querySelector('.fn-dur');
+            if (sel) syncDuracionGemela(sel);
+        }
+        syncTodasDuraciones();
+        syncChips();
+        refrescarResumenModulos();
     });
     document.getElementById('formPermisos').addEventListener('submit', function () {
         this.querySelectorAll('select, input').forEach(function (el) { el.disabled = false; });

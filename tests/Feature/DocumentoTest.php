@@ -241,6 +241,79 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
+    public function guardar_borrador_sin_permiso_responde_403()
+    {
+        $user = $this->makeUser('abogado');
+        $user->permisos()->where('permiso', 'editar_documentos')->delete();
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)->put(
+            route('documentos.save', [$caso->id, 'disciplinario']),
+            ['yellow_blocks' => $this->filledBlocks('disciplinario')]
+        )->assertForbidden();
+    }
+
+    /** @test */
+    public function guardar_despues_de_generar_sin_editar_generados_responde_403()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+        $caso->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+        ]);
+
+        $this->actingAs($user)->put(
+            route('documentos.save', [$caso->id, 'disciplinario']),
+            ['yellow_blocks' => $this->filledBlocks('disciplinario')]
+        )->assertForbidden();
+    }
+
+    /** @test */
+    public function guardar_edicion_despues_de_generar_con_permiso_no_revierte_estado()
+    {
+        $user = $this->makeUser('abogado', ['editar_generados']);
+        $caso = $this->makeCaso($user);
+        $caso->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+        ]);
+
+        $blocks = $this->filledBlocks('disciplinario');
+        $blocks[0] = 'TEXTO_EDITADO_POST_GENERAR';
+
+        $this->actingAs($user)
+            ->put(route('documentos.save', [$caso->id, 'disciplinario']), [
+                'yellow_blocks' => $blocks,
+            ])
+            ->assertRedirect(route('documentos.edit', [$caso->id, 'disciplinario']));
+
+        $caso->refresh();
+        $this->assertSame('generado', $caso->estadoDocumento('disciplinario')->estado);
+        $this->assertSame(
+            'TEXTO_EDITADO_POST_GENERAR',
+            $caso->datos_oficiales['yellow_blocks']['disciplinario'][0]
+        );
+    }
+
+    /** @test */
+    public function documento_generado_muestra_guardar_edicion_y_no_borrador()
+    {
+        $user = $this->makeUser('abogado', ['editar_generados']);
+        $caso = $this->makeCaso($user);
+        $caso->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.edit', [$caso->id, 'disciplinario']))
+            ->assertOk()
+            ->assertSee('Guarda cambios en un documento ya generado')
+            ->assertDontSee('Guarda el avance sin generar el documento');
+    }
+
+    /** @test */
     public function generar_documento_lo_marca_sin_descargar()
     {
         $user = $this->makeUser('abogado');
@@ -543,6 +616,7 @@ class DocumentoTest extends TestCase
             ->post(route('abogado.registro.store'), [
                 'tipo_proceso' => 'terminacion',
                 'nombre' => 'Conductor Demo',
+                'cedula' => '1234567890',
             ])
             ->assertRedirect(route('documentos.hub'))
             ->assertSessionHas('clear_nuevo_draft')
@@ -572,6 +646,7 @@ class DocumentoTest extends TestCase
             ->get(route('documentos.hub'))
             ->assertOk()
             ->assertSee('Pendiente')
+            ->assertDontSee('En proceso')
             ->assertSee('Borrador')
             ->assertSee('Generada, no descargada')
             ->assertDontSee('Generada y descargada')
@@ -592,7 +667,33 @@ class DocumentoTest extends TestCase
         $this->actingAs($user)
             ->get(route('documentos.hub'))
             ->assertOk()
-            ->assertSee('Generada y descargada');
+            ->assertSee('Generada y descargada')
+            ->assertSee('En proceso');
+    }
+
+    /** @test */
+    public function el_estado_visible_pasa_a_en_proceso_al_descargar_un_documento()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
+
+        $this->assertSame('Pendiente', $caso->estadoVisible());
+
+        $caso->update(['estado' => 'En Proceso']);
+        $this->assertSame('Pendiente', $caso->fresh()->estadoVisible());
+
+        $caso->estadoDocumento('acta')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now(),
+        ]);
+        $this->assertSame('En proceso', $caso->fresh()->estadoVisible());
+
+        $caso->update(['estado' => 'Sancionado']);
+        $this->assertSame('Sancionado', $caso->fresh()->estadoVisible());
+
+        $caso->update(['estado' => 'Archivado']);
+        $this->assertSame('Archivado', $caso->fresh()->estadoVisible());
     }
 
     /** @test */
@@ -1208,5 +1309,55 @@ class DocumentoTest extends TestCase
             ->get(route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']))
             ->assertOk()
             ->assertSee('btn-volver-lista" href="'.route('documentos.hub').'"', false);
+    }
+
+    /** @test */
+    public function solo_la_coordinadora_puede_manejar_un_caso_sancionado_o_archivado()
+    {
+        $rh = $this->makeUser('abogado', ['editar_casos', 'editar_documentos', 'eliminar_casos']);
+        $coord = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($rh, ['estado' => 'Sancionado', 'nombre' => 'Cerrado']);
+
+        $this->actingAs($rh)
+            ->from(route('abogado.detalleproceso', $caso->id))
+            ->put(route('abogado.actualizarproceso', $caso->id), ['nombre' => 'Tocado'])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('Cerrado', $caso->fresh()->nombre);
+
+        $this->actingAs($rh)
+            ->delete(route('abogado.eliminarproceso', $caso->id))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertNotNull($caso->fresh());
+
+        $this->actingAs($coord)
+            ->from(route('abogado.detalleproceso', $caso->id))
+            ->put(route('abogado.actualizarproceso', $caso->id), [
+                'nombre' => 'Corregido',
+                'cedula' => '1234567890',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('Corregido', $caso->fresh()->nombre);
+
+        $archivado = $this->makeCaso($rh, ['estado' => 'Archivado', 'nombre' => 'Archivo']);
+
+        $this->actingAs($rh)
+            ->from(route('documentos.edit', [$archivado->id, 'disciplinario']))
+            ->put(route('documentos.save', [$archivado->id, 'disciplinario']), [])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('Archivo', $archivado->fresh()->nombre);
+
+        $this->actingAs($rh)
+            ->get(route('abogado.detalleproceso', $caso->id))
+            ->assertOk()
+            ->assertSee('Solo la coordinadora puede manejarlo')
+            ->assertDontSee('Editar Proceso');
     }
 }

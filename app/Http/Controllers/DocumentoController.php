@@ -121,8 +121,9 @@ class DocumentoController extends Controller
     {
         $this->assertValidTipo($tipo);
         $caso   = $this->accessibleCase($id);
+        $bloqueado = $caso->soloLoManejaCoordinadora();
         $slot   = CasoDocumentoEstado::slotDe($tipo);
-        if ($slot) {
+        if ($slot && !$bloqueado) {
             $caso->guardarVarianteSlot($slot, $tipo);
         }
         $estadoDoc = $caso->estadoDocumento($tipo);
@@ -132,6 +133,8 @@ class DocumentoController extends Controller
         $bloques      = $caso->datos_oficiales['yellow_blocks'][$tipo] ?? [];
         $defaultTexts = $documents->defaultTexts($tipo);
 
+        $yaGenerado = $estadoDoc->estado === 'generado';
+
         return view('documents.edit', [
             'pageTitle'    => 'Diligenciar · ' . $this->labelTipo($tipo),
             'caso'         => $caso,
@@ -139,6 +142,10 @@ class DocumentoController extends Controller
             'slot'         => $slot,
             'labelTipo'    => $this->labelTipo($tipo),
             'estadoDoc'    => $estadoDoc,
+            'yaGenerado'   => $yaGenerado,
+            'puedeEscribir' => $yaGenerado
+                ? auth()->user()->puede('editar_generados')
+                : auth()->user()->puede('editar_documentos'),
             'definitions'  => $definitions,
             'sections'     => $sections,
             'bloques'      => $bloques,
@@ -162,13 +169,24 @@ class DocumentoController extends Controller
         $this->assertValidTipo($tipo);
         $formato = $request->input('formato');
         $quiereGenerar = in_array($formato, ['docx', 'pdf', 'generar'], true);
-        auth()->user()->exigir($quiereGenerar ? 'generar_documentos' : 'editar_documentos');
 
-        $caso        = $this->accessibleCase($id);
-        $slot        = CasoDocumentoEstado::slotDe($tipo);
+        $caso = $this->accessibleCase($id);
+        $slot = CasoDocumentoEstado::slotDe($tipo);
         if ($slot) {
             $caso->guardarVarianteSlot($slot, $tipo);
         }
+
+        $estadoDoc = $caso->estadoDocumento($tipo);
+        $yaGenerado = $estadoDoc->estado === 'generado';
+        if ($yaGenerado) {
+            auth()->user()->exigir('editar_generados');
+            if ($quiereGenerar) {
+                auth()->user()->exigir('generar_documentos');
+            }
+        } else {
+            auth()->user()->exigir($quiereGenerar ? 'generar_documentos' : 'editar_documentos');
+        }
+
         $definitions = $documents->blockDefinitions($tipo);
 
         $bloques = $this->bloquesDesdeRequest($request, $tipo, count($definitions));
@@ -185,7 +203,6 @@ class DocumentoController extends Controller
         $allFilled = collect($bloques)->every(fn ($v) => trim((string) $v) !== '');
         $nuevoEstado = $allFilled ? 'completo' : 'en_diligenciamiento';
 
-        $estadoDoc = $caso->estadoDocumento($tipo);
         if ($quiereGenerar) {
             $estadoDoc->update([
                 'estado' => 'generado',
@@ -207,11 +224,11 @@ class DocumentoController extends Controller
 
         $redirect = redirect()->route('documentos.edit', [$id, $tipo]);
 
-        if ($tipo === 'terminacion') {
-            return $redirect->with('success', 'Borrador guardado. Genera y descárgalo en Generar documentos.');
+        if ($yaGenerado) {
+            return $redirect->with('success', 'Edición guardada.');
         }
 
-        if ($allFilled) {
+        if ($tipo === 'terminacion' || $allFilled) {
             return $redirect->with('success', 'Borrador guardado. Genera y descárgalo en Generar documentos.');
         }
 

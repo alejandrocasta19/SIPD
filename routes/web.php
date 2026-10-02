@@ -9,6 +9,7 @@ use App\Http\Controllers\DocumentoController;
 use App\Http\Controllers\AnexoController;
 use App\Http\Controllers\AvisoController;
 use App\Http\Controllers\CoordinadoraController;
+use App\Http\Controllers\Auth\SesionInactividadController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +44,12 @@ Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::get('/abogado', [ProcesoDisciplinarioController::class, 'dashboard'])
         ->name('abogado.dashboard');
+
+    Route::post('/sesion/actividad', [SesionInactividadController::class, 'actividad'])
+        ->name('sesion.actividad');
+
+    Route::post('/sesion/expirar', [SesionInactividadController::class, 'expirar'])
+        ->name('sesion.expirar');
 
 });
 

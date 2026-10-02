@@ -39,7 +39,11 @@
 
                         <a class="btn btn-secondary btn-volver-lista" href="{{ $volverA }}"><i class="fas fa-arrow-left"></i> Volver a la lista</a>
 
-                        @if(auth()->user()->puede('editar_casos'))
+                        @if($proceso->soloLoManejaCoordinadora())
+                        <span class="btn btn-outline-secondary disabled" style="pointer-events:none;">
+                            <i class="fas fa-lock"></i> Solo la coordinadora puede manejarlo
+                        </span>
+                        @elseif(auth()->user()->puede('editar_casos'))
                         <button type="button"
                                 class="btn btn-primary"
                                 onclick="habilitarEdicion()">
@@ -183,11 +187,11 @@
                 
                 <div class="card-body">
                     
-                    <!-- Información del Conductor -->
+                    <!-- Información del trabajador -->
                     <div class="info-box">
 
                         <div class="info-header">
-                            <h4><i class="fas fa-user"></i>Información del Conductor</h4>
+                            <h4><i class="fas fa-user"></i>Información del trabajador</h4>
                         </div>
 
                         <div class="info-content">
@@ -195,12 +199,15 @@
                             <div class="row">
 
                                 <div class="col-md-3">
-                                    <strong>Nombre del Conductor:</strong>
+                                    <strong>Nombre del trabajador:</strong>
 
                                     <input type="text"
                                            name="nombre"
+                                           id="inp-nombre"
                                            value="{{ $proceso->nombre }}"
                                            class="form-control campo-editable"
+                                           title="Solo letras"
+                                           required
                                            readonly>
                                 </div>
 
@@ -209,8 +216,13 @@
 
                                     <input type="text"
                                            name="cedula"
+                                           id="inp-cedula"
                                            value="{{ $proceso->cedula }}"
                                            class="form-control campo-editable"
+                                           inputmode="numeric"
+                                           pattern="[0-9]+"
+                                           title="Solo números"
+                                           required
                                            readonly>
                                 </div>
 
@@ -219,8 +231,12 @@
 
                                     <input type="text"
                                            name="telefono"
+                                           id="inp-telefono"
                                            value="{{ $proceso->telefono }}"
                                            class="form-control campo-editable"
+                                           inputmode="numeric"
+                                           pattern="[0-9]*"
+                                           title="Solo números"
                                            readonly>
                                 </div>
 
@@ -229,8 +245,46 @@
 
                                     <input type="text"
                                            name="modalidad"
+                                           id="inp-modalidad"
                                            value="{{ $proceso->modalidad }}"
                                            class="form-control campo-editable"
+                                           readonly>
+                                </div>
+
+                                @php
+                                    $placaAplica = \App\Support\Modalidades::usaPlaca($proceso->modalidad);
+                                    $cargoAplica = filled($proceso->cargo) || $proceso->modalidad === 'Administrativos' || \App\Support\Modalidades::pideCargo($proceso->modalidad);
+                                @endphp
+                                <div class="col-md-3" id="cargo-field" @unless($cargoAplica) hidden @endunless>
+                                    <strong>Cargo:</strong>
+                                    @if($proceso->modalidad === 'Administrativos')
+                                        <select name="cargo" id="inp-cargo" class="form-control campo-editable" disabled>
+                                            @foreach(\App\Support\Modalidades::areasAdministrativas() as $area)
+                                                <option value="{{ $area }}" {{ $proceso->cargo === $area ? 'selected' : '' }}>{{ $area }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <input type="text"
+                                               name="cargo"
+                                               id="inp-cargo"
+                                               value="{{ $proceso->cargo }}"
+                                               class="form-control campo-editable"
+                                               title="Solo letras"
+                                               @if($cargoAplica) required @endif
+                                               @unless($cargoAplica) disabled @endunless
+                                               readonly>
+                                    @endif
+                                </div>
+                                <div class="col-md-3" id="placa-field" @unless($placaAplica) hidden @endunless>
+                                    <strong>Placa del vehículo:</strong>
+
+                                    <input type="text"
+                                           name="placa"
+                                           id="inp-placa"
+                                           value="{{ $proceso->placa }}"
+                                           class="form-control campo-editable"
+                                           placeholder="Ej: GRK206"
+                                           @unless($placaAplica) disabled @endunless
                                            readonly>
                                 </div>
 
@@ -555,6 +609,11 @@
     .flujo-doc-card.is-actual .flujo-doc-now { color: #1d4ed8; }
 
     .info-box {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        min-height: 0;
+        padding: 0;
         background: #fff;
         border: 1px solid var(--cth-border);
         border-radius: 12px;
@@ -707,13 +766,31 @@
 
 <script>
 
+var MODALIDADES_PLACA = @json(\App\Support\Modalidades::conPlaca());
+
+function syncPlacaDetalle() {
+    var mod = document.getElementById('inp-modalidad');
+    var box = document.getElementById('placa-field');
+    var input = document.getElementById('inp-placa');
+    var aplica = MODALIDADES_PLACA.indexOf(((mod && mod.value) || '').trim()) !== -1;
+    if (box) box.hidden = !aplica;
+    if (input) input.disabled = !aplica;
+}
+
 function habilitarEdicion() {
     let campos = document.querySelectorAll('.campo-editable');
     campos.forEach(campo => {
         campo.removeAttribute('readonly');
         campo.removeAttribute('disabled');
     });
+    syncPlacaDetalle();
     document.getElementById('btnGuardar').style.display = 'inline-block';
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    var mod = document.getElementById('inp-modalidad');
+    if (mod) mod.addEventListener('input', syncPlacaDetalle);
+    syncPlacaDetalle();
+});
 </script>
 @endsection

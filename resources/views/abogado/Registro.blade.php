@@ -206,6 +206,75 @@
 .f-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
 .f-grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 14px; }
 @media (max-width: 700px) { .f-grid-2, .f-grid-3 { grid-template-columns: 1fr; } }
+.mod-note { margin: -8px 0 16px; font-size: 13px; font-weight: 500; color: #64748b; }
+.mod-step {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.mod-step.is-done { color: var(--cth-green-text); font-weight: 600; }
+.mod-sub {
+    margin: -4px 0 16px;
+    padding: 14px 14px 2px;
+    border-radius: 14px;
+    background: #fffbeb;
+    border: 1.5px dashed #f59e0b;
+}
+.mod-sub .mod-step { color: #92400e; }
+.mod-sub.is-done {
+    background: #f0fdf4;
+    border-style: solid;
+    border-color: #bbf7d0;
+}
+.js-grupo .mod-chevron { font-size: 11px; margin-left: 2px; transition: transform .2s; }
+.js-grupo.is-open {
+    background: #fff;
+    color: var(--cth-green-text);
+    border-color: var(--c-green);
+}
+.js-grupo.is-open .mod-chevron { transform: rotate(180deg); }
+.doc-actions {
+    max-width: 850px;
+    margin: 16px auto 0;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.doc-actions .resp-strip {
+    margin: 0;
+    flex: 1;
+    min-width: 220px;
+    background: #f0fdf4;
+}
+.doc-actions-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+.btn-toolbar.btn-firma {
+    background: #fff;
+    color: #0f172a;
+    border: 1.5px solid #dbe3ee;
+    border-radius: 12px;
+    padding: 12px 18px;
+    cursor: pointer;
+}
+.btn-toolbar.btn-registrar {
+    background: var(--c-green);
+    color: #fff;
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 20px;
+    box-shadow: 0 8px 18px rgba(0, 104, 55, .22);
+}
+label.sub-tab-btn { position: relative; margin: 0; }
+label.sub-tab-btn .mod-radio {
+    position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer;
+}
 
 /* ─── Toolbar ─── */
 .form-toolbar {
@@ -324,6 +393,65 @@
     @endphp
     <input type="hidden" name="tipo_proceso" id="tipo_proceso" value="{{ $tipoInicial }}">
 
+    @php
+        $grupoAbierto = null;
+        foreach ($selector as $item) {
+            if (in_array($modalidadSeleccionada, $item['opciones'], true)) {
+                $grupoAbierto = $item['id'];
+            }
+        }
+        $mostrarExpediente = $modalidadSeleccionada !== '' && \App\Support\Modalidades::interpretar($modalidadSeleccionada, old('cargo')) !== null;
+    @endphp
+
+    @php
+        $nombreGrupoAbierto = '';
+        foreach ($selector as $item) {
+            if ($grupoAbierto === $item['id']) {
+                $nombreGrupoAbierto = $item['nombre'];
+            }
+        }
+        if ($mostrarExpediente) {
+            $textoModalidad = 'Modalidad seleccionada: ' . $modalidadSeleccionada . '.';
+        } elseif ($nombreGrupoAbierto !== '') {
+            $textoModalidad = 'Elige una opción de ' . $nombreGrupoAbierto . ' para continuar.';
+        } else {
+            $textoModalidad = 'Selecciona una modalidad para continuar.';
+        }
+    @endphp
+    <p class="mod-step{{ $mostrarExpediente ? ' is-done' : '' }}" id="mod-note">{{ $textoModalidad }}</p>
+    <div class="sub-tab-bar" id="modalidad-grid">
+        @foreach($selector as $item)
+            @if($item['tipo'] === 'grupo')
+                <button type="button" class="sub-tab-btn js-grupo{{ $grupoAbierto === $item['id'] ? ' is-open' : '' }}" data-grupo="{{ $item['id'] }}" data-nombre="{{ $item['nombre'] }}">
+                    {{ $item['nombre'] }}
+                    <i class="fas fa-chevron-down mod-chevron" aria-hidden="true"></i>
+                </button>
+            @else
+                <label class="sub-tab-btn{{ $modalidadSeleccionada === $item['nombre'] ? ' active' : '' }}">
+                    <input class="mod-radio" type="radio" name="modalidad" value="{{ $item['nombre'] }}" {{ $modalidadSeleccionada === $item['nombre'] ? 'checked' : '' }}>
+                    {{ $item['nombre'] }}
+                </label>
+            @endif
+        @endforeach
+    </div>
+    @foreach($selector as $item)
+        @if($item['opciones'] !== [])
+            @php $subElegida = in_array($modalidadSeleccionada, $item['opciones'], true); @endphp
+            <div class="mod-sub js-sub{{ $subElegida ? ' is-done' : '' }}" id="sub-{{ $item['id'] }}" @unless($grupoAbierto === $item['id']) hidden @endunless>
+                <p class="mod-step js-sub-hint" @if($subElegida) hidden @endif>Elige una opción. El formulario aparece al seleccionarla.</p>
+                <div class="sub-tab-bar">
+                    @foreach($item['opciones'] as $opcion)
+                        <label class="sub-tab-btn{{ $modalidadSeleccionada === $opcion ? ' active' : '' }}">
+                            <input class="mod-radio" type="radio" name="modalidad" value="{{ $opcion }}" {{ $modalidadSeleccionada === $opcion ? 'checked' : '' }}>
+                            {{ $opcion }}
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    @endforeach
+
+    <div id="expediente-rest" {{ $mostrarExpediente ? '' : 'hidden' }}>
     <div class="panel-card" style="margin-bottom: 24px;">
         <div class="panel-head">
             <h3><i class="fas fa-user-circle" style="color:var(--c-green);"></i> Datos Generales del Expediente</h3>
@@ -334,24 +462,32 @@
                 <input type="search" id="worker-search" class="field-input" autocomplete="off" placeholder="Escriba nombre o cédula para autocompletar...">
                 <div id="worker-results"></div>
             </div>
+            @php
+                $placaAplica = \App\Support\Modalidades::usaPlaca($modalidadSeleccionada);
+                $cargoAplica = \App\Support\Modalidades::pideCargo($modalidadSeleccionada);
+            @endphp
             <div class="f-grid-2">
                 <div class="field-block" style="margin-bottom:0;">
                     <label class="field-label">Nombre del Trabajador *</label>
-                    <input type="text" name="nombre" id="inp-nombre" class="field-input" required placeholder="Nombre completo" value="{{ old('nombre', request('nombre')) }}">
+                    <input type="text" name="nombre" id="inp-nombre" class="field-input" required title="Solo letras" placeholder="Solo letras" value="{{ old('nombre', request('nombre')) }}">
                 </div>
                 <div class="field-block" style="margin-bottom:0;">
-                    <label class="field-label">Cédula</label>
-                    <input type="text" name="cedula" id="inp-cedula" class="field-input" placeholder="Número de cédula" value="{{ old('cedula', request('cedula')) }}">
+                    <label class="field-label">Cédula *</label>
+                    <input type="text" name="cedula" id="inp-cedula" class="field-input" required inputmode="numeric" pattern="[0-9]+" title="Solo números" placeholder="Solo números" value="{{ old('cedula', request('cedula')) }}">
                 </div>
             </div>
-            <div class="f-grid-3" style="margin-top:14px;">
-                <div class="field-block" style="margin-bottom:0;">
-                    <label class="field-label">Cargo del Trabajador</label>
-                    <input type="text" name="modalidad" id="inp-cargo" class="field-input" placeholder="Ej: Conductor / Taquillero" value="{{ old('modalidad', request('modalidad')) }}">
-                </div>
+            <div class="field-block" id="placa-field" style="margin-top:14px;"{{ $placaAplica ? '' : ' hidden' }}>
+                <label class="field-label">Placa del vehículo</label>
+                <input type="text" name="placa" id="inp-placa" class="field-input" placeholder="Ej: GRK206" value="{{ old('placa', request('placa')) }}"{{ $placaAplica ? '' : ' disabled' }}>
+            </div>
+            <div class="field-block" id="cargo-field" style="margin-top:14px;"{{ $cargoAplica ? '' : ' hidden' }}>
+                <label class="field-label">Cargo</label>
+                <input type="text" name="cargo" id="inp-cargo" class="field-input" placeholder="Cargo del trabajador" value="{{ old('cargo', request('cargo')) }}"{{ $cargoAplica ? '' : ' disabled' }}>
+            </div>
+            <div class="f-grid-2" style="margin-top:14px;">
                 <div class="field-block" style="margin-bottom:0;">
                     <label class="field-label">Teléfono</label>
-                    <input type="text" name="telefono" class="field-input" placeholder="Teléfono de contacto" value="{{ old('telefono', request('telefono')) }}">
+                    <input type="text" name="telefono" id="inp-telefono" class="field-input" inputmode="numeric" pattern="[0-9]*" title="Solo números" placeholder="Solo números" value="{{ old('telefono', request('telefono')) }}">
                 </div>
                 <div class="field-block" style="margin-bottom:0;">
                     <label class="field-label">Fecha de la Falta</label>
@@ -376,14 +512,16 @@
     </div>
 
     {{-- PESTAÑAS DE DOCUMENTOS --}}
-    <div class="sub-tab-bar">
+    <div class="sub-tab-bar" id="etapa-grid">
         @foreach($slotsUi as $slot => $meta)
-            <button type="button" id="tab-{{ $slot }}" class="sub-tab-btn {{ $slot === $slotInicial ? 'active' : '' }}" onclick="selectSlot('{{ $slot }}')">
+            <button type="button" id="tab-{{ $slot }}" class="sub-tab-btn" onclick="selectSlot('{{ $slot }}')">
                 <i class="fas {{ $meta['icon'] }}"></i> {{ $meta['label'] }}
             </button>
         @endforeach
     </div>
+    <p class="mod-note" id="etapa-note">Elige un paso. El formato y el documento aparecen al seleccionarlo.</p>
 
+    <div id="etapa-rest" hidden>
     <div class="panel-card doc-preview-wrapper" style="margin-bottom: 24px;">
         <div class="panel-head" style="background:#f8fafc;">
             <h3><i class="fas fa-file-contract" style="color:var(--c-green);"></i> Documento interactivo oficial</h3>
@@ -407,30 +545,31 @@
             <div>Este formato se llena y queda registrado igual que los demás. Después hay que imprimirlo para firma del gerente y subir el escaneo en Anexos escaneados.</div>
         </div>
 
-        <div style="padding: 18px 24px; border-bottom: 1px solid var(--c-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: #fff;">
-            <div class="resp-strip" style="margin-bottom:0; flex:1; min-width: 250px;">
-                <div class="resp-ava">{{ $iniciales }}</div>
-                <div class="resp-info">
-                    <b>{{ $me->name }}</b>
-                    <span>{{ $me->cargo ?: ucfirst($me->role) }} · {{ now()->format('d/m/Y') }}</span>
-                </div>
-            </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <label class="btn-toolbar" style="background:#f1f5f9; color:#334155; cursor:pointer; font-weight:700;">
-                    <i class="fas fa-signature"></i> Subir firma
-                    <input type="file" id="firma-registro" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
-                </label>
-                <button type="submit" class="btn-toolbar btn-save">
-                    <i class="fas fa-save"></i> Registrar proceso
-                </button>
-            </div>
-        </div>
-
-        <div class="phpword-document-container" style="background: #e2e8f0; padding: 24px 16px; overflow-x: auto;">
+        <div class="phpword-document-container" style="background: #e2e8f0; padding: 24px 16px 28px; overflow-x: auto;">
             <div id="doc-html-host" style="background: #ffffff; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 28px 32px; border-radius: 4px; border: 1px solid #ccc; font-family: 'Arial', sans-serif;">
                 {!! $interactiveHtml !!}
             </div>
+            <div class="doc-actions">
+                <div class="resp-strip">
+                    <div class="resp-ava">{{ $iniciales }}</div>
+                    <div class="resp-info">
+                        <b>{{ $me->name }}</b>
+                        <span>{{ $me->cargo ?: ucfirst($me->role) }} · {{ now()->format('d/m/Y') }}</span>
+                    </div>
+                </div>
+                <div class="doc-actions-btns">
+                    <label class="btn-toolbar btn-firma">
+                        <i class="fas fa-signature"></i> Subir firma
+                        <input type="file" id="firma-registro" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
+                    </label>
+                    <button type="submit" class="btn-toolbar btn-registrar">
+                        <i class="fas fa-save"></i> Registrar proceso
+                    </button>
+                </div>
+            </div>
         </div>
+    </div>
+    </div>
     </div>
 
 </form>
@@ -443,12 +582,15 @@ var TIPO_SERVIDOR = @json($tipoInicial);
 var hadValidationError = @json($errors->any());
 var currentSlot = @json($slotInicial);
 var currentTipo = @json($tipoInicial);
+var etapaAbierta = false;
 var plantillaCache = {};
+var MODALIDADES_PLACA = @json(\App\Support\Modalidades::conPlaca());
+var AREAS_ADMIN = @json(\App\Support\Modalidades::areasAdministrativas());
 var DRAFT_KEY = 'sipd_nuevo_proceso';
 var persistTimer;
 
 function emptyDraft() {
-    return { slot: 'apertura', tipo: 'disciplinario', fields: {}, yellow: {}, optional: {} };
+    return { slot: 'apertura', tipo: 'disciplinario', fields: {}, yellow: {}, optional: {}, etapaAbierta: false };
 }
 
 function readDraft() {
@@ -460,6 +602,7 @@ function readDraft() {
         d.fields = d.fields && typeof d.fields === 'object' ? d.fields : {};
         d.yellow = d.yellow && typeof d.yellow === 'object' ? d.yellow : {};
         d.optional = d.optional && typeof d.optional === 'object' ? d.optional : {};
+        d.etapaAbierta = !!d.etapaAbierta;
         return d;
     } catch (e) {
         return emptyDraft();
@@ -492,12 +635,91 @@ function isYellowField(el) {
     return !!(el && el.name && el.name.indexOf('yellow_blocks_') === 0);
 }
 
+function modalidadActual() {
+    var sel = document.querySelector('#registro-form input[name="modalidad"]:checked');
+    return sel ? sel.value.trim() : '';
+}
+
+function syncModalidadVista() {
+    var seleccion = modalidadActual();
+    document.querySelectorAll('#modalidad-grid .sub-tab-btn, .js-sub .sub-tab-btn').forEach(function(btn) {
+        if (btn.classList.contains('js-grupo')) return;
+        var input = btn.querySelector('input');
+        btn.classList.toggle('active', !!(input && input.checked));
+    });
+    var grupoAbierto = '';
+    document.querySelectorAll('.js-grupo').forEach(function(btn) {
+        var panel = document.getElementById('sub-' + btn.getAttribute('data-grupo'));
+        var elegido = !!(panel && panel.querySelector('input:checked'));
+        if (panel && elegido) panel.hidden = false;
+        var abierto = !!(panel && !panel.hidden);
+        btn.classList.toggle('is-open', abierto);
+        btn.classList.remove('active');
+        if (panel) {
+            panel.classList.toggle('is-done', elegido);
+            var hint = panel.querySelector('.js-sub-hint');
+            if (hint) hint.hidden = elegido;
+        }
+        if (abierto) grupoAbierto = btn.getAttribute('data-nombre') || '';
+    });
+    var rest = document.getElementById('expediente-rest');
+    if (rest) rest.hidden = seleccion === '';
+    var note = document.getElementById('mod-note');
+    if (note) {
+        note.classList.toggle('is-done', seleccion !== '');
+        if (seleccion) note.textContent = 'Modalidad seleccionada: ' + seleccion + '.';
+        else if (grupoAbierto) note.textContent = 'Elige una opción de ' + grupoAbierto + ' para continuar.';
+        else note.textContent = 'Selecciona una modalidad para continuar.';
+    }
+    syncPlacaVista();
+    syncCargoVista();
+}
+
+function syncCargoVista() {
+    var actual = modalidadActual();
+    var aplica = actual !== '' && AREAS_ADMIN.indexOf(actual) === -1;
+    var box = document.getElementById('cargo-field');
+    var input = document.getElementById('inp-cargo');
+    if (box) box.hidden = !aplica;
+    if (input) {
+        input.disabled = !aplica;
+        input.required = aplica;
+    }
+}
+
+function syncPlacaVista() {
+    var aplica = MODALIDADES_PLACA.indexOf(modalidadActual()) !== -1;
+    var box = document.getElementById('placa-field');
+    var input = document.getElementById('inp-placa');
+    if (box) box.hidden = !aplica;
+    if (input) {
+        input.disabled = !aplica;
+        input.required = aplica;
+    }
+}
+
+function marcarModalidad(valor) {
+    var radios = document.querySelectorAll('#registro-form input[name="modalidad"]');
+    var destino = null;
+    radios.forEach(function(el) {
+        if (el.value === valor && !el.disabled) destino = el;
+    });
+    if (!destino) return false;
+    radios.forEach(function(el) { el.checked = el === destino; });
+    syncModalidadVista();
+    return true;
+}
+
 function collectGeneralFields() {
     var fields = {};
     generalFieldNodes().forEach(function(el) {
-        if (el.name && !isYellowField(el) && el.id !== 'worker-search') {
-            fields[el.name] = el.value;
+        if (!el.name || isYellowField(el) || el.id === 'worker-search') return;
+        if (el.type === 'radio') {
+            if (el.checked) fields[el.name] = el.value;
+            else if (!Object.prototype.hasOwnProperty.call(fields, el.name)) fields[el.name] = '';
+            return;
         }
+        fields[el.name] = el.value;
     });
     return fields;
 }
@@ -505,9 +727,12 @@ function collectGeneralFields() {
 function applyGeneralFields(fields) {
     if (!fields) return;
     generalFieldNodes().forEach(function(el) {
-        if (el.name && !isYellowField(el) && Object.prototype.hasOwnProperty.call(fields, el.name)) {
-            el.value = fields[el.name];
+        if (!el.name || isYellowField(el) || !Object.prototype.hasOwnProperty.call(fields, el.name)) return;
+        if (el.type === 'radio') {
+            el.checked = !el.disabled && el.value === fields[el.name];
+            return;
         }
+        el.value = fields[el.name];
     });
 }
 
@@ -554,6 +779,7 @@ function persistDraft() {
     var d = readDraft();
     d.slot = currentSlot;
     d.tipo = currentTipo;
+    d.etapaAbierta = !!etapaAbierta;
     d.fields = Object.assign({}, d.fields || {}, collectGeneralFields());
     d.yellow = d.yellow || {};
     d.optional = d.optional || {};
@@ -614,7 +840,11 @@ function hydratePlantilla(tipo) {
 function syncDocHeader() {
     var map = {
         nombre: ((document.getElementById('inp-nombre') || {}).value || '').trim(),
-        cargo: ((document.getElementById('inp-cargo') || {}).value || '').trim(),
+        cargo: (function () {
+            var cargo = document.getElementById('inp-cargo');
+            if (cargo && !cargo.disabled && (cargo.value || '').trim()) return cargo.value.trim();
+            return modalidadActual();
+        })(),
         cedula: ((document.getElementById('inp-cedula') || {}).value || '').trim()
     };
     document.querySelectorAll('#doc-html-host [data-header]').forEach(function(el) {
@@ -626,9 +856,19 @@ function syncDocHeader() {
 }
 
 function setActiveTab(slot) {
-    document.querySelectorAll('.sub-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('#etapa-grid .sub-tab-btn').forEach(function(b) { b.classList.remove('active'); });
     var tab = document.getElementById('tab-' + slot);
     if (tab) tab.classList.add('active');
+}
+
+function syncEtapaVista() {
+    var rest = document.getElementById('etapa-rest');
+    var note = document.getElementById('etapa-note');
+    if (rest) rest.hidden = !etapaAbierta;
+    if (note) note.hidden = !!etapaAbierta;
+    if (!etapaAbierta) {
+        document.querySelectorAll('#etapa-grid .sub-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    }
 }
 
 function autosizeTextareas(root) {
@@ -712,9 +952,11 @@ function loadPlantilla(tipo, slot) {
 }
 
 window.selectSlot = function(slot) {
+    etapaAbierta = true;
     persistDraft();
     currentSlot = slot;
     setActiveTab(slot);
+    syncEtapaVista();
     var variantes = SLOT_VARIANTES[slot] || [];
     var tipo = variantes.indexOf(currentTipo) !== -1 ? currentTipo : variantes[0];
     loadPlantilla(tipo, slot);
@@ -723,7 +965,33 @@ window.selectSlot = function(slot) {
 document.addEventListener('DOMContentLoaded', function () {
     var inp_nombre = document.getElementById('inp-nombre');
     var inp_cedula = document.getElementById('inp-cedula');
-    var inp_cargo  = document.getElementById('inp-cargo');
+    function soloLetras(el) {
+        if (!el) return;
+        el.addEventListener('input', function () {
+            var limpio = this.value.replace(/[^\p{L} ']/gu, '');
+            if (limpio !== this.value) this.value = limpio;
+        });
+    }
+    function soloNumeros(el) {
+        if (!el) return;
+        el.addEventListener('input', function () {
+            var limpio = this.value.replace(/\D/g, '');
+            if (limpio !== this.value) this.value = limpio;
+        });
+    }
+    soloLetras(inp_nombre);
+    soloLetras(document.getElementById('inp-cargo'));
+    soloNumeros(inp_cedula);
+    soloNumeros(document.getElementById('inp-telefono'));
+    var inpPlaca = document.getElementById('inp-placa');
+    if (inpPlaca) {
+        inpPlaca.addEventListener('input', function () {
+            var crudo = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            var letras = crudo.slice(0, 3).replace(/[^A-Z]/g, '');
+            var numeros = crudo.slice(letras.length).replace(/\D/g, '').slice(0, 3);
+            this.value = letras + (numeros ? '-' + numeros : '');
+        });
+    }
     var ciName     = document.getElementById('ci-worker-name');
     var ciSub      = document.getElementById('ci-worker-sub');
     var workerSrch = document.getElementById('worker-search');
@@ -733,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateBar() {
         var name  = inp_nombre ? inp_nombre.value.trim() : '';
         var cc    = inp_cedula ? inp_cedula.value.trim() : '';
-        var cargo = inp_cargo  ? inp_cargo.value.trim()  : '';
+        var cargo = modalidadActual();
         if(ciName) ciName.textContent = name ? name + (cc ? ' · C.C. ' + cc : '') : 'Nuevo Proceso Disciplinario';
         if(ciSub)  ciSub.textContent  = name
             ? (cargo || '—') + ' · Expediente en creación · {{ now()->format("d/m/Y") }}'
@@ -742,7 +1010,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if(inp_nombre) inp_nombre.addEventListener('input', function() { updateBar(); syncDocHeader(); });
     if(inp_cedula) inp_cedula.addEventListener('input', function() { updateBar(); syncDocHeader(); });
-    if(inp_cargo)  inp_cargo.addEventListener('input', function() { updateBar(); syncDocHeader(); });
+    document.querySelectorAll('#registro-form input[name="modalidad"]').forEach(function(el) {
+        el.addEventListener('change', function() {
+            if (this.checked && this.closest('#modalidad-grid')) {
+                document.querySelectorAll('.js-sub input').forEach(function(input) { input.checked = false; });
+                document.querySelectorAll('.js-sub').forEach(function(panel) { panel.hidden = true; });
+            }
+            if (this.checked && this.closest('.js-sub')) {
+                document.querySelectorAll('#modalidad-grid input').forEach(function(input) { input.checked = false; });
+            }
+            syncModalidadVista();
+            updateBar();
+            syncDocHeader();
+        });
+    });
+    document.querySelectorAll('.js-grupo').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var id = btn.getAttribute('data-grupo');
+            document.querySelectorAll('.js-grupo').forEach(function(otro) { otro.classList.toggle('is-open', otro === btn); });
+            document.querySelectorAll('#modalidad-grid input, .js-sub input').forEach(function(input) { input.checked = false; });
+            document.querySelectorAll('.js-sub').forEach(function(panel) {
+                panel.hidden = panel.id !== 'sub-' + id;
+            });
+            syncModalidadVista();
+            updateBar();
+            syncDocHeader();
+        });
+    });
     if(workerSrch) {
         workerSrch.addEventListener('input', function() {
             clearTimeout(timer);
@@ -760,7 +1054,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             btn.addEventListener('click', function(){
                                 if(inp_nombre) { inp_nombre.value = w.nombre||''; inp_nombre.dispatchEvent(new Event('input')); }
                                 if(inp_cedula) { inp_cedula.value = w.cedula||''; inp_cedula.dispatchEvent(new Event('input')); }
-                                if(inp_cargo)  { inp_cargo.value  = w.modalidad||''; inp_cargo.dispatchEvent(new Event('input')); }
+                                marcarModalidad(w.modalidad || '');
+                                var placa = document.getElementById('inp-placa');
+                                if (placa && !placa.disabled) { placa.value = w.placa || ''; placa.dispatchEvent(new Event('input')); }
                                 var tel = document.querySelector('[name="telefono"]');
                                 if(tel) { tel.value = w.telefono||''; tel.dispatchEvent(new Event('input')); }
                                 updateBar();
@@ -786,18 +1082,24 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    etapaAbierta = hadValidationError || !!draft.etapaAbierta;
+
     updateBar();
-    setActiveTab(currentSlot);
+    syncModalidadVista();
     syncTipoHidden(currentTipo);
+    syncEtapaVista();
 
     var hostInicial = document.getElementById('doc-html-host');
     plantillaCache[TIPO_SERVIDOR] = hostInicial ? hostInicial.innerHTML : '';
 
-    if (currentTipo === TIPO_SERVIDOR) {
-        hydratePlantilla(currentTipo);
-        renderVariantBar(currentSlot);
-    } else {
-        loadPlantilla(currentTipo, currentSlot);
+    if (etapaAbierta) {
+        setActiveTab(currentSlot);
+        if (currentTipo === TIPO_SERVIDOR) {
+            hydratePlantilla(currentTipo);
+            renderVariantBar(currentSlot);
+        } else {
+            loadPlantilla(currentTipo, currentSlot);
+        }
     }
 
     generalFieldNodes().forEach(function(field) {

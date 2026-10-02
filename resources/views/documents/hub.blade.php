@@ -88,7 +88,7 @@
 
 @section('content')
 <form class="hub-toolbar" method="GET" action="{{ route('documentos.hub') }}">
-    <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por conductor, cédula, placa o N° proceso...">
+    <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por trabajador, cédula, placa o N° proceso...">
     <button class="hub-btn" type="submit"><i class="fas fa-search"></i> Buscar</button>
 </form>
 
@@ -106,7 +106,7 @@
         <thead>
             <tr>
                 <th>Proceso</th>
-                <th>Conductor / cédula</th>
+                <th>Trabajador / cédula</th>
                 <th class="center">1. Apertura</th>
                 <th class="center">2. Acta</th>
                 <th class="center">3. Sanción / llamado / terminación</th>
@@ -117,18 +117,19 @@
         <tbody>
         @forelse($casos as $caso)
             @php
+                $estadoVisible = $caso->estadoVisible();
                 $estadoDot = [
                     'Pendiente' => 'dot-pend',
-                    'En Proceso' => 'dot-proc',
+                    'En proceso' => 'dot-proc',
                     'Sancionado' => 'dot-sanc',
                     'Archivado' => 'dot-arch',
-                ][$caso->estado] ?? 'dot-arch';
+                ][$estadoVisible] ?? 'dot-arch';
             @endphp
             <tr>
                 <td>
                     <a class="proc-lnk" href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}">PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</a>
                     <span class="hub-sub">
-                        <span class="st"><i class="fas fa-circle {{ $estadoDot }}"></i> {{ $caso->estado }}</span>
+                        <span class="st"><i class="fas fa-circle {{ $estadoDot }}"></i> {{ $estadoVisible }}</span>
                         @if(($caso->anexos_count ?? 0) > 0)
                             · {{ $caso->anexos_count }} anexo{{ $caso->anexos_count === 1 ? '' : 's' }}
                         @endif
@@ -136,7 +137,7 @@
                 </td>
                 <td>
                     <strong>{{ $caso->nombre }}</strong>
-                    <span class="hub-sub">{{ $caso->cedula ?: 'Sin cédula' }}</span>
+                    <span class="hub-sub">{{ $caso->cedula ?: 'Sin cédula' }} · {{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) }}</span>
                 </td>
                 @foreach(\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes)
                     @php
@@ -166,8 +167,8 @@
                                 </button>
                             </form>
                         @endif
-                        <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn" title="Editar datos del proceso">
-                            <i class="fas fa-edit"></i> Editar
+                        <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn" title="{{ $caso->soloLoManejaCoordinadora() ? 'Ver proceso' : 'Editar datos del proceso' }}">
+                            <i class="fas {{ $caso->soloLoManejaCoordinadora() ? 'fa-eye' : 'fa-edit' }}"></i> {{ $caso->soloLoManejaCoordinadora() ? 'Ver' : 'Editar' }}
                         </a>
                         @if(auth()->user()->puede('descargar_documentos'))
                             @php

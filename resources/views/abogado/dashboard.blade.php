@@ -12,7 +12,7 @@
     $estadoClass = function ($estado) {
         return match ($estado) {
             'Pendiente' => 'pend',
-            'En Proceso' => 'proc',
+            'En proceso', 'En Proceso' => 'proc',
             'Sancionado' => 'sanc',
             default => 'arch',
         };
@@ -114,7 +114,7 @@
                         <span class="dash-dot {{ $dotClass($paso['tono']) }}">{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</span>
                         <div class="dash-main">
                             <b>{{ $proceso->nombre }}</b>
-                            <small>{{ $proceso->codigoProceso() }} · {{ $proceso->tipo_falta ?: 'Sin tipificar' }}</small>
+                            <small>{{ $proceso->codigoProceso() }} · {{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }} · {{ $proceso->tipo_falta ?: 'Sin tipificar' }}</small>
                         </div>
                         <span class="dash-status {{ $paso['tono'] }}">{{ $paso['texto'] }}</span>
                     </a>
@@ -185,7 +185,7 @@
                     <span class="dash-dot">{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</span>
                     <div class="dash-main">
                         <b>{{ $proceso->nombre }}</b>
-                        <small>{{ $paso['texto'] }}</small>
+                        <small>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }} · {{ $paso['texto'] }}</small>
                     </div>
                     <span class="dash-status {{ $estadoClass($proceso->estado) }}">
                         <i class="fas fa-circle" style="font-size:6px;"></i> {{ $proceso->estado }}

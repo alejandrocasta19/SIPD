@@ -135,7 +135,8 @@ table.plz tr:hover td { background: #f8fafc; }
                 <tr>
                     <th>ID</th>
                     <th>PROCESO</th>
-                    <th>CONDUCTOR</th>
+                    <th>TRABAJADOR</th>
+                    <th>MODALIDAD</th>
                     <th>TIPO DE PLAZO</th>
                     <th>VENCIMIENTO</th>
                     <th>DÍAS RESTANTES</th>
@@ -152,8 +153,9 @@ table.plz tr:hover td { background: #f8fafc; }
                             <a class="pro" href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}">{{ $codigoProceso($plazo->proceso_id) }}</a>
                         </td>
                         <td class="name">{{ $plazo->conductor }}</td>
+                        <td>{{ \App\Support\Modalidades::etiquetaCaso($plazo->modalidad, $plazo->cargo) }}</td>
                         <td>
-                            @if(!empty($plazo->es_descargos))
+                            @if(!empty($plazo->es_descargos) && !in_array($plazo->estado, ['Sancionado', 'Archivado'], true) || (auth()->user()->esCoordinadora() && !empty($plazo->es_descargos)))
                                 <form class="plz-tipo" method="POST" action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}">
                                     @csrf
                                     @method('PUT')
@@ -194,7 +196,7 @@ table.plz tr:hover td { background: #f8fafc; }
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="empty">No hay plazos registrados</td>
+                        <td colspan="8" class="empty">No hay plazos registrados</td>
                     </tr>
                 @endforelse
             </tbody>

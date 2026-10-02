@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use App\Support\Formatos;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class PerfilController extends Controller
 {
@@ -26,6 +26,15 @@ class PerfilController extends Controller
                 ->with('error', 'Pide permiso a la coordinadora para editar tu perfil.');
         }
 
+        $request->merge([
+            'cedula' => $request->filled('cedula')
+                ? preg_replace('/\D/', '', (string) $request->input('cedula'))
+                : $request->input('cedula'),
+            'telefono' => $request->filled('telefono')
+                ? preg_replace('/\D/', '', (string) $request->input('telefono'))
+                : $request->input('telefono'),
+        ]);
+
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
@@ -33,7 +42,7 @@ class PerfilController extends Controller
             'cedula' => ['nullable', 'string', 'max:30'],
             'cargo' => ['nullable', 'string', 'max:255'],
             'fecha_ingreso' => ['nullable', 'date'],
-        ]);
+        ], Formatos::mensajes());
 
         if ($validator->fails()) {
             return back()

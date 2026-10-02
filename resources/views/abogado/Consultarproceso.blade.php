@@ -251,12 +251,16 @@
         @endif
         <div class="search">
             <i class="fas fa-search"></i>
-            <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar por conductor, cédula, placa o tipo de falta...">
+            <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar por trabajador, cédula, placa o tipo de falta...">
         </div>
         <select name="modalidad" onchange="this.form.submit()">
             <option value="">Todas las modalidades</option>
-            @foreach($modalidades as $modalidad)
-                <option value="{{ $modalidad }}" {{ request('modalidad') === $modalidad ? 'selected' : '' }}>{{ $modalidad }}</option>
+            @foreach(\App\Support\Modalidades::opcionesFiltro() as $grupo => $opciones)
+                <optgroup label="{{ $grupo }}">
+                    @foreach($opciones as $opcion)
+                        <option value="{{ $opcion }}" {{ request('modalidad') === $opcion ? 'selected' : '' }}>{{ $opcion }}</option>
+                    @endforeach
+                </optgroup>
             @endforeach
         </select>
         <div class="results">{{ $procesos->total() }} resultado{{ $procesos->total() === 1 ? '' : 's' }}</div>
@@ -269,7 +273,6 @@
                     <th>ID</th>
                     <th>CONDUCTOR</th>
                     <th>CÉDULA</th>
-                    <th>PLACA</th>
                     <th>MODALIDAD</th>
                     <th>TIPO DE FALTA</th>
                     <th>FECHA FALTA</th>
@@ -291,19 +294,19 @@
                         </td>
                         <td class="name">{{ $proceso->nombre }}</td>
                         <td>{{ $proceso->cedula ?: '—' }}</td>
-                        <td>{{ $proceso->placa ?: '—' }}</td>
-                        <td>{{ $proceso->modalidad ?: '—' }}</td>
+                        <td>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }}</td>
                         <td>{{ $proceso->tipo_falta ?: '—' }}</td>
                         <td>{{ $proceso->fecha_falta ? \Carbon\Carbon::parse($proceso->fecha_falta)->format('Y-m-d') : '—' }}</td>
                         @if($esCoordinadora)
                             <td>{{ $proceso->user->name ?? 'Sin asignar' }}</td>
                         @endif
                         <td>
-                            @if($proceso->estado == 'Pendiente')
+                            @php $estadoLista = $proceso->estadoVisible(); @endphp
+                            @if($estadoLista === 'Pendiente')
                                 <span class="st"><i class="fas fa-circle dot-pend"></i> Pendiente</span>
-                            @elseif($proceso->estado == 'En Proceso')
+                            @elseif($estadoLista === 'En proceso')
                                 <span class="st"><i class="fas fa-circle dot-proc"></i> En proceso</span>
-                            @elseif($proceso->estado == 'Sancionado')
+                            @elseif($estadoLista === 'Sancionado')
                                 <span class="st"><i class="fas fa-circle dot-sanc"></i> Sancionado</span>
                             @else
                                 <span class="st"><i class="fas fa-circle dot-arch"></i> Archivado</span>
@@ -314,7 +317,7 @@
                                 <a href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}" title="Ver proceso">
                                     <i class="far fa-eye"></i>
                                 </a>
-                                @if(auth()->user()->puede('eliminar_casos'))
+                                @if(auth()->user()->puede('eliminar_casos') && !$proceso->soloLoManejaCoordinadora())
                                 <form action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST"
                                       data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente."
                                       data-confirm-title="Eliminar proceso"
@@ -333,7 +336,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $esCoordinadora ? 10 : 9 }}" class="empty">No hay procesos disciplinarios registrados</td>
+                        <td colspan="{{ $esCoordinadora ? 9 : 8 }}" class="empty">No hay procesos disciplinarios registrados</td>
                     </tr>
                 @endforelse
             </tbody>

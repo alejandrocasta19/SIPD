@@ -73,7 +73,7 @@
             @error('name') <div style="color:#dc2626;margin-top:-10px;margin-bottom:12px;font-size:13px;">{{ $message }}</div> @enderror
 
             <label>Correo</label>
-            <input type="email" name="email" value="{{ old('email', $user->email) }}" required>
+            <input type="email" name="email" value="{{ old('email', $user->email) }}" required pattern="[A-Za-z]+@sipd\.co" title="texto@sipd.co">
             @error('email') <div style="color:#dc2626;margin-top:-10px;margin-bottom:12px;font-size:13px;">{{ $message }}</div> @enderror
 
             <label>Cargo</label>

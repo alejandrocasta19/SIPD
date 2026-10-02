@@ -49,7 +49,7 @@
                 <a class="ver-code" href="{{ route('abogado.detalleproceso', $proceso->id) }}">{{ $codigo($proceso) }}</a>
                 <div class="ver-main">
                     <b>{{ $proceso->nombre }}</b>
-                    <small>{{ $proceso->tipo_falta ?: 'Sin tipificar' }} · En Proceso</small>
+                    <small>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }} · {{ $proceso->tipo_falta ?: 'Sin tipificar' }} · En Proceso</small>
                 </div>
                 <div class="ver-rh">{{ $proceso->user->name ?? 'Sin RH asignado' }}</div>
                 <div class="ver-acts">

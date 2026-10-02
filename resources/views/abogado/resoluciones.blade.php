@@ -81,6 +81,7 @@
                     <th>N° RESOLUCIÓN</th>
                     <th>PROCESO</th>
                     <th>CONDUCTOR / AFECTADO</th>
+                    <th>MODALIDAD</th>
                     <th>TIPO</th>
                     <th>ESTADO DE FIRMA</th>
                     <th>FECHA EXPEDICIÓN</th>
@@ -96,6 +97,7 @@
                             <a class="name" style="text-decoration:none;" href="{{ route('abogado.detalleproceso', $resolucion->proceso_id) }}">PRO-{{ str_pad($resolucion->proceso_id, 3, '0', STR_PAD_LEFT) }}</a>
                         </td>
                         <td class="name">{{ $resolucion->nombre }}</td>
+                        <td>{{ \App\Support\Modalidades::etiquetaCaso($resolucion->modalidad, $resolucion->cargo) }}</td>
                         <td>
                             @if($resolucion->tipo === 'sancionatoria')
                                 <span class="st"><i class="fas fa-circle dot-sanc"></i> {{ $tipos[$resolucion->tipo] }}</span>
@@ -118,7 +120,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="empty">No hay resoluciones registradas</td>
+                        <td colspan="7" class="empty">No hay resoluciones registradas</td>
                     </tr>
                 @endforelse
             </tbody>

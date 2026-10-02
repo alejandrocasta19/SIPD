@@ -23,6 +23,7 @@ class ProcesoDisciplinario extends Model
         'placa',
         'ruta',
         'modalidad',
+        'cargo',
         'telefono',
 
         // INFORMACIÓN DISCIPLINARIA
@@ -157,6 +158,39 @@ class ProcesoDisciplinario extends Model
         return $this->hasMany(CasoDocumentoEstado::class, 'caso_id');
     }
 
+    public function scopeConDocumentoDescargado($query)
+    {
+        return $query->whereHas('documentoEstados', function ($q) {
+            $q->whereNotNull('descargado_en');
+        });
+    }
+
+    public function scopeSinDocumentoDescargado($query)
+    {
+        return $query->whereDoesntHave('documentoEstados', function ($q) {
+            $q->whereNotNull('descargado_en');
+        });
+    }
+
+    /**
+     * Pendiente y En proceso siguen el avance del documento.
+     * Sancionado y Archivado siguen la decisión de la coordinadora.
+     */
+    public function scopeDondeEstadoVisible($query, string $estado)
+    {
+        if (in_array($estado, ['Sancionado', 'Archivado'], true)) {
+            return $query->where('estado', $estado);
+        }
+
+        $query->whereNotIn('estado', ['Sancionado', 'Archivado']);
+
+        if (in_array($estado, ['En proceso', 'En Proceso'], true)) {
+            return $query->conDocumentoDescargado();
+        }
+
+        return $query->sinDocumentoDescargado();
+    }
+
     /**
      * Obtiene (o crea) el estado del subdocumento indicado.
      */
@@ -279,7 +313,7 @@ class ProcesoDisciplinario extends Model
         if ($proceso && $proceso->exists) {
             return [
                 'nombre'   => trim((string) $proceso->nombre),
-                'cargo'    => trim((string) ($proceso->modalidad ?: '')),
+                'cargo'    => trim((string) ($proceso->cargo ?: $proceso->modalidad ?: '')),
                 'cedula'   => trim((string) ($proceso->cedula ?: '')),
                 'fecha'    => self::fechaExpedicion(),
                 'radicado' => $proceso->numeroRadicado(),
@@ -545,6 +579,55 @@ class ProcesoDisciplinario extends Model
             'sub_medio' => $subMedio,
             'sub_fallo' => $subFallo,
         ];
+    }
+
+    public function tieneDocumentoDescargado(): bool
+    {
+        $estados = $this->relationLoaded('documentoEstados')
+            ? $this->documentoEstados
+            : $this->documentoEstados()->get();
+
+        return $estados->contains(fn ($doc) => $doc->estaDescargado());
+    }
+
+    /**
+     * Pendiente si todavía no se descarga ningún formato.
+     * En proceso si hay al menos un documento descargado.
+     * Sancionado o Archivado quedan como los dejó la coordinadora.
+     */
+    public function estadoVisible(): string
+    {
+        if (in_array($this->estado, ['Sancionado', 'Archivado'], true)) {
+            return $this->estado;
+        }
+
+        return $this->tieneDocumentoDescargado() ? 'En proceso' : 'Pendiente';
+    }
+
+    public function cerradoPorCoordinadora(): bool
+    {
+        return in_array($this->estado, ['Sancionado', 'Archivado'], true);
+    }
+
+    public function soloLoManejaCoordinadora(?User $user = null): bool
+    {
+        $user = $user ?: auth()->user();
+
+        return $this->cerradoPorCoordinadora() && (!$user || !$user->esCoordinadora());
+    }
+
+    public function redireccionSiBloqueado()
+    {
+        if (!$this->soloLoManejaCoordinadora()) {
+            return null;
+        }
+
+        $mensaje = 'Los procesos sancionados o archivados solo los puede manejar la coordinadora.';
+        if (request()->expectsJson()) {
+            abort(403, $mensaje);
+        }
+
+        return redirect()->back()->with('error', $mensaje);
     }
 
     public function tieneDocumentoGenerado(): bool

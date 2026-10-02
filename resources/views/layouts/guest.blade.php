@@ -40,7 +40,7 @@
 
             <div class="guest-public">
                 <small>ACCESO PÚBLICO</small>
-                <p>¿Eres conductor y quieres consultar el estado de tu proceso?</p>
+                <p>¿Quieres consultar el estado de tu proceso?</p>
                 <a class="btn-public" href="{{ route('consulta.publica') }}">Consultar mi caso</a>
             </div>
         </aside>

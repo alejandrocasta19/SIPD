@@ -10,7 +10,7 @@
         </div>
         <div class="proc-head-side">
             <span class="stat-chip">{{ $workersGrouped->total() }} trabajadores</span>
-            <span class="stat-chip yellow">{{ $workersGrouped->getCollection()->where('es_reincidente', true)->count() }} reincidentes</span>
+            <span class="stat-chip yellow">{{ $reincidentes }} reincidentes</span>
             <a class="btn-add" href="{{ route('abogado.registro') }}"><i class="fas fa-plus"></i> Registrar proceso</a>
         </div>
     </div>
@@ -120,7 +120,7 @@
         <input type="hidden" name="per_page" value="{{ $workersGrouped->perPage() }}">
         <div class="search">
             <i class="fas fa-search"></i>
-            <input type="text" name="q" value="{{ $search }}" placeholder="Buscar por nombre del conductor o cédula...">
+            <input type="text" name="q" value="{{ $search }}" placeholder="Buscar por nombre del trabajador o cédula...">
         </div>
         @if(!empty($search))
             <a href="{{ route('abogado.reincidencias') }}" class="btn-clear">Limpiar</a>
@@ -133,13 +133,13 @@
         <div class="empty">No se encontraron antecedentes o registros de reincidencia.</div>
     @else
         @foreach($workersGrouped as $worker)
-            <div class="table-card">
+            <div class="table-card js-casos-card" data-per-page="5">
                 <div class="worker-header">
                     <div class="worker-info">
                         <b>{{ $worker->nombre }}</b>
                         <span>
                             @if($worker->cedula) C.C. {{ $worker->cedula }} · @endif
-                            {{ $worker->modalidad ?: 'Sin modalidad' }}
+                            {{ $worker->modalidades->isNotEmpty() ? $worker->modalidades->implode(' · ') : 'Sin modalidad' }}
                         </span>
                     </div>
                     <div>
@@ -153,7 +153,7 @@
                             </span>
                         @endif
                         <a href="{{ route('abogado.registro', ['nombre' => $worker->nombre, 'cedula' => $worker->cedula, 'modalidad' => $worker->modalidad, 'telefono' => $worker->telefono]) }}" class="btn-add" style="padding: 7px 12px; font-size: 12px;">
-                            Nuevo caso a conductor
+                            Nuevo caso al trabajador
                         </a>
                     </div>
                 </div>
@@ -163,6 +163,7 @@
                         <tr>
                             <th>EXPEDIENTE</th>
                             <th>FECHA FALTA</th>
+                            <th>MODALIDAD</th>
                             <th>TIPO DE FALTA</th>
                             <th>ESTADO</th>
                             <th class="col-acts">ACCIONES</th>
@@ -178,6 +179,7 @@
                                     @endif
                                 </td>
                                 <td>{{ $p->fecha_falta ? \Carbon\Carbon::parse($p->fecha_falta)->format('Y-m-d') : '—' }}</td>
+                                <td>{{ \App\Support\Modalidades::etiquetaCaso($p->modalidad, $p->cargo) }}</td>
                                 <td class="name">{{ $p->tipo_falta ?: 'Sin tipo' }}</td>
                                 <td>
                                     @if($p->estado == 'Pendiente')

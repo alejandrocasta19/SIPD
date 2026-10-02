@@ -8,6 +8,7 @@
     $plazosVencidos = $plazosVencidos ?? 0;
     $plazosPorVencer = $plazosPorVencer ?? 0;
     $abiertos = $abiertos ?? ($pendientes + $enProceso);
+    $veredictos = $veredictos ?? 0;
     $nSolicitudes = $solicitudesPendientes->count();
 @endphp
 
@@ -29,9 +30,6 @@
             <span class="stat-chip green">{{ $tasaResolucion }}% resolución</span>
             @if($enProceso > 0)<span class="stat-chip">{{ $enProceso }} veredicto</span>@endif
             @if($plazosVencidos > 0)<span class="stat-chip red">{{ $plazosVencidos }} vencidos</span>@endif
-            <a class="btn-add" href="{{ route('coordinadora.veredictos') }}"><i class="fas fa-gavel"></i> Veredictos</a>
-            <a class="btn-alt" href="{{ route('coordinadora.solicitudes') }}"><i class="fas fa-key"></i> Solicitudes</a>
-            <a class="btn-alt" href="{{ route('coordinadora.notificar') }}"><i class="far fa-paper-plane"></i> Avisar</a>
         </div>
     </div>
 @endsection
@@ -102,7 +100,7 @@
                         <span class="dash-dot blue">{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</span>
                         <div class="dash-main">
                             <b>{{ $proceso->nombre }}</b>
-                            <small>{{ $proceso->tipo_falta ?: 'Sin tipificar' }} · {{ $proceso->user->name ?? 'Sin RH' }}</small>
+                            <small>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }} · {{ $proceso->tipo_falta ?: 'Sin tipificar' }} · {{ $proceso->user->name ?? 'Sin RH' }}</small>
                         </div>
                         <span class="dash-status proc">
                             <i class="fas fa-circle" style="font-size:6px;"></i> En Proceso

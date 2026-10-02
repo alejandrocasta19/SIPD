@@ -40,7 +40,7 @@
 
             <div class="guest-public">
                 <small>ACCESO PÚBLICO</small>
-                <p>¿Eres conductor y quieres consultar el estado de tu proceso?</p>
+                <p>¿Quieres consultar el estado de tu proceso?</p>
                 <a class="btn-public" href="{{ route('consulta.publica') }}">Consultar mi caso</a>
             </div>
         </aside>
@@ -49,6 +49,12 @@
             <div class="guest-panel-inner">
                 <h2>Acceso al sistema</h2>
                 <p class="guest-lead">Ingresa las credenciales de tu cuenta institucional.</p>
+
+                @if (session('status'))
+                    <div class="sipd-alert sipd-alert-warning" role="status">
+                        <div>{{ session('status') }}</div>
+                    </div>
+                @endif
 
                 @if($errors->any())
                     <div class="sipd-alert sipd-alert-error" role="alert">
@@ -68,7 +74,7 @@
 
                     <div class="guest-field">
                         <label for="email">Correo electrónico <span class="req">*</span></label>
-                        <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="usuario@cootranshuila.com" autocomplete="username" required autofocus class="{{ $errors->has('email') ? 'is-invalid' : '' }}">
+                        <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="nombre@sipd.co" pattern="[A-Za-z]+@sipd\.co" title="Usa el correo del sistema: texto@sipd.co" autocomplete="username" required autofocus class="{{ $errors->has('email') ? 'is-invalid' : '' }}">
                     </div>
 
                     <div class="guest-field">

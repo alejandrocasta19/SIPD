@@ -81,27 +81,24 @@
 </table>
 
 <h2>3. Volumen mensual</h2>
+<p class="note">Casos registrados en cada mes.</p>
 <table class="grid">
-    <tr><th>Mes</th><th>Total</th><th>Pendiente</th><th>En proceso</th><th>Sancionado</th><th>Archivado</th></tr>
+    <tr><th>Mes</th><th>Casos</th></tr>
     @forelse(($data['monthly'] ?? []) as $month)
         @php $st = $month['states'] ?? []; @endphp
         <tr>
             <td>{{ $month['period'] }}</td>
             <td class="num">{{ $month['total'] ?? array_sum($st) }}</td>
-            <td class="num">{{ $st['Pendiente'] ?? 0 }}</td>
-            <td class="num">{{ $st['En Proceso'] ?? 0 }}</td>
-            <td class="num">{{ $st['Sancionado'] ?? 0 }}</td>
-            <td class="num">{{ $st['Archivado'] ?? 0 }}</td>
         </tr>
     @empty
-        <tr><td colspan="6">Sin movimiento mensual.</td></tr>
+        <tr><td colspan="2">Sin movimiento mensual.</td></tr>
     @endforelse
 </table>
 
-<h2>4. Cargo del trabajador</h2>
-<p class="note">Oficios con más procesos (conductor, taquillero, etc.).</p>
+<h2>4. Modalidad y cargo</h2>
+<p class="note">Modalidad del proceso y cargo del trabajador.</p>
 <table class="grid">
-    <tr><th>#</th><th>Cargo</th><th>Casos</th><th>Participación</th></tr>
+    <tr><th>#</th><th>Modalidad</th><th>Casos</th><th>Participación</th></tr>
     @forelse(($data['by_modalidad'] ?? []) as $i => $row)
         <tr><td class="num">{{ $i + 1 }}</td><td>{{ $row['label'] }}</td><td class="num">{{ $row['total'] }}</td><td class="num">{{ $pct($row['total']) }}</td></tr>
     @empty

@@ -161,7 +161,7 @@
                 <form class="sipd-search" action="{{ route('abogado.consultarproceso') }}" method="GET">
                     <div class="sipd-search-inner">
                         <i class="fas fa-search"></i>
-                        <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar por conductor, cédula, placa o N° proceso...">
+                        <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar por trabajador, cédula, placa o N° proceso...">
                     </div>
                 </form>
 
@@ -286,6 +286,7 @@
     </div>
 
     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">@csrf</form>
+    <form id="inactividad-form" action="{{ route('sesion.expirar') }}" method="POST" class="d-none">@csrf</form>
 
     @if(!$isManager)
     <div class="sipd-dialog-bg" id="modalSolicitarPermiso">
@@ -349,7 +350,7 @@
                     <div class="pf-grid">
                         <div>
                             <label>NOMBRE COMPLETO</label>
-                            <input type="text" name="name" value="{{ old('name', $authUser->name) }}" required readonly>
+                            <input type="text" name="name" value="{{ old('name', $authUser->name) }}" required title="Solo letras" readonly>
                             @error('name') <div class="pwd-error">{{ $message }}</div> @enderror
                         </div>
                         <div>
@@ -367,7 +368,7 @@
                         </div>
                         <div>
                             <label>CARGO</label>
-                            <input type="text" name="cargo" value="{{ old('cargo', $authUser->cargo) }}" readonly>
+                            <input type="text" name="cargo" value="{{ old('cargo', $authUser->cargo) }}" title="Solo letras" readonly>
                         </div>
                         <div>
                             <label>FECHA DE INGRESO</label>
@@ -477,6 +478,61 @@
     </script>
     @endif
     <script src="{{ rtrim(request()->root(), '/') }}/js/sipd-feedback.js?v=8"></script>
+    <script>
+        (function () {
+            var form = document.getElementById('inactividad-form');
+            if (!form) return;
+
+            var limiteMs = {{ (int) config('session.idle', 30) }} * 60 * 1000;
+            var pulsoCadaMs = 60 * 1000;
+            var token = document.querySelector('meta[name="csrf-token"]');
+            var ultimoPulso = 0;
+            var pulsoTimer = null;
+            var cierreTimer = null;
+
+            function cerrar() {
+                form.submit();
+            }
+
+            function programarCierre() {
+                clearTimeout(cierreTimer);
+                cierreTimer = setTimeout(cerrar, limiteMs);
+            }
+
+            function pulsar() {
+                pulsoTimer = null;
+                ultimoPulso = Date.now();
+                fetch(@json(route('sesion.actividad')), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': token ? token.getAttribute('content') : ''
+                    }
+                }).then(function (respuesta) {
+                    if (respuesta.status === 401 || respuesta.status === 419) cerrar();
+                }).catch(function () {});
+            }
+
+            function programarPulso() {
+                if (pulsoTimer) return;
+                var espera = pulsoCadaMs - (Date.now() - ultimoPulso);
+                pulsoTimer = setTimeout(pulsar, Math.max(espera, 0));
+            }
+
+            function marcarActividad() {
+                programarCierre();
+                programarPulso();
+            }
+
+            ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(function (evento) {
+                window.addEventListener(evento, marcarActividad, { passive: true });
+            });
+
+            programarCierre();
+        })();
+    </script>
 
     <script src="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/plugins/jquery/jquery.min.js"></script>
     <script src="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -541,6 +597,20 @@
             var saveProfile = document.getElementById('save-profile-btn');
             var pedirPerfil = document.getElementById('pedir-perfil-btn');
             var profileInputs = document.querySelectorAll('#profile-form input');
+            profileInputs.forEach(function (input) {
+                if (input.name === 'name' || input.name === 'cargo') {
+                    input.addEventListener('input', function () {
+                        var limpio = this.value.replace(/[^\p{L} ']/gu, '');
+                        if (limpio !== this.value) this.value = limpio;
+                    });
+                }
+                if (input.name === 'cedula' || input.name === 'telefono') {
+                    input.addEventListener('input', function () {
+                        var limpio = this.value.replace(/\D/g, '');
+                        if (limpio !== this.value) this.value = limpio;
+                    });
+                }
+            });
 
             function openProfileModal(e) {
                 if (e) e.preventDefault();

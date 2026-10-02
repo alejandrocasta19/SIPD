@@ -362,7 +362,7 @@
             <p>
                 <strong>Trabajador:</strong> {{ $caso->nombre }}
                 @if($caso->cedula) · C.C. {{ $caso->cedula }}@endif
-                @if($caso->modalidad) · {{ $caso->modalidad }}@endif
+                @if($caso->modalidad || $caso->cargo) · {{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) }}@endif
             </p>
         </div>
         <div>
@@ -490,7 +490,7 @@
                                class="btn-ev btn-ev-download">
                                 <i class="fas fa-download"></i> Descargar
                             </a>
-                            @if(auth()->user()->esCoordinadora() || $ev->user_id === auth()->id())
+                            @if(!$caso->soloLoManejaCoordinadora() && (auth()->user()->esCoordinadora() || $ev->user_id === auth()->id()))
                                 <form method="POST"
                                       action="{{ route('documentos.evidencias.destroy', [$caso->id, $ev->id]) }}"
                                       data-confirm="La evidencia se eliminará del expediente."

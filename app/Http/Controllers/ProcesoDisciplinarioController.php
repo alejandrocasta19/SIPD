@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Storage;
 use App\Services\ReportService;
 use App\Services\OfficialDocumentService;
 use Illuminate\Validation\ValidationException;
+use App\Support\Formatos;
+use App\Support\Modalidades;
 use App\Support\Paginacion;
 use Illuminate\Support\Str;
 use Throwable;
@@ -55,14 +57,16 @@ class ProcesoDisciplinarioController extends Controller
         $user = auth()->user();
         $visible = $this->visibleProcesses();
 
-        $pendientes = (clone $visible)->where('estado', 'Pendiente')->count();
-        $enProceso = (clone $visible)->where('estado', 'En Proceso')->count();
-        $sancionados = (clone $visible)->where('estado', 'Sancionado')->count();
-        $archivados = (clone $visible)->where('estado', 'Archivado')->count();
-        $total = (clone $visible)->count();
+        $conteos = $this->conteosVisibles($visible);
+        $pendientes = $conteos['Pendiente'];
+        $enProceso = $conteos['En proceso'];
+        $sancionados = $conteos['Sancionado'];
+        $archivados = $conteos['Archivado'];
+        $total = $pendientes + $enProceso + $sancionados + $archivados;
         $resueltos = $sancionados + $archivados;
         $tasaResolucion = $total > 0 ? (int) round(($resueltos / $total) * 100) : 0;
         $abiertos = $pendientes + $enProceso;
+        $veredictos = (clone $visible)->where('estado', 'En Proceso')->count();
 
         $pct = function ($count) use ($total) {
             return $total > 0 ? (int) round(($count / $total) * 100) : 0;
@@ -78,26 +82,14 @@ class ProcesoDisciplinarioController extends Controller
             ->sortBy(fn ($proceso) => $proceso->diasPlazo())
             ->values();
 
-        $proximoVencer = $casosAbiertos->first();
-        $diasVencer = $proximoVencer ? $proximoVencer->diasPlazo() : null;
         $plazosVencidos = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'vencido')->count();
         $plazosPorVencer = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'por_vencer')->count();
 
-        $descargosPendientes = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso'])
+        $descargosPendientes = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])
             ->where(function ($query) {
                 $query->whereNull('descargos')->orWhere('descargos', '');
             })
             ->count();
-
-        $alertaDescargos = $casosAbiertos->first(function ($proceso) {
-            return !filled($proceso->descargos);
-        });
-
-        $alertasActivas = collect([
-            $plazosVencidos > 0,
-            $plazosPorVencer > 0,
-            $descargosPendientes > 0,
-        ])->filter()->count();
 
         $atencion = $casosAbiertos->take(6);
 
@@ -149,13 +141,10 @@ class ProcesoDisciplinarioController extends Controller
             'pctProceso' => $pct($enProceso),
             'pctSancionado' => $pct($sancionados),
             'pctArchivado' => $pct($archivados),
-            'proximoVencer' => $proximoVencer,
-            'diasVencer' => $diasVencer,
             'plazosVencidos' => $plazosVencidos,
             'plazosPorVencer' => $plazosPorVencer,
-            'alertaDescargos' => $alertaDescargos,
             'descargosPendientes' => $descargosPendientes,
-            'alertasActivas' => $alertasActivas,
+            'veredictos' => $veredictos,
             'atencion' => $atencion,
             'recientes' => $recientes,
             'anexosTotal' => $anexosTotal,
@@ -186,6 +175,8 @@ class ProcesoDisciplinarioController extends Controller
                 old('optional_clauses.' . $tipoInicial . '.descargos_fuera_de_termino')
             ),
             'profileUser' => auth()->user(),
+            'selector' => Modalidades::selector(auth()->user()),
+            'modalidadSeleccionada' => (string) old('modalidad', request('modalidad', '')),
         ]);
     }
 
@@ -221,7 +212,7 @@ class ProcesoDisciplinarioController extends Controller
                 $query->where('nombre', 'like', '%' . $term . '%')
                     ->orWhere('cedula', 'like', '%' . $term . '%');
             })
-            ->select('nombre', 'cedula', 'modalidad', 'ruta', 'telefono')
+            ->select('nombre', 'cedula', 'modalidad', 'placa', 'ruta', 'telefono')
             ->orderBy('nombre')
             ->limit(10)
             ->get()
@@ -256,10 +247,17 @@ class ProcesoDisciplinarioController extends Controller
             return !empty($item->cedula) ? 'CC:' . trim($item->cedula) : 'NAME:' . mb_strtolower(trim($item->nombre));
         })->map(function ($group) {
             $first = $group->first();
+            $modalidades = $group->map(function ($proceso) {
+                $etiqueta = Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo);
+                return $etiqueta === '—' ? '' : $etiqueta;
+            })->filter()->unique()->values();
             return (object) [
                 'nombre'        => $first->nombre,
                 'cedula'        => $first->cedula,
-                'modalidad'     => $first->modalidad,
+                'modalidad'     => $first->modalidad === 'Administrativos' && filled($first->cargo)
+                    ? $first->cargo
+                    : $first->modalidad,
+                'modalidades'   => $modalidades,
                 'telefono'      => $first->telefono,
                 'placa'         => $first->placa,
                 'total_casos'   => $group->count(),
@@ -268,11 +266,13 @@ class ProcesoDisciplinarioController extends Controller
             ];
         })->sortByDesc('total_casos')->values();
 
-        $workersGroupedPaginated = Paginacion::deColeccion($workersGrouped);
+        $reincidentes = $workersGrouped->where('es_reincidente', true)->count();
+        $workersGroupedPaginated = Paginacion::deColeccion($workersGrouped, 5);
 
         return view('abogado.Reincidencias', [
             'pageTitle'      => 'Reincidencias',
             'workersGrouped' => $workersGroupedPaginated,
+            'reincidentes'   => $reincidentes,
             'search'         => $search,
             'profileUser'    => auth()->user(),
         ]);
@@ -284,18 +284,19 @@ class ProcesoDisciplinarioController extends Controller
     public function index(Request $request, $mine = false)
     {
         $visible = $this->visibleProcesses();
+        $visibles = $this->conteosVisibles($visible);
         $conteos = [
-            'todos' => (clone $visible)->count(),
-            'Pendiente' => (clone $visible)->where('estado', 'Pendiente')->count(),
-            'En Proceso' => (clone $visible)->where('estado', 'En Proceso')->count(),
-            'Sancionado' => (clone $visible)->where('estado', 'Sancionado')->count(),
-            'Archivado' => (clone $visible)->where('estado', 'Archivado')->count(),
+            'todos' => array_sum($visibles),
+            'Pendiente' => $visibles['Pendiente'],
+            'En Proceso' => $visibles['En proceso'],
+            'Sancionado' => $visibles['Sancionado'],
+            'Archivado' => $visibles['Archivado'],
         ];
 
-        $query = $visible->with('user')->withCount('anexos');
+        $query = $visible->with(['user', 'documentoEstados'])->withCount('anexos');
 
-        if ($request->filled('estado') && $request->estado !== 'todos') {
-            $query->where('estado', $request->estado);
+        if (in_array((string) $request->estado, ['Pendiente', 'En Proceso', 'En proceso', 'Sancionado', 'Archivado'], true)) {
+            $query->dondeEstadoVisible((string) $request->estado);
         }
 
         if ($request->filled('q')) {
@@ -314,7 +315,7 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         if ($request->filled('modalidad')) {
-            $query->where('modalidad', $request->modalidad);
+            Modalidades::aplicarFiltro($query, (string) $request->modalidad);
         }
 
         $procesos = Paginacion::deQuery($query->latest());
@@ -367,7 +368,9 @@ class ProcesoDisciplinarioController extends Controller
             $query->where('created_at', '<=', $request->hasta . ' 23:59:59');
         }
 
-        $casos = Paginacion::deQuery((clone $query)->whereIn('estado', ['Pendiente', 'En Proceso'])->withCount('anexos')->latest());
+        $casos = Paginacion::deQuery(
+            (clone $query)->whereNotIn('estado', ['Sancionado', 'Archivado'])->with('documentoEstados')->withCount('anexos')->latest()
+        );
 
         // Historial: cerrados (Sancionado + Archivado)
         $historial = (clone $query)->whereIn('estado', ['Sancionado', 'Archivado'])
@@ -393,6 +396,7 @@ class ProcesoDisciplinarioController extends Controller
                     'fecha_cierre'  => $cierre ? $cierre->format('d/m/Y') : '—',
                     'duracion_dias' => $duracion,
                     'modalidad'     => $p->modalidad,
+                    'cargo'         => $p->cargo,
                     'anexos'        => (int) $p->anexos_count,
                 ];
             });
@@ -495,7 +499,7 @@ class ProcesoDisciplinarioController extends Controller
         try {
             $casos = $this->visibleProcesses()
                 ->whereIn('id', $validated['ids'])
-                ->with('user')
+                ->with(['user', 'documentoEstados'])
                 ->withCount('anexos')
                 ->orderBy('id')
                 ->get();
@@ -517,6 +521,20 @@ class ProcesoDisciplinarioController extends Controller
 
             return back()->with('error', 'No fue posible exportar los casos seleccionados.');
         }
+    }
+
+    private function conteosVisibles($visible): array
+    {
+        $abiertos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado']);
+        $enProceso = (clone $abiertos)->conDocumentoDescargado()->count();
+        $abiertosTotal = (clone $abiertos)->count();
+
+        return [
+            'Pendiente' => $abiertosTotal - $enProceso,
+            'En proceso' => $enProceso,
+            'Sancionado' => (clone $visible)->where('estado', 'Sancionado')->count(),
+            'Archivado' => (clone $visible)->where('estado', 'Archivado')->count(),
+        ];
     }
 
     private function reportRange(Request $request): array
@@ -541,10 +559,20 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function store(Request $request)
     {
+        $seleccion = trim((string) $request->input('modalidad', ''));
+        $interpretada = Modalidades::interpretar($seleccion, $request->input('cargo'));
+        if ($seleccion !== '' && ($interpretada === null || !Modalidades::permiteSeleccion($request->user(), $seleccion))) {
+            throw ValidationException::withMessages([
+                'modalidad' => 'Esa modalidad no corresponde a tu cargo.',
+            ]);
+        }
+        $this->validarDatosTrabajador($request, $seleccion, $interpretada['modalidad'] ?? null);
+
         $validated = $request->validate([
             'tipo_proceso' => 'required|in:' . implode(',', CasoDocumentoEstado::TIPOS),
-            'nombre'       => 'required|string|max:255',
         ]);
+        $modalidad = $interpretada['modalidad'] ?? null;
+        $cargo = $interpretada['cargo'] ?? null;
 
         $rutaDocumento = null;
         $evidenciasToSave = [];
@@ -598,9 +626,12 @@ class ProcesoDisciplinarioController extends Controller
             'tipo_proceso'      => $validated['tipo_proceso'],
             'nombre'            => $request->nombre,
             'cedula'            => $request->cedula,
-            'placa'             => $request->placa,
+            'placa'             => Modalidades::usaPlaca($modalidad)
+                ? (Formatos::placaNormalizada($request->input('placa')) ?: null)
+                : null,
             'ruta'              => $request->ruta,
-            'modalidad'         => $request->modalidad,
+            'modalidad'         => $modalidad,
+            'cargo'             => $cargo,
             'telefono'          => $request->telefono,
             'tipo_falta'        => $request->tipo_falta,
             'descripcion_falta' => $request->descripcion_falta,
@@ -739,8 +770,8 @@ class ProcesoDisciplinarioController extends Controller
     {
         $proceso = $this->accessibleProcess($id);
 
-        if ($proceso->estado === 'Sancionado') {
-            return redirect()->back()->with('error', 'Acción denegada: Los procesos sancionados están bloqueados permanentemente y no admiten ninguna edición.');
+        if ($respuesta = $proceso->redireccionSiBloqueado()) {
+            return $respuesta;
         }
 
         $rutaDocumento = $proceso->documento_falta;
@@ -771,14 +802,27 @@ class ProcesoDisciplinarioController extends Controller
             }
         }
 
+        $seleccion = trim((string) $request->input('modalidad', ''));
+        $datosModalidad = Modalidades::interpretar($seleccion, $request->input('cargo'));
+        if ($seleccion !== '' && ($datosModalidad === null || !Modalidades::permiteSeleccion($request->user(), $seleccion))) {
+            throw ValidationException::withMessages([
+                'modalidad' => 'Esa modalidad no corresponde a tu cargo.',
+            ]);
+        }
+        $datosModalidad = $datosModalidad ?? ['modalidad' => null, 'cargo' => null];
+        $this->validarDatosTrabajador($request, $seleccion, $datosModalidad['modalidad'] ?? null);
+
         $proceso->update([
 
             'nombre' => $request->nombre,
             'cedula' => $request->cedula,
             'telefono' => $request->telefono,
-            'placa' => $request->placa,
+            'placa' => Modalidades::usaPlaca($datosModalidad['modalidad'] ?? null)
+                ? (Formatos::placaNormalizada($request->input('placa')) ?: null)
+                : null,
             'ruta' => $request->ruta,
-            'modalidad' => $request->modalidad,
+            'modalidad' => $datosModalidad['modalidad'] ?? null,
+            'cargo' => $datosModalidad['cargo'] ?? null,
 
             'tipo_falta' => $request->tipo_falta,
             'fecha_falta' => $request->fecha_falta,
@@ -862,6 +906,10 @@ class ProcesoDisciplinarioController extends Controller
     {
         $proceso = $this->accessibleProcess($id);
 
+        if ($respuesta = $proceso->redireccionSiBloqueado()) {
+            return $respuesta;
+        }
+
         if ($proceso->documento_falta) {
             Storage::disk('public')->delete($proceso->documento_falta);
         }
@@ -908,6 +956,8 @@ class ProcesoDisciplinarioController extends Controller
                     'id' => $proceso->id,
                     'numero' => $anio . '-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT),
                     'nombre' => $proceso->nombre,
+                    'modalidad' => $proceso->modalidad,
+                    'cargo' => $proceso->cargo,
                     'proceso_id' => $proceso->id,
                     'abogado' => $proceso->user->name ?? 'Sin asignar',
                     'expediente' => optional($fecha)->format('Y-m-d'),
@@ -966,6 +1016,9 @@ class ProcesoDisciplinarioController extends Controller
                     'id' => $proceso->id,
                     'proceso_id' => $proceso->id,
                     'conductor' => $proceso->nombre,
+                    'estado' => $proceso->estado,
+                    'modalidad' => $proceso->modalidad,
+                    'cargo' => $proceso->cargo,
                     'tipo' => $tipo,
                     'es_descargos' => $proceso->estado === 'Pendiente',
                     'descargos_presentacion' => $proceso->descargosPresentacionValue(),
@@ -1001,6 +1054,11 @@ class ProcesoDisciplinarioController extends Controller
     public function actualizarDescargosPresentacion(Request $request, $id)
     {
         $proceso = $this->accessibleProcess($id);
+
+        if ($respuesta = $proceso->redireccionSiBloqueado()) {
+            return $respuesta;
+        }
+
         $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));
 
         $validated = $request->validate([
@@ -1025,14 +1083,16 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function abogados()
     {
-        $abogados = User::where('role', 'equipo')
-            ->with('permisos')
-            ->withCount('procesos')
-            ->withCount(['procesos as procesos_abiertos_count' => function ($query) {
-                $query->whereIn('estado', ['Pendiente', 'En Proceso']);
-            }])
-            ->orderBy('name')
-            ->get();
+        $abogados = Paginacion::deQuery(
+            User::where('role', 'equipo')
+                ->with('permisos')
+                ->withCount('procesos')
+                ->withCount(['procesos as procesos_abiertos_count' => function ($query) {
+                    $query->whereIn('estado', ['Pendiente', 'En Proceso']);
+                }])
+                ->orderBy('name'),
+            5
+        );
 
         return view('coordinadora.abogados', [
             'pageTitle' => 'Equipo y permisos',
@@ -1069,11 +1129,11 @@ class ProcesoDisciplinarioController extends Controller
     {
         $permitidos = implode(',', User::cargosEquipo());
         $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'cargo' => 'required|in:' . $permitidos,
-        ]);
+            'name' => Formatos::reglasNombre(),
+            'email' => Formatos::reglasEmail(),
+            'cargo' => $request->cargo,
+            'activo' => true,
+        ], Formatos::mensajes());
 
         User::create([
             'name' => $request->name,
@@ -1099,24 +1159,15 @@ class ProcesoDisciplinarioController extends Controller
 
         try {
             $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email,' . $abogado->id,
-                'cargo' => 'required|string|max:255',
-                'activo' => 'required|boolean',
-                'nueva_password' => 'nullable|string|min:6|confirmed',
-            ], [
-                'nueva_password.min' => 'La contraseña debe tener al menos :min caracteres.',
-                'nueva_password.confirmed' => 'La confirmación de la contraseña no coincide.',
-            ]);
-        } catch (ValidationException $e) {
-            return redirect()
-                ->back()
+                'name' => Formatos::reglasNombre(),
+                'email' => Formatos::reglasEmail(true, $abogado->id),
+                'cargo' => Formatos::reglasCargo(),
                 ->withErrors($e->validator)
                 ->withInput()
                 ->with('abrir_editar_rh', $editarUrl);
         }
 
-        $data = [
+            ] + Formatos::mensajes());
             'name' => $validated['name'],
             'email' => $validated['email'],
             'cargo' => $validated['cargo'],
@@ -1151,6 +1202,31 @@ class ProcesoDisciplinarioController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|integer',
         ]);
+
+    private function validarDatosTrabajador(Request $request, string $seleccion, ?string $modalidad): void
+    {
+        $request->merge([
+            'nombre' => trim((string) $request->input('nombre')),
+            'cargo' => trim((string) $request->input('cargo')),
+            'placa' => $request->filled('placa')
+                ? Formatos::placaNormalizada($request->input('placa'))
+                : $request->input('placa'),
+        ]);
+
+        $reglas = [
+            'nombre' => Formatos::reglasNombre(),
+            'cedula' => Formatos::reglasCedula(),
+            'telefono' => Formatos::reglasTelefono(),
+        ];
+        if (Modalidades::pideCargo($seleccion)) {
+            $reglas['cargo'] = Formatos::reglasCargo();
+        }
+        if (Modalidades::usaPlaca($modalidad)) {
+            $reglas['placa'] = Formatos::reglasPlaca();
+        }
+
+        $request->validate($reglas, Formatos::mensajes());
+    }
 
         $responsable = User::whereKey($validated['user_id'])
             ->where('role', 'equipo')

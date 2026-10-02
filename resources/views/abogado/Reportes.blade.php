@@ -133,7 +133,7 @@
 <form class="rp-filters" method="GET" action="{{ route('abogado.reportes') }}" id="report-filters">
     <div class="rf"><label for="desde">Desde</label><input id="desde" name="desde" type="date" value="{{ request('desde') }}"></div>
     <div class="rf"><label for="hasta">Hasta</label><input id="hasta" name="hasta" type="date" value="{{ request('hasta') }}"></div>
-    <div class="rf"><label for="q">Buscar</label><input id="q" name="q" type="search" value="{{ request('q') }}" placeholder="Conductor, cédula, placa…"></div>
+    <div class="rf"><label for="q">Buscar</label><input id="q" name="q" type="search" value="{{ request('q') }}" placeholder="Trabajador, cédula, placa…"></div>
     <button class="rbtn g"  type="submit"><i class="fas fa-search"></i> Filtrar</button>
     <a href="{{ route('abogado.reportes') }}" class="rbtn sl"><i class="fas fa-undo"></i> Limpiar</a>
 </form>
@@ -163,8 +163,8 @@
         </div>
     </div>
     <div class="ch-card">
-        <h3>Cargo del trabajador</h3>
-        <p>Top 3 oficios con más procesos.</p>
+        <h3>Modalidad y cargo</h3>
+        <p>Top 3 modalidades con más procesos.</p>
         <div class="ch-wrap ch-rank" id="cargo-wrap">
             <ol class="top-list" id="cargo-list"></ol>
             <button type="button" class="top-more" id="cargo-more">Ampliar vista</button>
@@ -217,9 +217,8 @@
                 <tr>
                     <th></th>
                     <th>Proceso</th>
-                    <th>Conductor</th>
+                    <th>Trabajador</th>
                     <th>Cédula</th>
-                    <th>Placa</th>
                     <th>Tipo de Falta</th>
                     <th>Estado</th>
                     <th>Fecha</th>
@@ -235,11 +234,11 @@
                     <td><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="proc-lnk">PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</a></td>
                     <td><b>{{ $caso->nombre }}</b></td>
                     <td>{{ $caso->cedula   ?: '—' }}</td>
-                    <td>{{ $caso->placa    ?: '—' }}</td>
+                    <td>{{ \App\Support\Modalidades::textoPlaca($caso->modalidad, $caso->placa) }}</td>
                     <td>{{ $caso->tipo_falta ?: '—' }}</td>
-                    <td><span class="sb {{ strtolower(str_replace(' ', '-', $caso->estado)) }}">{{ $caso->estado }}</span></td>
+                    <td><span class="sb {{ strtolower(str_replace(' ', '-', $caso->estadoVisible())) }}">{{ $caso->estadoVisible() }}</span></td>
                     <td>{{ $caso->created_at ? $caso->created_at->format('d/m/Y') : '—' }}</td>
-                    <td>{{ $caso->modalidad ?: '—' }}</td>
+                    <td>{{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) }}</td>
                     <td style="text-align:center;">{{ $caso->anexos_count ?: '—' }}</td>
                     <td style="text-align:right;"><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="act-lnk"><i class="fas fa-eye"></i> Ver</a></td>
                 </tr>
@@ -293,12 +292,13 @@
         <thead>
             <tr>
                 <th>Proceso</th>
-                <th>Conductor</th>
+                <th>Trabajador</th>
                 <th>Cédula</th>
                 <th>Placa</th>
+                <th>Modalidad</th>
                 <th>Tipo de Falta</th>
                 <th>Resultado</th>
-                <th>Abogado</th>
+                <th>Responsable</th>
                 <th>Apertura</th>
                 <th>Cierre</th>
                 <th>Duración</th>
@@ -313,7 +313,8 @@
                 <td><a href="{{ route('abogado.detalleproceso', $h->id) }}" class="proc-lnk">PRO-{{ str_pad($h->id, 3, '0', STR_PAD_LEFT) }}</a></td>
                 <td><b>{{ $h->nombre }}</b></td>
                 <td>{{ $h->cedula   ?: '—' }}</td>
-                <td>{{ $h->placa    ?: '—' }}</td>
+                <td>{{ \App\Support\Modalidades::textoPlaca($h->modalidad, $h->placa) }}</td>
+                <td>{{ \App\Support\Modalidades::etiquetaCaso($h->modalidad, $h->cargo) }}</td>
                 <td>{{ $h->tipo_falta ?: '—' }}</td>
                 <td>
                     <span class="sb {{ strtolower(str_replace(' ', '-', $h->estado)) }}">{{ $h->estado }}</span>
@@ -342,7 +343,7 @@
             </tr>
         @empty
             <tr>
-                <td class="empty-c" colspan="13">
+                <td class="empty-c" colspan="14">
                     <i class="fas fa-archive" style="display:block;font-size:18px;margin-bottom:6px;opacity:.35;"></i>
                     No hay casos archivados ni sancionados aún.
                 </td>
@@ -434,8 +435,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var finals = Object.keys(states).filter(function(s){ return ['Sancionado','Archivado'].indexOf(s)>-1; });
 
         document.getElementById('card-total').textContent      = data.total||0;
-        document.getElementById('card-pendientes').textContent = states.Pendiente||0;
-        document.getElementById('card-proceso').textContent    = states['En Proceso']||0;
+        document.getElementById('card-pendientes').textContent = (data.kpis && data.kpis.pendientes) || states.Pendiente || 0;
+        document.getElementById('card-proceso').textContent    = (data.kpis && data.kpis.en_proceso) || states['En proceso'] || states['En Proceso'] || 0;
         document.getElementById('card-finalizados').textContent= finals.reduce(function(s,k){return s+(states[k]||0);},0);
         var anexos = data.anexos || {};
         document.getElementById('card-anexos').textContent = anexos.total||0;
@@ -467,8 +468,8 @@ document.addEventListener('DOMContentLoaded', function () {
             'cargo-list', 'cargo-wrap', 'cargo-more',
             data.by_modalidad || [],
             '#2563eb',
-            'Cargo del trabajador',
-            'Todos los oficios con procesos en el período.'
+            'Modalidad y cargo',
+            'Modalidad y cargo de los procesos del período.'
         );
         renderTopList(
             'fault-list', 'fault-wrap', 'fault-more',

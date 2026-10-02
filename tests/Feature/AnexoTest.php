@@ -382,7 +382,7 @@ class AnexoTest extends TestCase
             ->assertSee('Archivo previo')
             ->assertSee('Firmados')
             ->assertSee('Anexos')
-            ->assertSee('Cargo del trabajador')
+            ->assertSee('Modalidad y cargo')
             ->assertSee('Tipo de falta')
             ->assertSee('Ampliar vista')
             ->assertDontSee('Pendiente firma')

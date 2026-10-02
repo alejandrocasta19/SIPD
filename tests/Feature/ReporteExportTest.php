@@ -41,7 +41,7 @@ class ReporteExportTest extends TestCase
         $this->assertStringContainsString('COOTRANSHUILA', $html);
         $this->assertStringContainsString('Informe de gestión disciplinaria', $html);
         $this->assertStringContainsString('Uso interno', $html);
-        $this->assertStringContainsString('Cargo del trabajador', $html);
+        $this->assertStringContainsString('Modalidad y cargo', $html);
         $this->assertStringContainsString('Rutas', $html);
         $this->assertStringContainsString('Descargos', $html);
         $this->assertStringContainsString('Premium', $html);

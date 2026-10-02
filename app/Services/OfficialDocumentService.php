@@ -208,7 +208,7 @@ class OfficialDocumentService
     {
         abort_unless(isset(self::TEMPLATES[$type]), 404, 'Tipo de documento no válido');
         if (isset(self::BLOCKS[$type])) {
-            return self::BLOCKS[$type];
+        return self::BLOCKS[$type];
         }
 
         return $this->detectYellowBlocks($type);
@@ -217,7 +217,7 @@ class OfficialDocumentService
     public function fieldSections(string $type): array
     {
         if (isset(self::SECTIONS[$type])) {
-            return self::SECTIONS[$type];
+        return self::SECTIONS[$type];
         }
 
         $n = count($this->blockDefinitions($type));
@@ -355,11 +355,11 @@ class OfficialDocumentService
         libxml_clear_errors();
         $xpath = new DOMXPath($dom);
         $this->compactPhpWordLayout($dom, $xpath);
-
+        
         $yellowIndex = 0;
         $defaults = $this->defaultTexts($tipo);
         $containers = $xpath->query('//p|//td|//th|//li|//h1|//h2|//h3|//h4|//h5|//h6');
-
+        
         foreach ($containers as $p) {
             if (!($p instanceof \DOMElement)) {
                 continue;
@@ -371,7 +371,7 @@ class OfficialDocumentService
                 while ($p->firstChild) {
                     $p->removeChild($p->firstChild);
                 }
-                $txt = $dom->createElement('span', '(Firma Digital - Cargue su firma en el botón superior)');
+                $txt = $dom->createElement('span', '(Firma digital — usa el botón Subir firma, debajo del documento)');
                 $p->appendChild($txt);
             }
 
@@ -390,7 +390,7 @@ class OfficialDocumentService
             if ($matched === []) {
                 continue;
             }
-
+            
             $originalText = '';
             foreach ($matched as $span) {
                 $originalText .= $span->textContent;
@@ -408,10 +408,10 @@ class OfficialDocumentService
                 }
                 $p->appendChild($textarea);
             } else {
-                $firstSpan->parentNode->insertBefore($textarea, $firstSpan);
+            $firstSpan->parentNode->insertBefore($textarea, $firstSpan);
                 foreach ($matched as $span) {
                     if ($span->parentNode) {
-                        $span->parentNode->removeChild($span);
+                $span->parentNode->removeChild($span);
                     }
                 }
             }

@@ -452,17 +452,36 @@ class CoordinadoraTest extends TestCase
             ->get(route('coordinadora.abogados'))
             ->assertOk()
             ->assertSee('Generar documentos')
+            ->assertSee('Nuevo Proceso')
+            ->assertSee('Mis Casos')
+            ->assertSee('Reincidencias')
+            ->assertSee('Plazos y términos')
+            ->assertSee('Resoluciones')
+            ->assertSee('Estadísticas / Reportes')
+            ->assertSee('class="perm-mod-card"', false)
             ->assertSee('Descargar Word/PDF')
             ->assertSee('Guardar borrador')
             ->assertSee('Generar documento')
+            ->assertSee('Editar documento generado')
             ->assertSee('Descargar anexos')
             ->assertSee('Editar anexos')
             ->assertSee('Exportar reportes')
-            ->assertSee('Tiempo del módulo')
-            ->assertSee('name="duracion[expedientes]"', false)
-            ->assertSee('name="duracion[documentos]"', false)
+            ->assertSee('Permanente')
+            ->assertSee('name="duracion[editar_casos]"', false)
+            ->assertSee('name="duracion[eliminar_casos]"', false)
+            ->assertSee('name="duracion[editar_generados]"', false)
+            ->assertSee('name="duracion[editar_anexos]"', false)
+            ->assertSee('name="duracion[eliminar_anexos]"', false)
+            ->assertDontSee('name="duracion[casos]"', false)
+            ->assertDontSee('name="duracion[registro]"', false)
+            ->assertDontSee('name="duracion[documentos]"', false)
+            ->assertDontSee('name="duracion[expedientes]"', false)
             ->assertDontSee('name="duracion[ver_casos]"', false)
-            ->assertDontSee('name="duracion[editar_casos]"', false)
+            ->assertDontSee('name="duracion[registrar_casos]"', false)
+            ->assertDontSee('name="duracion[editar_documentos]"', false)
+            ->assertDontSee('name="duracion[generar_documentos]"', false)
+            ->assertDontSee('name="duracion[descargar_documentos]"', false)
+            ->assertDontSee('Tiempo del módulo')
             ->assertDontSee('Ver autos y actas')
             ->assertDontSee('Generar y editar documentos');
     }
@@ -486,6 +505,10 @@ class CoordinadoraTest extends TestCase
             ->assertSee('data-activo="1"', false)
             ->assertSee(route('coordinadora.abogados.editar', $rh->id), false)
             ->assertSee('Agregar nuevo integrante')
+            ->assertSee('Configurar permisos')
+            ->assertSee('Distribuye cargos y permisos')
+            ->assertSee('class="eq-card"', false)
+            ->assertSee('class="sipd-pager"', false)
             ->assertSee('name="cargo"', false)
             ->assertSee('<select name="cargo"', false)
             ->assertSee('Jefe de personal')
@@ -502,7 +525,7 @@ class CoordinadoraTest extends TestCase
         $this->actingAs($coord)
             ->put(route('coordinadora.abogados.editar', $rh->id), [
                 'name' => 'Kelly Johanna Rodríguez',
-                'email' => 'kelly.actualizada@sipd.co',
+                'email' => 'kellyactualizada@sipd.co',
                 'cargo' => 'Analista de RH',
                 'activo' => '1',
             ])
@@ -511,7 +534,7 @@ class CoordinadoraTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $rh->id,
             'name' => 'Kelly Johanna Rodríguez',
-            'email' => 'kelly.actualizada@sipd.co',
+            'email' => 'kellyactualizada@sipd.co',
             'cargo' => 'Analista de RH',
         ]);
         $this->assertSame($hashAntes, $rh->fresh()->password);
@@ -520,7 +543,7 @@ class CoordinadoraTest extends TestCase
             ->from(route('coordinadora.abogados'))
             ->put(route('coordinadora.abogados.editar', $rh->id), [
                 'name' => 'Kelly Johanna Rodríguez',
-                'email' => 'kelly.actualizada@sipd.co',
+                'email' => 'kellyactualizada@sipd.co',
                 'cargo' => 'Analista de RH',
                 'activo' => '1',
                 'nueva_password' => 'sipd456',
@@ -535,7 +558,7 @@ class CoordinadoraTest extends TestCase
             ->from(route('coordinadora.abogados'))
             ->put(route('coordinadora.abogados.editar', $rh->id), [
                 'name' => 'Kelly Johanna Rodríguez',
-                'email' => 'kelly.actualizada@sipd.co',
+                'email' => 'kellyactualizada@sipd.co',
                 'cargo' => 'Analista de RH',
                 'activo' => '1',
                 'nueva_password' => 'otra789',
@@ -661,7 +684,7 @@ class CoordinadoraTest extends TestCase
             ->put(route('coordinadora.abogados.permisos', $rh->id), [
                 'permisos' => ['ver_casos', 'ver_documentos', 'descargar_documentos'],
                 'duracion' => [
-                    'expedientes' => 'permanente',
+                    'casos' => 'permanente',
                     'documentos' => 'permanente',
                 ],
             ])
@@ -687,26 +710,32 @@ class CoordinadoraTest extends TestCase
         $this->actingAs($coord)
             ->put(route('coordinadora.abogados.permisos', $rh->id), [
                 'permisos' => ['descargar_documentos'],
-                'duracion' => ['documentos' => '3'],
+                'duracion' => ['descargar_documentos' => '3', 'documentos' => '3'],
             ])
             ->assertRedirect();
 
-        $rh = $rh->fresh();
+        $rh = $rh->fresh()->load('permisos');
         $this->assertTrue($rh->puede('descargar_documentos'));
         $this->assertTrue($rh->puede('ver_documentos'));
         $this->assertFalse($rh->puede('generar_documentos'));
+        $this->assertNull($rh->permisos->firstWhere('permiso', 'descargar_documentos')->expires_at);
+        $this->assertNull($rh->permisos->firstWhere('permiso', 'ver_documentos')->expires_at);
     }
 
     /** @test */
-    public function el_tiempo_del_modulo_cubre_ver_editar_y_eliminar_por_separado()
+    public function el_tiempo_solo_aplica_a_editar_y_eliminar()
     {
         $coord = $this->makeUser('coordinadora');
         $rh = $this->makeUser('abogado');
 
         $this->actingAs($coord)
             ->put(route('coordinadora.abogados.permisos', $rh->id), [
-                'permisos' => ['editar_casos', 'eliminar_casos'],
-                'duracion' => ['expedientes' => '3'],
+                'permisos' => ['editar_casos', 'eliminar_casos', 'ver_casos'],
+                'duracion' => [
+                    'editar_casos' => '3',
+                    'eliminar_casos' => '3',
+                    'ver_casos' => '3',
+                ],
             ])
             ->assertRedirect();
 
@@ -716,12 +745,47 @@ class CoordinadoraTest extends TestCase
         $this->assertTrue($rh->puede('eliminar_casos'));
         $this->assertFalse($rh->puede('registrar_casos'));
 
-        foreach (['ver_casos', 'editar_casos', 'eliminar_casos'] as $clave) {
+        $ver = $rh->permisos->firstWhere('permiso', 'ver_casos');
+        $this->assertNotNull($ver);
+        $this->assertNull($ver->expires_at);
+
+        foreach (['editar_casos', 'eliminar_casos'] as $clave) {
             $grant = $rh->permisos->firstWhere('permiso', $clave);
             $this->assertNotNull($grant);
             $this->assertNotNull($grant->expires_at);
             $this->assertTrue($grant->expires_at->between(now()->addHours(2), now()->addHours(4)));
         }
+    }
+
+    /** @test */
+    public function guardar_borrador_es_permanente_y_editar_generado_tiene_tiempo()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.abogados.permisos', $rh->id), [
+                'permisos' => [
+                    'ver_documentos',
+                    'editar_documentos',
+                    'editar_generados',
+                ],
+                'duracion' => [
+                    'editar_documentos' => '3',
+                    'editar_generados' => '3',
+                ],
+            ])
+            ->assertRedirect();
+
+        $rh = $rh->fresh()->load('permisos');
+        $this->assertTrue($rh->puede('editar_documentos'));
+        $this->assertTrue($rh->puede('editar_generados'));
+        $this->assertNull($rh->permisos->firstWhere('permiso', 'editar_documentos')->expires_at);
+        $this->assertNotNull($rh->permisos->firstWhere('permiso', 'editar_generados')->expires_at);
+        $this->assertTrue(
+            $rh->permisos->firstWhere('permiso', 'editar_generados')->expires_at
+                ->between(now()->addHours(2), now()->addHours(4))
+        );
     }
 
     private function makeCaso(?User $user, array $attrs = []): ProcesoDisciplinario

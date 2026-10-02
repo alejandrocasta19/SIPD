@@ -107,6 +107,7 @@
             <select id="anexo-caso" name="caso_id" required>
                 <option value="">Selecciona un proceso…</option>
                 @foreach($casos as $caso)
+                    @continue($caso->soloLoManejaCoordinadora())
                     <option value="{{ $caso->id }}" @if((string) old('caso_id', $casoSeleccionado ?? '') === (string) $caso->id) selected @endif>
                         PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }} · {{ $caso->nombre }}
                     </option>
@@ -159,7 +160,7 @@
     @endif
     <div class="search">
         <i class="fas fa-search"></i>
-        <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por proceso, conductor o nombre de archivo...">
+        <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por proceso, trabajador o nombre de archivo...">
     </div>
 </form>
 
@@ -187,7 +188,7 @@
             <tr>
                 <td>
                     <a class="id" href="{{ route('abogado.detalleproceso', $anexo->caso_id) }}">PRO-{{ str_pad($anexo->caso_id, 3, '0', STR_PAD_LEFT) }}</a>
-                    <span class="hub-sub">{{ $anexo->caso->nombre ?? '—' }}</span>
+                    <span class="hub-sub">{{ optional($anexo->caso)->nombre ?? '—' }} · {{ \App\Support\Modalidades::etiquetaCaso(optional($anexo->caso)->modalidad, optional($anexo->caso)->cargo) }}</span>
                 </td>
                 <td>
                     <span class="name">{{ $anexo->nombreVisible() }}</span>
