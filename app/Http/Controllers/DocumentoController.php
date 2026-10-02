@@ -33,7 +33,7 @@ class DocumentoController extends Controller
     private function visibleProcesses()
     {
         $query = ProcesoDisciplinario::query();
-        if (!in_array(auth()->user()->role, ['admin', 'coordinadora'], true)) {
+        if (!auth()->user()->esCoordinadora()) {
             $query->where('user_id', auth()->id());
         }
         return $query;

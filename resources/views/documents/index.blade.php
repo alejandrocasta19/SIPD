@@ -490,7 +490,7 @@
                                class="btn-ev btn-ev-download">
                                 <i class="fas fa-download"></i> Descargar
                             </a>
-                            @if(in_array(auth()->user()->role, ['admin','coordinadora']) || $ev->user_id === auth()->id())
+                            @if(auth()->user()->esCoordinadora() || $ev->user_id === auth()->id())
                                 <form method="POST"
                                       action="{{ route('documentos.evidencias.destroy', [$caso->id, $ev->id]) }}"
                                       data-confirm="La evidencia se eliminará del expediente."

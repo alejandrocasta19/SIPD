@@ -39,7 +39,7 @@ Route::post('/consultar-caso', [ConsultaPublicaController::class, 'buscar'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::get('/abogado', [ProcesoDisciplinarioController::class, 'dashboard'])
         ->name('abogado.dashboard');
@@ -52,7 +52,7 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::get('/abogado/reportes', [ProcesoDisciplinarioController::class, 'reportes'])
         ->name('abogado.reportes');
@@ -81,7 +81,7 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::get('/abogado/registro',
         [ProcesoDisciplinarioController::class, 'create']
@@ -111,7 +111,7 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::get('/abogado/consultarproceso',
         [ProcesoDisciplinarioController::class, 'index']
@@ -175,7 +175,7 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::get('/abogado/detalleproceso/{id}',
         [ProcesoDisciplinarioController::class, 'show']
@@ -193,7 +193,7 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::put('/abogado/actualizarproceso/{id}',
         [ProcesoDisciplinarioController::class, 'update']
@@ -208,21 +208,21 @@ Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function (
     )->name('abogado.solicitar_veredicto');
 
 });
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
     Route::delete('/abogado/eliminarproceso/{id}',
         [ProcesoDisciplinarioController::class, 'destroy']
     )->name('abogado.eliminarproceso');
 });
 
 //ABOGADS
-Route::middleware(['auth', 'role:admin,coordinadora'])->group(function () {
+Route::middleware(['auth', 'role:admin'])->group(function () {
 
     Route::get('/coordinadora/abogados',
         [ProcesoDisciplinarioController::class, 'abogados']
     )->name('coordinadora.abogados');
 
 });
-Route::middleware(['auth', 'role:admin,coordinadora'])->group(function () {
+Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::delete('/coordinadora/abogados/{id}', [ProcesoDisciplinarioController::class, 'eliminarAbogado'])
         ->name('coordinadora.abogados.eliminar');
 
@@ -274,7 +274,7 @@ Route::middleware(['auth'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,coordinadora,abogado'])->prefix('documentos')->name('documentos.')->group(function () {
+Route::middleware(['auth', 'role:admin,equipo'])->prefix('documentos')->name('documentos.')->group(function () {
 
     // Hub de documentos
     Route::get('/', [DocumentoController::class, 'hub'])

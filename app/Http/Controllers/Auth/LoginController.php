@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Http\Request;
 
 class LoginController extends Controller
 {
@@ -29,17 +30,28 @@ class LoginController extends Controller
         $role = auth()->user()->role;
 
         switch ($role) {
-
             case 'admin':
-            case 'coordinadora':
-                return '/abogado';
-
-            case 'abogado':
+            case 'equipo':
                 return '/abogado';
 
             default:
                 return '/';
         }
+    }
+
+    protected function authenticated(Request $request, $user)
+    {
+        if ($user->estaActivo()) {
+            return null;
+        }
+
+        $this->guard()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('login')->withErrors([
+            $this->username() => 'Tu perfil está desactivado. Consulta con la coordinadora.',
+        ]);
     }
 
     /**

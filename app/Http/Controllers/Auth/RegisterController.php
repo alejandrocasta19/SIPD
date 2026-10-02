@@ -87,7 +87,7 @@ class RegisterController extends Controller
             'password' => Hash::make($data['password']),
 
             // ROL
-            'role' => 'coordinadora',
+            'role' => 'admin',
 
             // CARGO
             'cargo' => 'Coordinadora'

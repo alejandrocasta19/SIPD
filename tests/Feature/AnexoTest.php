@@ -16,7 +16,7 @@ class AnexoTest extends TestCase
 
     private function makeUser(string $role = 'abogado'): User
     {
-        return User::factory()->create(['role' => $role]);
+        return User::factory()->create(['role' => User::normalizarRol($role)]);
     }
 
     private function makeCaso(User $user): ProcesoDisciplinario

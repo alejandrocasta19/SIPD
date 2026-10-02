@@ -423,7 +423,9 @@
                                                 <label class="mb-0" for="asignar-rh">Responsable RH</label>
                                                 <select id="asignar-rh" name="user_id" form="form-asignar-rh" class="form-control form-control-sm" required>
                                                     @foreach($equipoRh as $rh)
-                                                        <option value="{{ $rh->id }}" {{ (int) $proceso->user_id === (int) $rh->id ? 'selected' : '' }}>{{ $rh->name }}</option>
+                                                        <option value="{{ $rh->id }}" {{ (int) $proceso->user_id === (int) $rh->id ? 'selected' : '' }}>
+                                                            {{ $rh->nombreCorto() }}{{ $rh->estaActivo() ? '' : ' (inactivo)' }}
+                                                        </option>
                                                     @endforeach
                                                 </select>
                                                 <button type="submit" form="form-asignar-rh" class="btn btn-sm btn-success">Asignar</button>

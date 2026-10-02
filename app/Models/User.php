@@ -24,6 +24,7 @@ class User extends Authenticatable
         'password',
         'role',
         'cargo',
+        'activo',
         'telefono',
         'cedula',
         'firma_path',
@@ -48,6 +49,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'fecha_ingreso' => 'date',
+        'activo' => 'boolean',
     ];
 
     public function procesos()
@@ -55,9 +57,46 @@ class User extends Authenticatable
         return $this->hasMany(ProcesoDisciplinario::class, 'user_id');
     }
 
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_EQUIPO = 'equipo';
+
+    public const CARGOS_EQUIPO = [
+        'Jefe de personal',
+        'Asesor jurídico',
+    ];
+
+    public static function cargosEquipo(): array
+    {
+        return self::CARGOS_EQUIPO;
+    }
+
+    public static function normalizarRol(?string $role): string
+    {
+        return match ($role) {
+            'admin', 'coordinadora' => self::ROLE_ADMIN,
+            'equipo', 'abogado' => self::ROLE_EQUIPO,
+            default => self::ROLE_EQUIPO,
+        };
+    }
+
     public function esCoordinadora(): bool
     {
-        return in_array($this->role, ['admin', 'coordinadora'], true);
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function esEquipo(): bool
+    {
+        return $this->role === self::ROLE_EQUIPO;
+    }
+
+    public function estaActivo(): bool
+    {
+        return (bool) $this->activo;
+    }
+
+    public function scopeActivos($query)
+    {
+        return $query->where('activo', true);
     }
 
     public function etiquetaEquipo(): string
@@ -69,12 +108,91 @@ class User extends Authenticatable
         return $this->cargo ?: 'Equipo de RH';
     }
 
+    public static function partesNombre(string $name): array
+    {
+        return array_values(array_filter(preg_split('/\s+/', trim($name)) ?: []));
+    }
+
+    public static function titularParte(string $parte): string
+    {
+        return mb_convert_case(mb_strtolower($parte), MB_CASE_TITLE, 'UTF-8');
+    }
+
+    public static function primerNombreDe(string $name): string
+    {
+        $partes = self::partesNombre($name);
+
+        return $partes ? self::titularParte($partes[0]) : '';
+    }
+
+    public static function primerApellidoDe(string $name): string
+    {
+        $partes = self::partesNombre($name);
+        $n = count($partes);
+        if ($n >= 4) {
+            return self::titularParte($partes[2]);
+        }
+        if ($n >= 2) {
+            return self::titularParte($partes[$n - 1]);
+        }
+
+        return '';
+    }
+
     public function primerNombre(): string
     {
-        $partes = preg_split('/\s+/', trim((string) $this->name)) ?: [];
-        $primero = $partes[0] ?? (string) $this->name;
+        return self::primerNombreDe((string) $this->name);
+    }
 
-        return mb_convert_case(mb_strtolower($primero), MB_CASE_TITLE, 'UTF-8');
+    public function nombreCorto(): string
+    {
+        if ($this->esCoordinadora()) {
+            return $this->cargo ?: (string) $this->name;
+        }
+
+        $nombre = $this->primerNombre();
+        $apellido = self::primerApellidoDe((string) $this->name);
+
+        return trim($nombre . ($apellido !== '' ? ' ' . $apellido : ''));
+    }
+
+    public static function nombreTitulado(string $name): string
+    {
+        return implode(' ', array_map([self::class, 'titularParte'], self::partesNombre($name)));
+    }
+
+    public function inicialesCortas(): string
+    {
+        $nombre = $this->primerNombre();
+        $apellido = self::primerApellidoDe((string) $this->name);
+        $ini = '';
+        if ($nombre !== '') {
+            $ini .= mb_strtoupper(mb_substr($nombre, 0, 1));
+        }
+        if ($apellido !== '') {
+            $ini .= mb_strtoupper(mb_substr($apellido, 0, 1));
+        }
+
+        return $ini !== '' ? $ini : 'RH';
+    }
+
+    public static function slugParte(string $texto): string
+    {
+        $ascii = \Illuminate\Support\Str::ascii(mb_strtolower(trim($texto)));
+
+        return preg_replace('/[^a-z]/', '', $ascii) ?: '';
+    }
+
+    public static function emailInstitucional(string $name): string
+    {
+        return self::slugParte(self::primerNombreDe($name))
+            . self::slugParte(self::primerApellidoDe($name))
+            . '@sipd.co';
+    }
+
+    public static function claveInstitucional(string $name): string
+    {
+        return self::slugParte(self::primerNombreDe($name)) . '123';
     }
 
     public function permisos()
@@ -90,7 +208,7 @@ class User extends Authenticatable
     protected static function booted()
     {
         static::created(function (User $user) {
-            if ($user->role === 'abogado') {
+            if ($user->role === self::ROLE_EQUIPO) {
                 $user->otorgarPermisosPorDefecto();
             }
         });

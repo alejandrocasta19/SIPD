@@ -174,21 +174,22 @@
         </div>
         <div class="dash-team-grid">
             @forelse($cargaAbogados as $abogado)
-                @php
-                    $ini = collect(preg_split('/\s+/', trim($abogado->name)))->filter()->take(2)->map(function ($p) { return strtoupper(substr($p, 0, 1)); })->implode('');
-                @endphp
-                <div class="dash-team">
-                    <span class="dash-ava">{{ $ini }}</span>
+                <div class="dash-team {{ $abogado->estaActivo() ? '' : 'is-inactive' }}">
+                    <span class="dash-ava">{{ $abogado->inicialesCortas() }}</span>
                     <div>
                         <b>{{ $abogado->name }}</b>
                         <small>
                             {{ $abogado->cargo ?: 'Equipo de RH' }}
-                            @php
-                                $vigentes = ($abogado->permisos ?? collect())->filter(function ($p) { return $p->estaVigente(); });
-                                $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
-                            @endphp
-                            · {{ $vigentes->count() }} permiso{{ $vigentes->count() === 1 ? '' : 's' }}
-                            @if($temps > 0) · {{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }} @endif
+                            @if(!$abogado->estaActivo())
+                                · Inactivo
+                            @else
+                                @php
+                                    $vigentes = ($abogado->permisos ?? collect())->filter(function ($p) { return $p->estaVigente(); });
+                                    $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
+                                @endphp
+                                · {{ $vigentes->count() }} permiso{{ $vigentes->count() === 1 ? '' : 's' }}
+                                @if($temps > 0) · {{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }} @endif
+                            @endif
                         </small>
                     </div>
                     <div class="n">

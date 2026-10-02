@@ -12,11 +12,13 @@ class CoordinadoraTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeUser(string $role = 'abogado', array $attrs = []): User
+    private function makeUser(string $role = 'equipo', array $attrs = []): User
     {
+        $role = User::normalizarRol($role);
+
         return User::factory()->create(array_merge([
             'role' => $role,
-            'cargo' => $role === 'coordinadora' ? 'Coordinadora de RH' : 'Equipo de RH',
+            'cargo' => $role === User::ROLE_ADMIN ? 'Coordinadora de RH' : 'Equipo de RH',
         ], $attrs));
     }
 
@@ -481,9 +483,18 @@ class CoordinadoraTest extends TestCase
             ->assertSee('class="edit-rh"', false)
             ->assertSee('data-name="KELLY JOHANNA RODRIGUEZ VARGAS"', false)
             ->assertSee('data-email="kelly.johanna.rodriguez@pendiente.local"', false)
+            ->assertSee('data-activo="1"', false)
             ->assertSee(route('coordinadora.abogados.editar', $rh->id), false)
+            ->assertSee('Agregar nuevo integrante')
+            ->assertSee('name="cargo"', false)
+            ->assertSee('<select name="cargo"', false)
+            ->assertSee('Jefe de personal')
+            ->assertSee('Asesor jurídico')
+            ->assertSee('Selecciona el cargo')
+            ->assertSee('Perfil activo')
             ->assertSee('name="nueva_password"', false)
             ->assertSee('name="nueva_password_confirmation"', false)
+            ->assertSee('name="activo"', false)
             ->assertDontSee("onclick=\"abrirModalEditar", false);
 
         $hashAntes = $rh->password;
@@ -493,6 +504,7 @@ class CoordinadoraTest extends TestCase
                 'name' => 'Kelly Johanna Rodríguez',
                 'email' => 'kelly.actualizada@sipd.co',
                 'cargo' => 'Analista de RH',
+                'activo' => '1',
             ])
             ->assertRedirect();
 
@@ -510,6 +522,7 @@ class CoordinadoraTest extends TestCase
                 'name' => 'Kelly Johanna Rodríguez',
                 'email' => 'kelly.actualizada@sipd.co',
                 'cargo' => 'Analista de RH',
+                'activo' => '1',
                 'nueva_password' => 'sipd456',
                 'nueva_password_confirmation' => 'sipd456',
             ])
@@ -524,6 +537,7 @@ class CoordinadoraTest extends TestCase
                 'name' => 'Kelly Johanna Rodríguez',
                 'email' => 'kelly.actualizada@sipd.co',
                 'cargo' => 'Analista de RH',
+                'activo' => '1',
                 'nueva_password' => 'otra789',
                 'nueva_password_confirmation' => 'no-coincide',
             ])
@@ -532,6 +546,74 @@ class CoordinadoraTest extends TestCase
             ->assertSessionHasErrors('nueva_password');
 
         $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sipd456', $rh->fresh()->password));
+    }
+
+    /** @test */
+    public function coordinadora_puede_desactivar_un_integrante()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado', [
+            'name' => 'Marshall Stephen Rincón Peña',
+            'email' => 'marshallrincon@sipd.co',
+            'cargo' => 'Jefe de personal',
+        ]);
+        $otro = $this->makeUser('abogado', ['name' => 'Kelly RH']);
+        $caso = $this->makeCaso($otro);
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.abogados.editar', $rh->id), [
+                'name' => $rh->name,
+                'email' => $rh->email,
+                'cargo' => $rh->cargo,
+                'activo' => '0',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertFalse($rh->fresh()->estaActivo());
+
+        $this->actingAs($coord)
+            ->get(route('coordinadora.abogados'))
+            ->assertOk()
+            ->assertSee('Inactivo')
+            ->assertSee('data-activo="0"', false);
+
+        $this->actingAs($coord)
+            ->get(route('coordinadora.notificar'))
+            ->assertOk()
+            ->assertDontSee('marshallrincon@sipd.co')
+            ->assertDontSee('Marshall Stephen');
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.asignar', $caso->id), [
+                'user_id' => $rh->id,
+            ])
+            ->assertNotFound();
+
+        $this->post(route('logout'));
+
+        $this->from(route('login'))
+            ->post(route('login'), [
+                'email' => $rh->email,
+                'password' => 'password',
+            ])
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+    }
+
+    /** @test */
+    public function integrante_inactivo_no_conserva_la_sesion()
+    {
+        $rh = $this->makeUser('abogado', ['activo' => false]);
+
+        $this->actingAs($rh)
+            ->get(route('abogado.dashboard'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
     }
 
     /** @test */

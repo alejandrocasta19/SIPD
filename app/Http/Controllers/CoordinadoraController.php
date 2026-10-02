@@ -147,7 +147,7 @@ class CoordinadoraController extends Controller
 
         return view('coordinadora.notificar', [
             'pageTitle' => 'Avisar al equipo',
-            'equipo' => User::where('role', 'abogado')->orderBy('name')->get(),
+            'equipo' => User::where('role', 'equipo')->activos()->orderBy('name')->get(),
             'procesos' => ProcesoDisciplinario::latest()->take(40)->get(['id', 'nombre', 'estado']),
         ]);
     }
@@ -165,7 +165,8 @@ class CoordinadoraController extends Controller
             'proceso_id' => 'nullable|integer|exists:disciplinario,id',
         ]);
 
-        $miembros = User::where('role', 'abogado')
+        $miembros = User::where('role', 'equipo')
+            ->activos()
             ->whereIn('id', $validated['destinatarios'])
             ->get();
 
@@ -189,7 +190,7 @@ class CoordinadoraController extends Controller
     {
         abort_unless(auth()->user()->esCoordinadora(), 403);
 
-        $miembro = User::where('role', 'abogado')->findOrFail($id);
+        $miembro = User::where('role', 'equipo')->findOrFail($id);
         $claves = $request->input('permisos', []);
         if (!is_array($claves)) {
             $claves = [];

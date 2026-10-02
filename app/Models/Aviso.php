@@ -105,7 +105,7 @@ class Aviso extends Model
 
     public static function aCoordinadoras(array $data): Collection
     {
-        $coords = User::whereIn('role', ['admin', 'coordinadora'])->get();
+        $coords = User::where('role', User::ROLE_ADMIN)->get();
 
         return $coords->map(function (User $coord) use ($data) {
             return self::enviar($coord, $data);

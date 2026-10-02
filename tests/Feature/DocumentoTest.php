@@ -19,7 +19,7 @@ class DocumentoTest extends TestCase
 
     private function makeUser(string $role = 'abogado', array $extras = []): User
     {
-        $user = User::factory()->create(['role' => $role]);
+        $user = User::factory()->create(['role' => User::normalizarRol($role)]);
         foreach ($extras as $permiso) {
             $user->otorgarPermiso($permiso, null);
         }

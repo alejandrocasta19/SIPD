@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" href="{{ asset('images/logo-sipd.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('images/logo-sipd.png') }}" type="image/png">
     <title>SIPD · {{ $pageTitle ?? 'Inicio' }}</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=41">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=46">
     @yield('styles')
 </head>
 <body class="theme-cootranshuila">
@@ -22,9 +22,8 @@
         $me = auth()->user();
         $me->loadMissing('permisos');
         $pageTitle = $pageTitle ?? (request()->routeIs('abogado.dashboard') ? 'Inicio' : 'SIPD');
-        $nameParts  = collect(preg_split('/\s+/', trim($me->name)))->filter()->values();
-        $iniciales  = $nameParts->take(2)->map(fn($p) => strtoupper(substr($p, 0, 1)))->implode('');
-        $nombreCorto = $nameParts->get(0, '') . ($nameParts->get(2) ? ' ' . $nameParts->get(2) : ($nameParts->get(1) ? ' ' . $nameParts->get(1) : ''));
+        $iniciales = $me->inicialesCortas();
+        $nombreCorto = $me->nombreCorto();
         $isManager = $me->esCoordinadora();
         $etiquetaRol = $me->etiquetaEquipo();
         $visibleProcesses = \App\Models\ProcesoDisciplinario::query();
@@ -48,7 +47,7 @@
     <div class="sipd-app">
         <aside class="sipd-sidebar">
             <a class="sipd-brand" href="{{ route('abogado.dashboard') }}">
-                <img class="sipd-brand-logo" src="{{ asset('images/logo-sipd.svg') }}" alt="SIPD">
+                <img class="sipd-brand-logo" src="{{ asset('images/logo-sipd.png') }}" alt="SIPD">
                 <div>
                     <strong>SIPD</strong>
                     <small>COOTRANSHUILA</small>
@@ -249,7 +248,7 @@
                             <div class="user-menu-head">
                                 <span class="ava">{{ $iniciales }}</span>
                                 <div class="user-menu-meta">
-                                    <b title="{{ auth()->user()->name }}">{{ auth()->user()->name }}</b>
+                                    <b title="{{ auth()->user()->name }}">{{ $nombreCorto }}</b>
                                     <span class="mail" title="{{ auth()->user()->email }}">{{ auth()->user()->email }}</span>
                                     <small>{{ $etiquetaRol }}</small>
                                 </div>
@@ -377,7 +376,7 @@
                     </div>
 
                     <div class="pf-status">
-                        Rol asignado: {{ ucfirst($authUser->role) }} · Acceso activo
+                        Rol asignado: {{ $authUser->etiquetaEquipo() }} · {{ $authUser->estaActivo() ? 'Acceso activo' : 'Perfil inactivo' }}
                     </div>
 
                     <div class="pwd-actions">

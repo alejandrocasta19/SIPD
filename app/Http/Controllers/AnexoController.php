@@ -24,7 +24,7 @@ class AnexoController extends Controller
     private function visibleProcesses()
     {
         $query = ProcesoDisciplinario::query();
-        if (!in_array(auth()->user()->role, ['admin', 'coordinadora'], true)) {
+        if (!auth()->user()->esCoordinadora()) {
             $query->where('user_id', auth()->id());
         }
         return $query;
@@ -33,7 +33,7 @@ class AnexoController extends Controller
     private function visibleAnexos()
     {
         $query = CasoAnexo::query()->with(['caso', 'user']);
-        if (!in_array(auth()->user()->role, ['admin', 'coordinadora'], true)) {
+        if (!auth()->user()->esCoordinadora()) {
             $query->whereHas('caso', function ($sub) {
                 $sub->where('user_id', auth()->id());
             });

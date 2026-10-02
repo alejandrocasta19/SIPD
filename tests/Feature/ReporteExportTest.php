@@ -16,7 +16,7 @@ class ReporteExportTest extends TestCase
     public function informe_global_incluye_identidad_y_apartados_ampliados()
     {
         $user = User::factory()->create([
-            'role' => 'abogado',
+            'role' => 'equipo',
             'name' => 'Kelly RH',
         ]);
         ProcesoDisciplinario::factory()->create([
@@ -53,7 +53,7 @@ class ReporteExportTest extends TestCase
     /** @test */
     public function relacion_de_casos_incluye_radicado_y_ruta()
     {
-        $user = User::factory()->create(['role' => 'abogado', 'name' => 'Analista RH']);
+        $user = User::factory()->create(['role' => 'equipo', 'name' => 'Analista RH']);
         $caso = ProcesoDisciplinario::factory()->create([
             'user_id' => $user->id,
             'nombre' => 'Conductor Norte',
@@ -79,7 +79,7 @@ class ReporteExportTest extends TestCase
     /** @test */
     public function se_puede_descargar_el_informe_global_en_pdf_word_y_excel()
     {
-        $user = User::factory()->create(['role' => 'abogado']);
+        $user = User::factory()->create(['role' => 'equipo']);
         $user->otorgarPermiso('exportar_reportes', null);
         ProcesoDisciplinario::factory()->create(['user_id' => $user->id]);
 
@@ -99,7 +99,7 @@ class ReporteExportTest extends TestCase
     /** @test */
     public function excel_del_informe_incluye_lineas_de_separacion()
     {
-        $user = User::factory()->create(['role' => 'abogado']);
+        $user = User::factory()->create(['role' => 'equipo']);
         ProcesoDisciplinario::factory()->create([
             'user_id' => $user->id,
             'estado' => 'Pendiente',

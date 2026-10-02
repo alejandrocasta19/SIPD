@@ -108,7 +108,7 @@ class ProcesoDisciplinarioController extends Controller
 
         $anexosTotal = CasoAnexo::whereIn('caso_id', (clone $visible)->select('id'))->count();
 
-        $cargaAbogados = User::where('role', 'abogado')
+        $cargaAbogados = User::where('role', 'equipo')
             ->when(!$user->esCoordinadora(), function ($query) use ($user) {
                 $query->whereKey($user->id);
             })
@@ -117,6 +117,7 @@ class ProcesoDisciplinarioController extends Controller
             ->withCount(['procesos as procesos_abiertos_count' => function ($query) {
                 $query->whereIn('estado', ['Pendiente', 'En Proceso']);
             }])
+            ->orderByDesc('activo')
             ->orderByDesc('procesos_count')
             ->take($user->esCoordinadora() ? 12 : 4)
             ->get();
@@ -645,7 +646,13 @@ class ProcesoDisciplinarioController extends Controller
             'pageTitle' => 'PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT),
             'volverA' => $this->resolverVolverDetalle($request),
             'equipoRh' => auth()->user()->esCoordinadora()
-                ? User::where('role', 'abogado')->orderBy('name')->get()
+                ? User::where('role', 'equipo')
+                    ->where(function ($query) use ($proceso) {
+                        $query->activos()->orWhere('id', $proceso->user_id);
+                    })
+                    ->orderByDesc('activo')
+                    ->orderBy('name')
+                    ->get()
                 : collect(),
         ]);
     }
@@ -1018,7 +1025,7 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function abogados()
     {
-        $abogados = User::where('role', 'abogado')
+        $abogados = User::where('role', 'equipo')
             ->with('permisos')
             ->withCount('procesos')
             ->withCount(['procesos as procesos_abiertos_count' => function ($query) {
@@ -1033,6 +1040,7 @@ class ProcesoDisciplinarioController extends Controller
             'catalogoPermisos' => \App\Support\RhPermisos::catalogo(),
             'duracionesPermiso' => \App\Support\RhPermisos::duracionesHoras(),
             'requierePermisos' => \App\Support\RhPermisos::requiere(),
+            'cargosEquipo' => User::cargosEquipo(),
         ]);
     }
 
@@ -1059,28 +1067,26 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function guardarAbogado(Request $request)
     {
+        $permitidos = implode(',', User::cargosEquipo());
         $request->validate([
             'name' => 'required',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'cargo' => 'required'
+            'cargo' => 'required|in:' . $permitidos,
         ]);
 
         User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-
-            // ROL DEL SISTEMA
-            'role' => 'abogado',
-
-            // CARGO DEL ABOGADO
-            'cargo' => $request->cargo
+            'role' => 'equipo',
+            'cargo' => $request->cargo,
+            'activo' => true,
         ]);
 
         return redirect()
             ->back()
-            ->with('success', 'Registro de RH guardado correctamente');
+            ->with('success', 'Integrante agregado al equipo de RH.');
     }
 
     /**
@@ -1088,7 +1094,7 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function editarAbogado(Request $request, $id)
     {
-        $abogado = User::where('role', 'abogado')->findOrFail($id);
+        $abogado = User::where('role', 'equipo')->findOrFail($id);
         $editarUrl = route('coordinadora.abogados.editar', $abogado->id);
 
         try {
@@ -1096,6 +1102,7 @@ class ProcesoDisciplinarioController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email,' . $abogado->id,
                 'cargo' => 'required|string|max:255',
+                'activo' => 'required|boolean',
                 'nueva_password' => 'nullable|string|min:6|confirmed',
             ], [
                 'nueva_password.min' => 'La contraseña debe tener al menos :min caracteres.',
@@ -1113,6 +1120,7 @@ class ProcesoDisciplinarioController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'cargo' => $validated['cargo'],
+            'activo' => $request->boolean('activo'),
         ];
 
         if (!empty($validated['nueva_password'])) {
@@ -1120,12 +1128,19 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         $abogado->update($data);
+        $abogado = $abogado->fresh();
+
+        if (!$abogado->estaActivo()) {
+            $ok = 'El perfil de ' . $abogado->nombreCorto() . ' quedó inactivo. Ya no podrá ingresar al sistema.';
+        } elseif (!empty($validated['nueva_password'])) {
+            $ok = 'Registro de RH y contraseña actualizados.';
+        } else {
+            $ok = 'Registro de RH actualizado correctamente';
+        }
 
         return redirect()
             ->back()
-            ->with('success', empty($validated['nueva_password'])
-                ? 'Registro de RH actualizado correctamente'
-                : 'Registro de RH y contraseña actualizados.');
+            ->with('success', $ok);
     }
 
     public function asignarProceso(Request $request, $id)
@@ -1137,7 +1152,10 @@ class ProcesoDisciplinarioController extends Controller
             'user_id' => 'required|integer',
         ]);
 
-        $responsable = User::whereKey($validated['user_id'])->where('role', 'abogado')->firstOrFail();
+        $responsable = User::whereKey($validated['user_id'])
+            ->where('role', 'equipo')
+            ->activos()
+            ->firstOrFail();
         $proceso->update(['user_id' => $responsable->id]);
 
         return redirect()->back()->with('success', 'Proceso asignado a ' . $responsable->name . '.');

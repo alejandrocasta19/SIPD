@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" href="{{ asset('images/logo-sipd.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('images/logo-sipd.png') }}" type="image/png">
     <title>Consultar mi caso · SIPD Cootranshuila</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=38">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=45">
 </head>
 <body class="consulta-page">
     <div class="consulta-hero">
@@ -18,7 +18,7 @@
                     <img src="{{ rtrim(request()->root(), '/') }}/images/logo-cootranshuila-claro.png" alt="Cootranshuila">
                     <span>
                         <span class="guest-sipd-row">
-                            <img class="guest-sipd-mark" src="{{ rtrim(request()->root(), '/') }}/images/logo-sipd.svg" alt="">
+                            <img class="guest-sipd-mark" src="{{ rtrim(request()->root(), '/') }}/images/logo-sipd.png" alt="">
                             <strong>SIPD</strong>
                         </span>
                         <small>Sistema de procesos disciplinarios</small>

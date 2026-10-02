@@ -20,7 +20,7 @@ class CreateUsersTable extends Migration
             $table->string('cargo')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('role')->default('abogado');
+            $table->string('role')->default('equipo');
             $table->rememberToken();
             $table->timestamps();
         });
