@@ -12,10 +12,11 @@ class Paginacion
     public const DEFAULT = 10;
     public const MAX = 100;
 
-    public static function porPagina(?Request $request = null, int $default = self::DEFAULT): int
+    public static function porPagina(?Request $request = null, int $default = self::DEFAULT, string $pageName = 'page'): int
     {
         $request = $request ?: request();
-        $valor = (int) $request->input('per_page', $default);
+        $paramName = $pageName === 'page' ? 'per_page' : "per_page_{$pageName}";
+        $valor = (int) $request->input($paramName, $default);
 
         if ($valor < 1) {
             return $default;
@@ -29,16 +30,16 @@ class Paginacion
         return in_array($cantidad, self::OPCIONES, true);
     }
 
-    public static function deQuery($query, int $default = self::DEFAULT): LengthAwarePaginator
+    public static function deQuery($query, int $default = self::DEFAULT, string $pageName = 'page'): LengthAwarePaginator
     {
-        return $query->paginate(self::porPagina(null, $default))->withQueryString();
+        return $query->paginate(self::porPagina(null, $default, $pageName), ['*'], $pageName)->withQueryString();
     }
 
-    public static function deColeccion($items, int $default = self::DEFAULT): LengthAwarePaginator
+    public static function deColeccion($items, int $default = self::DEFAULT, string $pageName = 'page'): LengthAwarePaginator
     {
         $items = $items instanceof Collection ? $items : collect($items);
-        $perPage = self::porPagina(null, $default);
-        $page = LengthAwarePaginator::resolveCurrentPage();
+        $perPage = self::porPagina(null, $default, $pageName);
+        $page = LengthAwarePaginator::resolveCurrentPage($pageName);
 
         return new LengthAwarePaginator(
             $items->forPage($page, $perPage)->values(),
@@ -48,6 +49,7 @@ class Paginacion
             [
                 'path' => LengthAwarePaginator::resolveCurrentPath(),
                 'query' => request()->query(),
+                'pageName' => $pageName,
             ]
         );
     }

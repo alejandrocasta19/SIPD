@@ -5,6 +5,8 @@
 @if($paginador && $paginador->total() > 0)
     @php
         $porPagina = (int) $paginador->perPage();
+        $pageName = $paginador->getPageName();
+        $perPageName = $pageName === 'page' ? 'per_page' : 'per_page_' . $pageName;
         $esPreset = \App\Support\Paginacion::esPreset($porPagina);
         $pagina = $paginador->currentPage();
         $ultima = $paginador->lastPage();
@@ -13,7 +15,7 @@
     @endphp
     <div class="sipd-pager">
         <form class="sipd-pager-size" method="GET" action="{{ url()->current() }}">
-            @foreach(request()->except(['page', 'per_page']) as $clave => $valor)
+            @foreach(request()->except([$pageName, $perPageName]) as $clave => $valor)
                 @if(is_array($valor))
                     @foreach($valor as $item)
                         <input type="hidden" name="{{ $clave }}[]" value="{{ $item }}">
@@ -29,7 +31,7 @@
                 @endforeach
                 <option value="custom" {{ $esPreset ? '' : 'selected' }}>Personalizado</option>
             </select>
-            <input type="number" name="per_page" class="sipd-pager-custom {{ $esPreset ? 'is-hidden' : '' }}"
+            <input type="number" name="{{ $perPageName }}" class="sipd-pager-custom {{ $esPreset ? 'is-hidden' : '' }}"
                    min="1" max="{{ \App\Support\Paginacion::MAX }}" value="{{ $porPagina }}"
                    aria-label="Cantidad personalizada">
             <button type="submit" class="sipd-pager-go {{ $esPreset ? 'is-hidden' : '' }}">Aplicar</button>

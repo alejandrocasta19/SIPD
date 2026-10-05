@@ -33,15 +33,20 @@ class CoordinadoraController extends Controller
     {
         abort_unless(auth()->user()->esCoordinadora(), 403);
 
-        $pendientes = PermisoSolicitud::with('user')
-            ->where('estado', PermisoSolicitud::PENDIENTE)
-            ->latest()
-            ->get();
+        $pendientes = Paginacion::deQuery(
+            PermisoSolicitud::with('user')
+                ->where('estado', PermisoSolicitud::PENDIENTE)
+                ->latest(),
+            10,
+            'pendientes_page'
+        );
 
         $historial = Paginacion::deQuery(
             PermisoSolicitud::with(['user', 'respondente'])
                 ->where('estado', '!=', PermisoSolicitud::PENDIENTE)
-                ->latest('responded_at')
+                ->latest('responded_at'),
+            10,
+            'historial_page'
         );
 
         return view('coordinadora.solicitudes', [

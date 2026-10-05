@@ -109,6 +109,7 @@
     @empty
         <div class="sol-card empty">No hay solicitudes pendientes.</div>
     @endforelse
+    @include('partials.paginacion', ['paginador' => $pendientes, 'etiqueta' => 'solicitudes pendientes'])
 
     @if($historial->count() > 0)
         <div class="hist-head">

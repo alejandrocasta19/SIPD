@@ -287,9 +287,6 @@ Route::middleware(['auth', 'role:admin,equipo'])->prefix('documentos')->name('do
     Route::get('/', [DocumentoController::class, 'hub'])
         ->name('hub');
 
-    // Índice: documentos del caso
-    Route::get('/{id}', [DocumentoController::class, 'index'])
-        ->name('index');
 
     // Formulario de diligenciamiento (split-screen)
     Route::get('/{id}/{tipo}/editar', [DocumentoController::class, 'edit'])
