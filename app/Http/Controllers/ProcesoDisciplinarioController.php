@@ -66,7 +66,7 @@ class ProcesoDisciplinarioController extends Controller
         $resueltos = $sancionados + $archivados;
         $tasaResolucion = $total > 0 ? (int) round(($resueltos / $total) * 100) : 0;
         $abiertos = $pendientes + $enProceso;
-        $veredictos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])->conDocumentoDescargado()->count();
+        $veredictos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])->has('documentoEstados')->count();
 
         $pct = function ($count) use ($total) {
             return $total > 0 ? (int) round(($count / $total) * 100) : 0;
@@ -115,7 +115,7 @@ class ProcesoDisciplinarioController extends Controller
             ->get();
 
         $pendientesVeredicto = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])
-            ->conDocumentoDescargado()
+            ->has('documentoEstados')
             ->with('user')
             ->latest()
             ->take(8)
@@ -527,7 +527,7 @@ class ProcesoDisciplinarioController extends Controller
     private function conteosVisibles($visible): array
     {
         $abiertos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado']);
-        $enProceso = (clone $abiertos)->conDocumentoDescargado()->count();
+        $enProceso = (clone $abiertos)->has('documentoEstados')->count();
         $abiertosTotal = (clone $abiertos)->count();
 
         return [
