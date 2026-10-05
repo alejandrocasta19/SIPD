@@ -270,7 +270,7 @@
         <table class="proc">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>PROCESO</th>
                     <th>CONDUCTOR</th>
                     <th>CÉDULA</th>
                     <th>MODALIDAD</th>
@@ -317,19 +317,28 @@
                                 <a href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}" title="Ver proceso">
                                     <i class="far fa-eye"></i>
                                 </a>
-                                @if(auth()->user()->puede('eliminar_casos') && !$proceso->soloLoManejaCoordinadora())
-                                <form action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST"
-                                      data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente."
-                                      data-confirm-title="Eliminar proceso"
-                                      data-confirm-ok="Eliminar"
-                                      data-confirm-danger="1"
-                                      data-confirm-icon="warning">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="danger" title="Eliminar proceso">
-                                        <i class="far fa-trash-alt"></i>
+                                @if(!$proceso->soloLoManejaCoordinadora())
+                                    @if(auth()->user()->puede('eliminar_casos'))
+                                    <form action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST"
+                                          data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente."
+                                          data-confirm-title="Eliminar proceso"
+                                          data-confirm-ok="Eliminar"
+                                          data-confirm-danger="1"
+                                          data-confirm-icon="warning">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="danger" title="Eliminar proceso">
+                                            <i class="far fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                    @else
+                                    <button type="button"
+                                            class="danger"
+                                            title="Solicitar permiso para eliminar"
+                                            onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('eliminar_casos')">
+                                        <i class="fas fa-key"></i>
                                     </button>
-                                </form>
+                                    @endif
                                 @endif
                             </div>
                         </td>

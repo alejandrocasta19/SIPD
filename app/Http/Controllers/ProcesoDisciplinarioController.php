@@ -66,7 +66,7 @@ class ProcesoDisciplinarioController extends Controller
         $resueltos = $sancionados + $archivados;
         $tasaResolucion = $total > 0 ? (int) round(($resueltos / $total) * 100) : 0;
         $abiertos = $pendientes + $enProceso;
-        $veredictos = (clone $visible)->where('estado', 'En Proceso')->count();
+        $veredictos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])->conDocumentoDescargado()->count();
 
         $pct = function ($count) use ($total) {
             return $total > 0 ? (int) round(($count / $total) * 100) : 0;
@@ -114,7 +114,8 @@ class ProcesoDisciplinarioController extends Controller
             ->take($user->esCoordinadora() ? 12 : 4)
             ->get();
 
-        $pendientesVeredicto = (clone $visible)->where('estado', 'En Proceso')
+        $pendientesVeredicto = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])
+            ->conDocumentoDescargado()
             ->with('user')
             ->latest()
             ->take(8)
@@ -904,21 +905,40 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function destroy($id)
     {
-        $proceso = $this->accessibleProcess($id);
+        try {
+            $proceso = $this->accessibleProcess($id);
 
-        if ($respuesta = $proceso->redireccionSiBloqueado()) {
-            return $respuesta;
+            if ($respuesta = $proceso->redireccionSiBloqueado()) {
+                return $respuesta;
+            }
+
+            // Cleanup associated files on disk to prevent phantom files
+            if ($proceso->documento_falta) {
+                Storage::disk('public')->delete($proceso->documento_falta);
+            }
+            
+            foreach ($proceso->anexos ?? [] as $anexo) {
+                foreach ([$anexo->ruta_segura, str_replace('.pdf', '_signed.pdf', $anexo->ruta_segura)] as $ruta) {
+                    if ($ruta && Storage::disk('local')->exists($ruta)) {
+                        Storage::disk('local')->delete($ruta);
+                    }
+                }
+            }
+            
+            foreach ($proceso->evidencias ?? [] as $evidencia) {
+                if ($evidencia->ruta_segura && Storage::disk('local')->exists($evidencia->ruta_segura)) {
+                    Storage::disk('local')->delete($evidencia->ruta_segura);
+                }
+            }
+
+            $proceso->delete();
+
+            return redirect()
+                ->route('abogado.consultarproceso')
+                ->with('success', 'Proceso disciplinario eliminado correctamente');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Error al eliminar el proceso: ' . $e->getMessage());
         }
-
-        if ($proceso->documento_falta) {
-            Storage::disk('public')->delete($proceso->documento_falta);
-        }
-
-        $proceso->delete();
-
-        return redirect()
-            ->back()
-            ->with('success', 'Proceso disciplinario eliminado correctamente');
     }
 
     /**
@@ -963,6 +983,7 @@ class ProcesoDisciplinarioController extends Controller
                     'expediente' => optional($fecha)->format('Y-m-d'),
                     'tipo' => $tipo,
                     'firmada' => $firmada,
+                    'solo_coordinadora' => in_array($proceso->estado, ['Sancionado', 'Archivado'], true) && (!auth()->user() || !auth()->user()->esCoordinadora()),
                 ];
             });
 
@@ -1022,6 +1043,7 @@ class ProcesoDisciplinarioController extends Controller
                     'tipo' => $tipo,
                     'es_descargos' => $proceso->estado === 'Pendiente',
                     'descargos_presentacion' => $proceso->descargosPresentacionValue(),
+                    'tiene_forma_seteada' => $proceso->descargos_forma !== null,
                     'vencimiento' => $proceso->vencimientoPlazo(),
                     'dias' => $proceso->diasPlazo(),
                     'semaforo' => $proceso->semaforoPlazo(),
@@ -1057,6 +1079,10 @@ class ProcesoDisciplinarioController extends Controller
 
         if ($respuesta = $proceso->redireccionSiBloqueado()) {
             return $respuesta;
+        }
+
+        if ($proceso->descargos_forma !== null) {
+            auth()->user()->exigir('editar_casos');
         }
 
         $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));

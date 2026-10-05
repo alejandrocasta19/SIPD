@@ -36,12 +36,12 @@
 
 @section('content')
     @if($nSolicitudes > 0)
-        <div class="verdict-banner" style="background:#fff7ed;border-color:#fed7aa;margin-bottom:20px;">
+        <div class="verdict-banner">
             <div>
-                <b style="color:#9a3412;">{{ $nSolicitudes }} solicitud{{ $nSolicitudes === 1 ? '' : 'es' }} de permiso</b>
-                <span style="color:#c2410c;">{{ $solicitudesPendientes->first()->user->name }} pide {{ $solicitudesPendientes->first()->etiquetaPermiso() }}.</span>
+                <b>{{ $nSolicitudes }} solicitud{{ $nSolicitudes === 1 ? '' : 'es' }} de permiso</b>
+                <span>{{ $solicitudesPendientes->pluck('user.name')->join(', ') }} pide{{ $nSolicitudes > 1 ? 'n' : '' }} {{ $nSolicitudes === 1 ? $solicitudesPendientes->first()->etiquetaPermiso() : 'permisos pendientes de respuesta' }}.</span>
             </div>
-            <a href="{{ route('coordinadora.solicitudes') }}" style="background:#c2410c;color:#fff;border-radius:10px;padding:10px 16px;font-weight:700;text-decoration:none;">Revisar</a>
+            <a href="{{ route('coordinadora.solicitudes') }}">Revisar solicitudes</a>
         </div>
     @endif
 

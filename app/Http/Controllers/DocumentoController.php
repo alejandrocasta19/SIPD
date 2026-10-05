@@ -387,20 +387,24 @@ class DocumentoController extends Controller
      */
     public function destroyEvidencia(int $id, int $evidenciaId)
     {
-        $caso      = $this->accessibleCase($id);
-        $evidencia = $caso->evidencias()->findOrFail($evidenciaId);
+        try {
+            $caso      = $this->accessibleCase($id);
+            $evidencia = $caso->evidencias()->findOrFail($evidenciaId);
 
-        $canDelete = auth()->user()->esCoordinadora()
-            || (auth()->user()->puede('eliminar_anexos') && $evidencia->user_id === auth()->id());
+            $canDelete = auth()->user()->esCoordinadora()
+                || (auth()->user()->puede('eliminar_anexos') && $evidencia->user_id === auth()->id());
 
-        abort_unless($canDelete, 403, 'No tienes permiso para eliminar esta evidencia.');
+            abort_unless($canDelete, 403, 'No tienes permiso para eliminar esta evidencia.');
 
-        Storage::disk('local')->delete($evidencia->ruta_segura);
-        $evidencia->delete();
+            Storage::disk('local')->delete($evidencia->ruta_segura);
+            $evidencia->delete();
 
-        return redirect()
-            ->route('documentos.index', $id)
-            ->with('success', 'Evidencia eliminada.');
+            return redirect()
+                ->route('documentos.index', $id)
+                ->with('success', 'Evidencia eliminada.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Error al eliminar la evidencia: ' . $e->getMessage());
+        }
     }
 
     // ─────────────────────────────────────────────────────────────

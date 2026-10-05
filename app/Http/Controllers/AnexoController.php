@@ -292,13 +292,17 @@ class AnexoController extends Controller
 
     public function destroy(int $id)
     {
-        $anexo = $this->accessibleAnexo($id);
-        abort_unless($this->puedeBorrarAnexo($anexo), 403, 'No tienes permiso para eliminar este anexo.');
+        try {
+            $anexo = $this->accessibleAnexo($id);
+            abort_unless($this->puedeBorrarAnexo($anexo), 403, 'No tienes permiso para eliminar este anexo.');
 
-        $this->borrarArchivos($anexo);
-        $anexo->delete();
+            $this->borrarArchivos($anexo);
+            $anexo->delete();
 
-        return redirect()->route('abogado.anexos')->with('success', 'Anexo eliminado.');
+            return redirect()->route('abogado.anexos')->with('success', 'Anexo eliminado.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Error al eliminar el anexo: ' . $e->getMessage());
+        }
     }
 
     private function puedeBorrarAnexo(CasoAnexo $anexo): bool

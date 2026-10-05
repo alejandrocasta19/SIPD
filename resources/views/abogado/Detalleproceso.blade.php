@@ -43,22 +43,41 @@
                         <span class="btn btn-outline-secondary disabled" style="pointer-events:none;">
                             <i class="fas fa-lock"></i> Solo la coordinadora puede manejarlo
                         </span>
-                        @elseif(auth()->user()->puede('editar_casos'))
-                        <button type="button"
-                                class="btn btn-primary"
-                                onclick="habilitarEdicion()">
-                            <i class="fas fa-edit"></i> Editar Proceso
-                        </button>
-                        <button type="submit"
-                                id="btnGuardar"
-                                class="btn btn-success"
-                                style="display:none;">
-                            <i class="fas fa-save"></i> Guardar Cambios
-                        </button>
                         @else
-                        <button type="button" class="btn btn-outline-secondary" onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('editar_casos')">
-                            <i class="fas fa-key"></i> Pedir permiso para editar
-                        </button>
+                            @if(auth()->user()->puede('editar_casos'))
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    onclick="habilitarEdicion()">
+                                <i class="fas fa-edit"></i> Editar Proceso
+                            </button>
+                            <button type="submit"
+                                    id="btnGuardar"
+                                    class="btn btn-success"
+                                    style="display:none;">
+                                <i class="fas fa-save"></i> Guardar Cambios
+                            </button>
+                            @else
+                            <button type="button" class="btn btn-outline-secondary" onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('editar_casos')">
+                                <i class="fas fa-key"></i> Pedir permiso para editar
+                            </button>
+                            @endif
+
+                            @if(auth()->user()->puede('eliminar_casos'))
+                            <button type="submit"
+                                    form="form-eliminar-proceso"
+                                    class="btn btn-danger"
+                                    data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente y no se puede deshacer."
+                                    data-confirm-title="Eliminar proceso"
+                                    data-confirm-ok="Eliminar"
+                                    data-confirm-danger="1"
+                                    data-confirm-icon="warning">
+                                <i class="fas fa-trash-alt"></i> Eliminar Proceso
+                            </button>
+                            @else
+                            <button type="button" class="btn btn-outline-danger" onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('eliminar_casos')">
+                                <i class="fas fa-key"></i> Pedir permiso para eliminar
+                            </button>
+                            @endif
                         @endif
 
                     </div>
@@ -543,6 +562,12 @@
 <form id="form-asignar-rh" action="{{ route('coordinadora.asignar', $proceso->id) }}" method="POST" class="d-none">
     @csrf
     @method('PUT')
+</form>
+@endif
+@if(auth()->user()->puede('eliminar_casos'))
+<form id="form-eliminar-proceso" action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST" class="d-none">
+    @csrf
+    @method('DELETE')
 </form>
 @endif
 <style>

@@ -33,7 +33,7 @@
     .dot-green { color: var(--cth-green-bright); }
     .dot-purple { color: #8b5cf6; }
 
-    .table-card { background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+    .table-card { background: #fff; border-radius: 18px; overflow-x: auto; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
     table.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
     table.proc th { text-align: left; padding: 14px 12px; color: #94a3b8; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); white-space: nowrap; text-transform: uppercase; }
     table.proc td { padding: 14px 12px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; }
@@ -43,6 +43,30 @@
     .name { font-weight: 600; color: #0f172a; }
     .st { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
     .st i { font-size: 8px; }
+
+    .acts { display: flex; gap: 8px; justify-content: center; align-items: center; }
+    .acts a,
+    .acts button {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        background: #f1f5f9;
+        color: #64748b;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 13px;
+        padding: 0;
+        flex-shrink: 0;
+    }
+    .acts a:hover,
+    .acts button:hover { background: #ecfdf5; color: var(--cth-green-text); }
+    .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
+    .acts button.lock-del { color: #e11d48; background: #fff1f2; }
+    table.proc th.col-acts,
+    table.proc td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 
     .empty { text-align: center; padding: 40px 16px; color: #94a3b8; }
     
@@ -85,6 +109,7 @@
                     <th>TIPO</th>
                     <th>ESTADO DE FIRMA</th>
                     <th>FECHA EXPEDICIÓN</th>
+                    <th class="col-acts">ACCIONES</th>
                 </tr>
             </thead>
             <tbody>
@@ -117,10 +142,39 @@
                             @endif
                         </td>
                         <td>{{ $resolucion->expediente }}</td>
+                        <td class="col-acts">
+                            <div class="acts">
+                                <a href="{{ route('abogado.detalleproceso', $resolucion->proceso_id) }}" title="Ver Expediente"><i class="far fa-eye"></i></a>
+                                
+                                @if(!$resolucion->solo_coordinadora)
+                                    @if(auth()->user()->puede('eliminar_casos'))
+                                    <form action="{{ route('abogado.eliminarproceso', $resolucion->proceso_id) }}" method="POST"
+                                          data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente."
+                                          data-confirm-title="Eliminar proceso"
+                                          data-confirm-ok="Eliminar"
+                                          data-confirm-danger="1"
+                                          data-confirm-icon="warning">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="danger" title="Eliminar proceso">
+                                            <i class="far fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                    @else
+                                    <button type="button"
+                                            class="danger lock-del"
+                                            title="Solicitar permiso para eliminar"
+                                            onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('eliminar_casos')">
+                                        <i class="fas fa-key"></i>
+                                    </button>
+                                    @endif
+                                @endif
+                            </div>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="empty">No hay resoluciones registradas</td>
+                        <td colspan="8" class="empty">No hay resoluciones registradas</td>
                     </tr>
                 @endforelse
             </tbody>

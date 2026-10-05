@@ -31,7 +31,7 @@
             $visibleProcesses->where('user_id', $me->id);
         }
 
-        $notifVeredictos = $isManager ? (clone $visibleProcesses)->where('estado', 'En Proceso')->count() : 0;
+        $notifVeredictos = $isManager ? (clone $visibleProcesses)->whereNotIn('estado', ['Sancionado', 'Archivado'])->has('documentoEstados')->count() : 0;
         $bandeja = \App\Models\Aviso::noLeidosPara($me)->take(8);
         $bandejaCount = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count();
         $alertasSistema = \App\Support\AlertasSistema::visibles($me);
@@ -176,7 +176,7 @@
                         </a>
                     @endif
                     <div class="dropdown">
-                        <a class="sipd-bell dropdown-toggle" href="#" data-toggle="dropdown" title="Notificaciones">
+                        <a class="sipd-bell dropdown-toggle {{ $notifTotal > 0 ? 'has-new-notif' : '' }}" href="#" data-toggle="dropdown" title="Notificaciones">
                             <i class="far fa-bell"></i>
                             @if($notifTotal > 0)
                                 <span class="badge-dot">{{ $notifTotal }}</span>
@@ -184,54 +184,71 @@
                         </a>
                         <div class="dropdown-menu dropdown-menu-right notif-menu">
                             <div class="notif-menu-head">
-                                <h4>Notificaciones</h4>
-                                <span class="notif-menu-count {{ $notifTotal === 0 ? 'is-zero' : '' }}">{{ $notifTotal }}</span>
+                                <div class="notif-menu-head-left">
+                                    <h4>Notificaciones</h4>
+                                    <span class="notif-menu-count {{ $notifTotal === 0 ? 'is-zero' : '' }}">{{ $notifTotal }} {{ $notifTotal === 1 ? 'nueva' : 'nuevas' }}</span>
+                                </div>
+                                @if($notifTotal > 0)
+                                    <span class="notif-menu-live"><i class="fas fa-circle"></i> Activas</span>
+                                @endif
                             </div>
-                            @if($bandeja->isNotEmpty())
-                                @foreach($bandeja as $aviso)
-                                    <a href="{{ route('notificaciones.leer', $aviso->id) }}" class="{{ $aviso->esDirectiva() ? 'is-coord' : '' }}">
-                                        <span class="notif-ico {{ $aviso->tonoIcono() }}">
-                                            <i class="fas {{ $aviso->icono() }}"></i>
-                                        </span>
-                                        <span>
-                                            <b>
+                            <div class="notif-menu-body">
+                                @if($bandeja->isNotEmpty())
+                                    @foreach($bandeja as $aviso)
+                                        <a href="{{ route('notificaciones.leer', $aviso->id) }}"
+                                           class="notif-row is-{{ $aviso->tonoIcono() }} {{ !$aviso->leida_at ? 'is-unread' : '' }}">
+                                            <span class="notif-ico {{ $aviso->tonoIcono() }}">
+                                                <i class="fas {{ $aviso->icono() }}"></i>
+                                            </span>
+                                            <span class="notif-row-body">
                                                 @if($aviso->esDirectiva())
-                                                    <em class="notif-tag">Aviso de coordinación</em>
+                                                    <em class="notif-tag"><i class="fas fa-shield-alt"></i> Coordinación</em>
                                                 @endif
-                                                {{ $aviso->titulo }}
-                                            </b>
-                                            <span>{{ \Illuminate\Support\Str::limit($aviso->cuerpo ?: $aviso->motivo, 90) }}</span>
-                                        </span>
-                                    </a>
+                                                <b>{{ $aviso->titulo }}</b>
+                                                <span class="notif-row-desc">{{ \Illuminate\Support\Str::limit($aviso->cuerpo ?: $aviso->motivo, 80) }}</span>
+                                                <time class="notif-row-time">{{ $aviso->created_at->diffForHumans() }}</time>
+                                            </span>
+                                            @if(!$aviso->leida_at)
+                                                <span class="notif-new-dot"></span>
+                                            @endif
+                                        </a>
+                                    @endforeach
+                                @endif
+                                @foreach($alertasSistema as $alerta)
+                                    <div class="notif-item">
+                                        <a href="{{ $alerta['href'] }}" class="notif-row is-info">
+                                            <span class="notif-ico info">
+                                                <i class="{{ $alerta['icono'] }}"></i>
+                                            </span>
+                                            <span class="notif-row-body">
+                                                <em class="notif-tag-sys"><i class="fas fa-bolt"></i> Alerta del sistema</em>
+                                                <b>{{ $alerta['titulo'] }}</b>
+                                                <span class="notif-row-desc">{{ $alerta['detalle'] }}</span>
+                                            </span>
+                                            <span class="notif-new-dot"></span>
+                                        </a>
+                                        <form method="POST" action="{{ route('notificaciones.alertas.silenciar', $alerta['tipo']) }}">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="notif-mute" title="Quitar esta alerta">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 @endforeach
-                            @endif
-                            @foreach($alertasSistema as $alerta)
-                                <div class="notif-item">
-                                    <a href="{{ $alerta['href'] }}">
-                                        <span class="notif-ico {{ $alerta['tono'] }}">
-                                            <i class="{{ $alerta['icono'] }}"></i>
-                                        </span>
-                                        <span>
-                                            <b>{{ $alerta['titulo'] }}</b>
-                                            <span>{{ $alerta['detalle'] }}</span>
-                                        </span>
-                                    </a>
-                                    <form method="POST" action="{{ route('notificaciones.alertas.silenciar', $alerta['tipo']) }}">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="notif-mute" title="Quitar esta alerta">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            @endforeach
-                            @if($notifTotal === 0)
-                                <div class="notif-empty">
-                                    <i class="far fa-bell-slash"></i>
-                                    No hay notificaciones nuevas
-                                </div>
-                            @endif
-                            <a class="notif-footer" href="{{ route('notificaciones.index') }}">Ver bandeja</a>
+                                @if($notifTotal === 0)
+                                    <div class="notif-empty">
+                                        <div class="notif-empty-ring">
+                                            <i class="far fa-bell"></i>
+                                        </div>
+                                        <b>Todo al día</b>
+                                        <span>No tienes notificaciones pendientes.</span>
+                                    </div>
+                                @endif
+                            </div>
+                            <a class="notif-footer" href="{{ route('notificaciones.index') }}">
+                                <i class="fas fa-inbox"></i> Ver toda la bandeja
+                            </a>
                         </div>
                     </div>
 

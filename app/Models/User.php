@@ -235,7 +235,7 @@ class User extends Authenticatable
 
     public function otorgarPermisosPorDefecto(?int $grantedBy = null): void
     {
-        $claves = array_merge(RhPermisos::porDefecto(), Modalidades::porDefectoDeCargo($this->cargo));
+        $claves = array_merge(RhPermisos::porDefecto(), Modalidades::porCargo($this->cargo));
         foreach ($claves as $clave) {
             $this->permisos()->updateOrCreate(
                 ['permiso' => $clave],

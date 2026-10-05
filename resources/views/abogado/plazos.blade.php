@@ -64,17 +64,42 @@
 .chip:hover { border-color: #cbd5e1; color: var(--p-dark); transform: translateY(-2px); box-shadow: var(--p-hover); }
 .chip.active { background: linear-gradient(135deg, #f0fdf4, #dcfce7); color: var(--cth-green); border-color: #bbf7d0; box-shadow: 0 4px 15px rgba(34,197,94,0.15); }
 
-.table-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--p-shadow); animation: fadeInUp 0.8s ease-out backwards; }
+.table-card { background: #fff; border-radius: var(--radius); overflow-x: auto; box-shadow: var(--p-shadow); animation: fadeInUp 0.8s ease-out backwards; }
 
 table.plz { width: 100%; border-collapse: collapse; border-spacing: 0; }
-table.plz th { font-family: var(--font-head); text-align: left; padding: 16px 24px; color: #64748b; font-size: 12px; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; border: 1px solid var(--cth-border); background: #f8fafc; }
-table.plz td { padding: 16px 24px; border: 1px solid var(--cth-border); color: var(--p-dark); font-size: 14px; transition: var(--t-smooth); }
+table.plz th { font-family: var(--font-head); text-align: left; padding: 12px 14px; color: #64748b; font-size: 12px; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; border: 1px solid var(--cth-border); background: #f8fafc; }
+table.plz td { padding: 12px 14px; border: 1px solid var(--cth-border); color: var(--p-dark); font-size: 13px; transition: var(--t-smooth); }
 table.plz tr:hover td { background: #f8fafc; }
 
-.id { font-family: var(--font-head); font-weight: 700; text-decoration: none; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 8px; font-size: 12px; transition: var(--t-smooth); }
 .id:hover { background: #e2e8f0; color: var(--p-dark); }
 .pro { color: var(--cth-green); font-weight: 700; text-decoration: none; font-family: var(--font-head); }
 .pro:hover { text-decoration: underline; }
+
+.acts { display: flex; gap: 8px; justify-content: center; align-items: center; }
+.acts a,
+.acts button {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    flex-shrink: 0;
+}
+.acts a:hover,
+.acts button:hover { background: #ecfdf5; color: var(--cth-green-text); }
+.acts button.danger:hover { background: #fff1f2; color: #e11d48; }
+.acts button.warning:hover { background: #fffbeb; color: #d97706; }
+.acts button.lock-edit { color: #d97706; background: #fffbeb; }
+.acts button.lock-del { color: #e11d48; background: #fff1f2; }
+table.plz th.col-acts,
+table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 
 .name { font-weight: 600; color: var(--p-dark); }
 .dias {
@@ -89,7 +114,7 @@ table.plz tr:hover td { background: #f8fafc; }
 .st.vencer { background: #fffbeb; color: #d97706; }
 .st.vencido { background: #fef2f2; color: #dc2626; }
 
-.plz-tipo { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+.plz-tipo { display: flex; flex-direction: column; gap: 6px; }
 .plz-tipo select {
     font-size: 13px; font-weight: 600; color: var(--p-dark); border: 1px solid var(--cth-border);
     border-radius: 8px; padding: 7px 10px; background: #fff; max-width: 240px;
@@ -133,7 +158,6 @@ table.plz tr:hover td { background: #f8fafc; }
         <table class="plz">
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>PROCESO</th>
                     <th>TRABAJADOR</th>
                     <th>MODALIDAD</th>
@@ -141,36 +165,44 @@ table.plz tr:hover td { background: #f8fafc; }
                     <th>VENCIMIENTO</th>
                     <th>DÍAS RESTANTES</th>
                     <th>ESTADO</th>
+                    <th class="col-acts">ACCIONES</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($plazos as $plazo)
                     <tr>
                         <td>
-                            <a class="id" href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}">{{ $codigoPlazo($plazo->id) }}</a>
-                        </td>
-                        <td>
                             <a class="pro" href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}">{{ $codigoProceso($plazo->proceso_id) }}</a>
                         </td>
                         <td class="name">{{ $plazo->conductor }}</td>
                         <td>{{ \App\Support\Modalidades::etiquetaCaso($plazo->modalidad, $plazo->cargo) }}</td>
                         <td>
-                            @if(!empty($plazo->es_descargos) && !in_array($plazo->estado, ['Sancionado', 'Archivado'], true) || (auth()->user()->esCoordinadora() && !empty($plazo->es_descargos)))
-                                <form class="plz-tipo" method="POST" action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}">
-                                    @csrf
-                                    @method('PUT')
-                                    @if($filtro !== 'todos')
-                                        <input type="hidden" name="estado" value="{{ $filtro }}">
-                                    @endif
-                                    <select name="descargos_presentacion" onchange="this.form.submit()" aria-label="Presentación de descargos">
-                                        @if($plazo->descargos_presentacion === 'presentado')
-                                            <option value="presentado" selected>Descargos · Presentado</option>
+                            @php
+                                $puedeEditar = auth()->user()->puede('editar_casos') || auth()->user()->esCoordinadora();
+                                $yaVencido = $plazo->semaforo === 'vencido';
+                                $editable = (!$plazo->tiene_forma_seteada || $puedeEditar) && !$yaVencido;
+                                $soloCoordinadora = in_array($plazo->estado, ['Sancionado', 'Archivado'], true) && !auth()->user()->esCoordinadora();
+                            @endphp
+                            @if(!empty($plazo->es_descargos) && !$soloCoordinadora)
+                                @if($editable)
+                                    <form class="plz-tipo" method="POST" action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}">
+                                        @csrf
+                                        @method('PUT')
+                                        @if($filtro !== 'todos')
+                                            <input type="hidden" name="estado" value="{{ $filtro }}">
                                         @endif
-                                        @foreach($opcionesDescargos as $valor => $etiqueta)
-                                            <option value="{{ $valor }}" {{ $plazo->descargos_presentacion === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
-                                        @endforeach
-                                    </select>
-                                </form>
+                                        <select name="descargos_presentacion" onchange="this.form.submit()" aria-label="Presentación de descargos">
+                                            @if($plazo->descargos_presentacion === 'presentado')
+                                                <option value="presentado" selected>Descargos · Presentado</option>
+                                            @endif
+                                            @foreach($opcionesDescargos as $valor => $etiqueta)
+                                                <option value="{{ $valor }}" {{ $plazo->descargos_presentacion === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
+                                            @endforeach
+                                        </select>
+                                    </form>
+                                @else
+                                    <span style="font-weight: 600; color: #334155;">{{ $opcionesDescargos[$plazo->descargos_presentacion] ?? 'Descargos · No presentó' }}</span>
+                                @endif
                             @else
                                 {{ $plazo->tipo }}
                             @endif
@@ -192,6 +224,44 @@ table.plz tr:hover td { background: #f8fafc; }
                             @else
                                 <span class="st vencido"><i class="fas fa-circle"></i> Vencido</span>
                             @endif
+                        </td>
+                        <td class="col-acts">
+                            <div class="acts">
+                                <a href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}" title="Ver Expediente"><i class="far fa-eye"></i></a>
+                                
+                                @if(!$soloCoordinadora)
+                                    @if(!$editable && !$yaVencido)
+                                        <button type="button"
+                                                class="warning lock-edit"
+                                                title="Solicitar permiso para actualizar plazo"
+                                                onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('editar_casos')">
+                                            <i class="fas fa-key"></i>
+                                        </button>
+                                    @endif
+
+                                    @if(auth()->user()->puede('eliminar_casos'))
+                                    <form action="{{ route('abogado.eliminarproceso', $plazo->proceso_id) }}" method="POST"
+                                          data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente."
+                                          data-confirm-title="Eliminar proceso"
+                                          data-confirm-ok="Eliminar"
+                                          data-confirm-danger="1"
+                                          data-confirm-icon="warning">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="danger" title="Eliminar proceso">
+                                            <i class="far fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                    @else
+                                    <button type="button"
+                                            class="danger lock-del"
+                                            title="Solicitar permiso para eliminar"
+                                            onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('eliminar_casos')">
+                                        <i class="fas fa-key"></i>
+                                    </button>
+                                    @endif
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty

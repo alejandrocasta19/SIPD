@@ -63,10 +63,10 @@ class Aviso extends Model
     public function etiquetaTipo(): string
     {
         $etiquetas = [
-            self::TIPO_AVISO => 'Aviso de coordinación',
-            self::TIPO_PERMISO => 'Respuesta de permiso',
+            self::TIPO_AVISO     => 'Aviso de coordinación',
+            self::TIPO_PERMISO   => 'Permiso respondido',
             self::TIPO_SOLICITUD => 'Solicitud de permiso',
-            self::TIPO_VEREDICTO => 'Caso para veredicto',
+            self::TIPO_VEREDICTO => 'Requiere veredicto',
         ];
 
         return $etiquetas[$this->tipo] ?? 'Notificación';
@@ -75,8 +75,8 @@ class Aviso extends Model
     public function icono(): string
     {
         $iconos = [
-            self::TIPO_AVISO => 'fa-paper-plane',
-            self::TIPO_PERMISO => 'fa-key',
+            self::TIPO_AVISO     => 'fa-shield-alt',
+            self::TIPO_PERMISO   => 'fa-check-circle',
             self::TIPO_SOLICITUD => 'fa-user-lock',
             self::TIPO_VEREDICTO => 'fa-gavel',
         ];
@@ -87,13 +87,22 @@ class Aviso extends Model
     public function tonoIcono(): string
     {
         $tonos = [
-            self::TIPO_AVISO => 'coord',
-            self::TIPO_PERMISO => 'ok',
+            self::TIPO_AVISO     => 'coord',
+            self::TIPO_PERMISO   => 'ok',
             self::TIPO_SOLICITUD => 'warn',
-            self::TIPO_VEREDICTO => 'info',
+            self::TIPO_VEREDICTO => 'danger',
         ];
 
         return $tonos[$this->tipo] ?? 'info';
+    }
+
+    /**
+     * Clase CSS semántica para el color de borde e ícono de cada tipo.
+     * danger=rojo, warn=ámbar, ok=verde, coord=violeta, info=azul
+     */
+    public function colorClase(): string
+    {
+        return $this->tonoIcono();
     }
 
     public static function enviar(User $destinatario, array $data): self
