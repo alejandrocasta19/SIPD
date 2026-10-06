@@ -16,6 +16,21 @@
 
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=46">
     @yield('styles')
+    {{-- Pre-scroll: page starts hidden, scroll restored before first paint --}}
+    <style>html{opacity:0;transition:opacity .12s ease}</style>
+    <script>
+    (function(){
+        var _pos  = sessionStorage.getItem('sipd_scroll_pos');
+        var _path = sessionStorage.getItem('sipd_scroll_path');
+        sessionStorage.removeItem('sipd_scroll_pos');
+        sessionStorage.removeItem('sipd_scroll_path');
+        // Store target scroll for the body script to apply once DOM is ready
+        window.__sipdScroll = (_pos && _path === location.pathname) ? parseInt(_pos, 10) : null;
+        if (window.__sipdScroll !== null && 'scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+    })();
+    </script>
 </head>
 <body class="theme-cootranshuila">
     @php
@@ -31,7 +46,7 @@
             $visibleProcesses->where('user_id', $me->id);
         }
 
-        $notifVeredictos = $isManager ? (clone $visibleProcesses)->whereNotIn('estado', ['Sancionado', 'Archivado'])->has('documentoEstados')->count() : 0;
+        $notifVeredictos = $isManager ? (clone $visibleProcesses)->whereIn('estado', ['En Proceso', 'En proceso'])->count() : 0;
         $bandeja = \App\Models\Aviso::noLeidosPara($me)->take(8);
         $bandejaCount = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count();
         $alertasSistema = \App\Support\AlertasSistema::visibles($me);
@@ -741,7 +756,7 @@
 
             document.querySelectorAll('.sipd-pager-size').forEach(function (form) {
                 var choice = form.querySelector('.sipd-pager-choice');
-                var input = form.querySelector('input[name="per_page"]');
+                var input = form.querySelector('.sipd-pager-custom');
                 var go = form.querySelector('.sipd-pager-go');
                 if (!choice || !input) return;
                 function sync(submitPreset) {
@@ -758,8 +773,25 @@
                 }
                 choice.addEventListener('change', function () { sync(true); });
             });
+
+            // Guardar posición de scroll al salir (para paginación dentro del mismo módulo)
+            window.addEventListener('beforeunload', function() {
+                sessionStorage.setItem('sipd_scroll_pos', window.scrollY);
+                sessionStorage.setItem('sipd_scroll_path', window.location.pathname);
+            });
         })();
     </script>
     @yield('scripts')
+    {{-- Scroll restore + page reveal: runs AFTER full DOM is in place --}}
+    <script>
+    (function(){
+        var target = window.__sipdScroll;
+        if (target !== null && target !== undefined) {
+            window.scrollTo({ top: target, left: 0, behavior: 'instant' });
+        }
+        // Reveal the page (was hidden by CSS in <head>)
+        document.documentElement.style.opacity = '1';
+    })();
+    </script>
 </body>
 </html>

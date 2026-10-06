@@ -36,7 +36,12 @@
     .db-en_diligenciamiento { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
     .db-generado { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
     .db-descargado { background: #f0fdf4; color: var(--cth-green-text); border: 1px solid #bbf7d0; }
-    .hub-doc { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .hub-doc { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .hub-variante { font-size:10px; color:#64748b; font-style:italic; text-align:center; line-height:1.2; max-width:100%; }
+    .hub-variante strong { color:#334155; font-style:normal; }
+    .hub-worker-name { display:block; font-weight:700; color:#0f172a; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hub-worker-cedula { display:block; color:#64748b; font-size:11px; margin-top:1px; }
+    .hub-worker-area { display:block; color:#475569; font-size:11px; margin-top:2px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hub-dl { display:flex; gap:6px; flex-wrap:wrap; }
     .hub-dl a {
         display:inline-flex; align-items:center; gap:5px;
@@ -136,19 +141,35 @@
                     </span>
                 </td>
                 <td>
-                    <strong>{{ $caso->nombre }}</strong>
-                    <span class="hub-sub">{{ $caso->cedula ?: 'Sin cédula' }} · {{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) }}</span>
+                    <span class="hub-worker-name" title="{{ $caso->nombre }}">{{ $caso->nombre }}</span>
+                    <span class="hub-worker-cedula"><i class="fas fa-id-card" style="font-size:9px;opacity:.6"></i> {{ $caso->cedula ? number_format((float)preg_replace('/\D/', '', $caso->cedula), 0, '', '.') : 'Sin cédula' }}</span>
+                    <span class="hub-worker-area" title="{{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) }}"><i class="fas fa-briefcase" style="font-size:9px;opacity:.5"></i> {{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) ?: '—' }}</span>
                 </td>
                 @foreach(\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes)
                     @php
                         $tipoSlot = $caso->varianteDelSlot($slot);
-                        $estSlot = $caso->estadoDocumento($tipoSlot);
+                        $estSlot  = $caso->estadoDocumento($tipoSlot);
+                        $tieneOpciones = count($variantes) > 1;
+                        // Etiqueta corta de la variante elegida
+                        $varianteLabels = [
+                            'disciplinario' => 'Disciplinario',
+                            'comprobacion'  => 'Comprobación',
+                            'acta'          => 'Acta c&d',
+                            'sancion'       => 'Sanción',
+                            'llamado'       => 'Llamado de atención',
+                            'terminacion'   => 'Terminación',
+                            'archivo'       => 'Archivo',
+                        ];
+                        $varianteLabel = $varianteLabels[$tipoSlot] ?? ucfirst($tipoSlot);
                     @endphp
                     <td class="center">
                         <div class="hub-doc">
                             <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" title="{{ \App\Models\CasoDocumentoEstado::etiqueta($tipoSlot) }}" style="text-decoration:none;">
                                 <span class="doc-badge {{ $estSlot->claseHub() }}">{{ $estSlot->etiquetaHub() }}</span>
                             </a>
+                            @if($tieneOpciones)
+                                <span class="hub-variante"><strong>{{ $varianteLabel }}</strong></span>
+                            @endif
                         </div>
                     </td>
                 @endforeach
@@ -170,20 +191,37 @@
                         <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn" title="{{ $caso->soloLoManejaCoordinadora() ? 'Ver proceso' : 'Editar datos del proceso' }}">
                             <i class="fas {{ $caso->soloLoManejaCoordinadora() ? 'fa-eye' : 'fa-edit' }}"></i> {{ $caso->soloLoManejaCoordinadora() ? 'Ver' : 'Editar' }}
                         </a>
-                        @if(auth()->user()->puede('descargar_documentos'))
-                            @php
-                                $descargas = [];
-                                foreach (\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes) {
-                                    $tipoSlot = $caso->varianteDelSlot($slot);
-                                    $estSlot = $caso->estadoDocumento($tipoSlot);
-                                    $descargas[] = [
-                                        'label' => \App\Models\CasoDocumentoEstado::SLOT_LABELS[$slot],
-                                        'estado' => $estSlot->etiquetaHub(),
-                                        'word' => route('documentos.download', [$caso->id, $tipoSlot]),
-                                        'pdf' => route('documentos.download', [$caso->id, $tipoSlot]) . '?format=pdf',
-                                    ];
+                        @php
+                            $puedeGral = auth()->user()->puede('descargar_documentos');
+                            $descargas = [];
+                            $tieneAlMenosUno = false;
+                            foreach (\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes) {
+                                $tipoSlot = $caso->varianteDelSlot($slot);
+                                $estSlot = $caso->estadoDocumento($tipoSlot);
+                                
+                                $estaGenerado = $estSlot->estaGenerado();
+                                $fueDescargado = $estSlot->estaDescargado();
+                                $puedeDescargar = $puedeGral || !$fueDescargado;
+
+                                if (!$estaGenerado) {
+                                    $actionState = 'faltante';
+                                } elseif ($puedeDescargar) {
+                                    $actionState = 'listo';
+                                    $tieneAlMenosUno = true;
+                                } else {
+                                    $actionState = 'bloqueado';
                                 }
-                            @endphp
+
+                                $descargas[] = [
+                                    'label' => \App\Models\CasoDocumentoEstado::SLOT_LABELS[$slot],
+                                    'estado' => $estSlot->etiquetaHub(),
+                                    'actionState' => $actionState,
+                                    'word' => $actionState === 'listo' ? route('documentos.download', [$caso->id, $tipoSlot]) : null,
+                                    'pdf' => $actionState === 'listo' ? route('documentos.download', [$caso->id, $tipoSlot]) . '?format=pdf' : null,
+                                ];
+                            }
+                        @endphp
+                        @if($tieneAlMenosUno)
                             <button type="button" class="action-btn hub-open-dl"
                                 data-proc="PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}"
                                 data-nombre="{{ $caso->nombre }}"
@@ -202,7 +240,6 @@
     @include('partials.paginacion', ['paginador' => $casos])
 </div>
 
-@if(auth()->user()->puede('descargar_documentos'))
 <div class="sipd-dialog-bg" id="modalDescargas">
     <div class="sipd-dialog">
         <h3>Descargar · <span id="dlProc"></span></h3>
@@ -213,11 +250,9 @@
         </div>
     </div>
 </div>
-@endif
 @endsection
 
 @section('scripts')
-@if(auth()->user()->puede('descargar_documentos'))
 <script>
 (function () {
     var modal = document.getElementById('modalDescargas');
@@ -241,12 +276,18 @@
         document.getElementById('dlProc').textContent = btn.getAttribute('data-proc') || '';
         document.getElementById('dlNombre').textContent = btn.getAttribute('data-nombre') || '';
         list.innerHTML = items.map(function (item) {
+            var actions = '';
+            if (item.actionState === 'listo') {
+                actions = '<a class="hub-dl-word" href="' + esc(item.word) + '" title="Descargar Word"><i class="fas fa-file-word"></i> Word</a><a class="hub-dl-pdf" href="' + esc(item.pdf) + '" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>';
+            } else if (item.actionState === 'bloqueado') {
+                actions = '<span style="color:var(--cth-gray-text);font-size:12px;cursor:not-allowed;" title="Ya fue descargado. No tienes permisos para volver a descargarlo."><i class="fas fa-lock"></i> Requiere permiso</span>';
+            } else {
+                actions = '<span style="color:var(--cth-gray-text);font-size:12px;" title="Primero debes diligenciar y generar el documento."><i class="fas fa-file-signature"></i> Falta generar</span>';
+            }
+
             return '<div class="dl-item">' +
                 '<div><b>' + esc(item.label) + '</b><small>' + esc(item.estado) + '</small></div>' +
-                '<div class="hub-dl">' +
-                    '<a class="hub-dl-word" href="' + esc(item.word) + '" title="Descargar Word"><i class="fas fa-file-word"></i> Word</a>' +
-                    '<a class="hub-dl-pdf" href="' + esc(item.pdf) + '" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>' +
-                '</div>' +
+                '<div class="hub-dl">' + actions + '</div>' +
             '</div>';
         }).join('');
         modal.style.display = 'flex';
@@ -261,5 +302,4 @@
     });
 })();
 </script>
-@endif
 @endsection

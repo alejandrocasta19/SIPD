@@ -402,7 +402,7 @@ class ProcesoDisciplinarioController extends Controller
                 ];
             });
 
-        // Stats rápidas del historial
+        // Stats rápidas del historial (sobre colección completa)
         $hStats = [
             'total'      => $historial->count(),
             'sancionados'=> $historial->where('estado', 'Sancionado')->count(),
@@ -411,10 +411,12 @@ class ProcesoDisciplinarioController extends Controller
             'anexos'     => $historial->sum('anexos'),
         ];
 
+        $historialPaginado = Paginacion::deColeccion($historial, 10, 'historial_page');
+
         return view('abogado.Reportes', [
             'pageTitle' => 'Estadísticas y reportes',
             'casos'     => $casos,
-            'historial' => $historial,
+            'historial' => $historialPaginado,
             'hStats'    => $hStats,
         ]);
     }

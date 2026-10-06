@@ -18,7 +18,7 @@ class DocumentoController extends Controller
     {
         $this->middleware('permiso:ver_documentos')->only(['hub', 'index', 'edit', 'preview']);
         $this->middleware('permiso:editar_documentos')->only(['elegirVariante']);
-        $this->middleware('permiso:descargar_documentos')->only(['download']);
+        // download() maneja su propio control: primera descarga libre, las siguientes requieren permiso
         $this->middleware('permiso:subir_anexos')->only(['storeEvidencia']);
         $this->middleware('permiso:eliminar_anexos')->only(['destroyEvidencia']);
     }
@@ -274,6 +274,14 @@ class DocumentoController extends Controller
     {
         $this->assertValidTipo($tipo);
         $caso = $this->accessibleCase($id);
+
+        // Verificar acceso: la primera descarga de un documento es libre.
+        // Si ya fue descargado antes, se necesita el permiso descargar_documentos.
+        $estadoDocPrev = $caso->estadoDocumento($tipo);
+        $esPrimeraDescarga = $estadoDocPrev->descargado_en === null;
+        if (!$esPrimeraDescarga) {
+            auth()->user()->exigir('descargar_documentos');
+        }
 
         try {
             $filename = match ($tipo) {

@@ -224,7 +224,7 @@
                     <th>Fecha</th>
                     <th>Modalidad</th>
                     <th>Anexos</th>
-                    <th style="text-align:right;">Acción</th>
+                    <th style="text-align:right;">Ver</th>
                 </tr>
             </thead>
             <tbody>
@@ -234,7 +234,6 @@
                     <td><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="proc-lnk">PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</a></td>
                     <td><b>{{ $caso->nombre }}</b></td>
                     <td>{{ $caso->cedula   ?: '—' }}</td>
-                    <td>{{ \App\Support\Modalidades::textoPlaca($caso->modalidad, $caso->placa) }}</td>
                     <td>{{ $caso->tipo_falta ?: '—' }}</td>
                     <td><span class="sb {{ strtolower(str_replace(' ', '-', $caso->estadoVisible())) }}">{{ $caso->estadoVisible() }}</span></td>
                     <td>{{ $caso->created_at ? $caso->created_at->format('d/m/Y') : '—' }}</td>
@@ -243,7 +242,7 @@
                     <td style="text-align:right;"><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="act-lnk"><i class="fas fa-eye"></i> Ver</a></td>
                 </tr>
             @empty
-                <tr><td class="empty-c" colspan="11"><i class="fas fa-search" style="display:block;font-size:18px;margin-bottom:6px;opacity:.35;"></i>No hay casos que coincidan.</td></tr>
+                <tr><td class="empty-c" colspan="10"><i class="fas fa-search" style="display:block;font-size:18px;margin-bottom:6px;opacity:.35;"></i>No hay casos que coincidan.</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -351,6 +350,7 @@
         @endforelse
         </tbody>
     </table>
+    @include('partials.paginacion', ['paginador' => $historial])
 </div>
 
 <div class="rp-pop" id="rank-pop" role="dialog" aria-modal="true">

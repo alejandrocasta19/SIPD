@@ -18,8 +18,7 @@ class CoordinadoraController extends Controller
 
         $procesos = Paginacion::deQuery(
             ProcesoDisciplinario::with('user')
-                ->whereNotIn('estado', ['Sancionado', 'Archivado'])
-                ->has('documentoEstados')
+                ->whereIn('estado', ['En Proceso', 'En proceso'])
                 ->latest('updated_at')
         );
 
