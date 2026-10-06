@@ -167,7 +167,7 @@
                             <a href="{{ route('documentos.edit', [$caso->id, $tipoSlot]) }}" title="{{ \App\Models\CasoDocumentoEstado::etiqueta($tipoSlot) }}" style="text-decoration:none;">
                                 <span class="doc-badge {{ $estSlot->claseHub() }}">{{ $estSlot->etiquetaHub() }}</span>
                             </a>
-                            @if($tieneOpciones)
+                            @if($tieneOpciones && $estSlot->estado !== 'no_iniciado')
                                 <span class="hub-variante"><strong>{{ $varianteLabel }}</strong></span>
                             @endif
                         </div>
