@@ -73,8 +73,8 @@
     .case-tbl tr:hover td { background:#f8fafc; }
     .proc-lnk { color:var(--cth-green-text); font-weight:700; text-decoration:none; font-size:10.5px; font-family:monospace; }
     .case-tbl td b { font-weight:600; color:#0f172a; }
-    .act-lnk  { color:#2563eb; text-decoration:none; font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:3px; }
-    .act-lnk:hover { text-decoration:underline; }
+    .act-lnk  { width: 28px; height: 28px; border-radius: 6px; background: #f1f5f9; color: #64748b; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 12px; transition: all .15s; }
+    .act-lnk:hover { background: #ecfdf5; color: var(--cth-green-text); }
     .empty-c  { text-align:center; padding:28px; color:#94a3b8; font-size:12px; }
     .tbl-pager{ display:flex; justify-content:space-between; align-items:center; padding:8px 10px; color:#64748b; font-size:11px; border-top:1px solid #f1f5f9; }
 
@@ -224,7 +224,7 @@
                     <th>Fecha</th>
                     <th>Modalidad</th>
                     <th>Anexos</th>
-                    <th style="text-align:right;">Ver</th>
+                    <th style="text-align:right;"></th>
                 </tr>
             </thead>
             <tbody>
@@ -239,7 +239,7 @@
                     <td>{{ $caso->created_at ? $caso->created_at->format('d/m/Y') : '—' }}</td>
                     <td>{{ \App\Support\Modalidades::etiquetaCaso($caso->modalidad, $caso->cargo) }}</td>
                     <td style="text-align:center;">{{ $caso->anexos_count ?: '—' }}</td>
-                    <td style="text-align:right;"><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="act-lnk"><i class="fas fa-eye"></i> Ver</a></td>
+                    <td style="text-align:right;"><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="act-lnk" title="Ver Expediente"><i class="fas fa-eye"></i></a></td>
                 </tr>
             @empty
                 <tr><td class="empty-c" colspan="10"><i class="fas fa-search" style="display:block;font-size:18px;margin-bottom:6px;opacity:.35;"></i>No hay casos que coincidan.</td></tr>
@@ -303,7 +303,7 @@
                 <th>Duración</th>
                 <th>Anexos</th>
                 <th>Decisión / Observación</th>
-                <th style="text-align:right;">Ver</th>
+                <th style="text-align:right;"></th>
             </tr>
         </thead>
         <tbody>
@@ -335,7 +335,7 @@
                     {{ $h->decision ? Str::limit($h->decision, 80) : '—' }}
                 </td>
                 <td style="text-align:right;">
-                    <a href="{{ route('abogado.detalleproceso', $h->id) }}" class="act-lnk">
+                    <a href="{{ route('abogado.detalleproceso', $h->id) }}" class="act-lnk" title="Ver Expediente">
                         <i class="fas fa-eye"></i>
                     </a>
                 </td>

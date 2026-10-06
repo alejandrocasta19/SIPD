@@ -28,8 +28,8 @@
     .st-normal { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; padding: 6px 12px; border-radius: 999px; background: #f0fdf4; color: var(--cth-green-text); margin-right: 12px; }
 
     table.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table.proc th { text-align: left; padding: 10px 20px; color: #94a3b8; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); white-space: nowrap; text-transform: uppercase; }
-    table.proc td { padding: 10px 20px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; }
+    table.proc th { text-align: left; padding: 10px 20px; color: #64748b; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; white-space: nowrap; text-transform: uppercase; background: #f8fafc; }
+    table.proc td { padding: 10px 20px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; background: #fff; }
     table.proc tbody tr:hover { background: #fafbfc; }
 
     .id { color: var(--cth-green); font-weight: 700; text-decoration: none; }

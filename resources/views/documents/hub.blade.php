@@ -16,7 +16,7 @@
     .hub-table col.col-act { width:16%; }
     .hub-table th, .hub-table td { padding:11px 8px; border:1px solid var(--cth-border); text-align:left; vertical-align:middle; }
     .hub-table td { overflow:hidden; }
-    .hub-table th { color:#64748b; font-size:10px; letter-spacing:.02em; text-transform:uppercase; background:#f8fafc; line-height:1.3; }
+    .hub-table th { color:#64748b; font-size:10px; letter-spacing:.02em; text-transform:uppercase; background:#f8fafc; border-bottom:2px solid #e2e8f0; line-height:1.3; }
     .hub-table th.center, .hub-table td.center { text-align:center; }
     .hub-table a.proc-lnk { color:var(--cth-green); font-weight:700; text-decoration:none; font-size:14px; }
     .hub-sub { display:block; color:#64748b; font-size:12px; margin-top:4px; overflow:hidden; text-overflow:ellipsis; }

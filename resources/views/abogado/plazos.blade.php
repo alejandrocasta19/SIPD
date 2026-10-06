@@ -67,8 +67,8 @@
 .table-card { background: #fff; border-radius: var(--radius); overflow-x: auto; box-shadow: var(--p-shadow); animation: fadeInUp 0.8s ease-out backwards; }
 
 table.plz { width: 100%; border-collapse: collapse; border-spacing: 0; }
-table.plz th { font-family: var(--font-head); text-align: left; padding: 12px 14px; color: #64748b; font-size: 12px; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; border: 1px solid var(--cth-border); background: #f8fafc; }
-table.plz td { padding: 12px 14px; border: 1px solid var(--cth-border); color: var(--p-dark); font-size: 13px; transition: var(--t-smooth); }
+table.plz th { font-family: var(--font-head); text-align: left; padding: 12px 14px; color: #64748b; font-size: 12px; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; border: 1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; background: #f8fafc; }
+table.plz td { padding: 12px 14px; border: 1px solid var(--cth-border); color: var(--p-dark); font-size: 13px; transition: var(--t-smooth); background: #fff; }
 table.plz tr:hover td { background: #f8fafc; }
 
 .id:hover { background: #e2e8f0; color: var(--p-dark); }

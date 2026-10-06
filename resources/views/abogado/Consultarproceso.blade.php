@@ -127,11 +127,13 @@
     table.proc th {
         text-align: left;
         padding: 14px 12px;
-        color: #94a3b8;
+        color: #64748b;
         font-size: 11px;
         letter-spacing: .06em;
         font-weight: 700;
         border: 1px solid var(--cth-border);
+        border-bottom: 2px solid #e2e8f0;
+        background: #f8fafc;
         white-space: nowrap;
     }
 
@@ -140,7 +142,13 @@
         border: 1px solid var(--cth-border);
         color: #334155;
         vertical-align: middle;
+        background: #fff;
     }
+
+    table.proc tr.st-pendiente td:first-child { border-left: 3px solid #f59e0b; }
+    table.proc tr.st-en-proceso td:first-child { border-left: 3px solid #3b82f6; }
+    table.proc tr.st-sancionado td:first-child { border-left: 3px solid #f43f5e; }
+    table.proc tr.st-archivado td:first-child { border-left: 3px solid #94a3b8; }
 
     table.proc tbody tr:hover { background: #fafbfc; }
 
@@ -286,7 +294,8 @@
             </thead>
             <tbody>
                 @forelse($procesos as $proceso)
-                    <tr>
+                    @php $estadoLista = $proceso->estadoVisible(); @endphp
+                    <tr class="st-{{ strtolower(str_replace(' ', '-', $estadoLista)) }}">
                         <td>
                             <a class="id" href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}">{{ $codigo($proceso) }}</a>
                             @if(($proceso->anexos_count ?? 0) > 0)
@@ -302,7 +311,6 @@
                             <td>{{ $proceso->user->name ?? 'Sin asignar' }}</td>
                         @endif
                         <td>
-                            @php $estadoLista = $proceso->estadoVisible(); @endphp
                             @if($estadoLista === 'Pendiente')
                                 <span class="st"><i class="fas fa-circle dot-pend"></i> Pendiente</span>
                             @elseif($estadoLista === 'En proceso')

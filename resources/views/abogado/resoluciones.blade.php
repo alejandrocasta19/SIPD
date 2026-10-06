@@ -35,8 +35,8 @@
 
     .table-card { background: #fff; border-radius: 18px; overflow-x: auto; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
     table.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table.proc th { text-align: left; padding: 14px 12px; color: #94a3b8; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); white-space: nowrap; text-transform: uppercase; }
-    table.proc td { padding: 14px 12px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; }
+    table.proc th { text-align: left; padding: 14px 12px; color: #64748b; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; white-space: nowrap; text-transform: uppercase; background: #f8fafc; }
+    table.proc td { padding: 14px 12px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; background: #fff; }
     table.proc tbody tr:hover { background: #fafbfc; }
 
     .id { color: var(--cth-green); font-weight: 700; text-decoration: none; }
