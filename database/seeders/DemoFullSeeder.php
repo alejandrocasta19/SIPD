@@ -36,7 +36,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $kelly->id, 'nombre' => 'Martina Herrera', 'cedula' => '10101010',
             'cargo' => 'Recursos humanos', 'modalidad' => 'Administrativos',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Leve',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Retraso en ruta',
             'descripcion_falta' => 'Llegada tarde reiterada sin justificación',
             'fecha_falta' => now()->subDays(2)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -45,7 +45,7 @@ class DemoFullSeeder extends Seeder
         $pK2 = ProcesoDisciplinario::create([
             'user_id' => $kelly->id, 'nombre' => 'Luis Fernando Gómez', 'cedula' => '20202020',
             'cargo' => 'Despachador', 'modalidad' => 'Despacho',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Desobediencia a instrucciones',
             'descripcion_falta' => 'Negligencia en asignación de rutas',
             'fecha_falta' => now()->subDays(10)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -58,7 +58,7 @@ class DemoFullSeeder extends Seeder
         $pK3 = ProcesoDisciplinario::create([
             'user_id' => $kelly->id, 'nombre' => 'Paola Rojas', 'cedula' => '30303011',
             'cargo' => 'Estación toma', 'modalidad' => 'Estación toma',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Abandono de ruta',
             'descripcion_falta' => 'Abandono de puesto sin autorización',
             'fecha_falta' => now()->subDays(18)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -71,7 +71,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $kelly->id, 'nombre' => 'Diego Salcedo', 'cedula' => '40404011',
             'cargo' => 'Auxiliar call center', 'modalidad' => 'Call center',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Maltrato al pasajero',
             'descripcion_falta' => 'Mal trato reiterado al usuario reportado por supervisor',
             'fecha_falta' => now()->subDays(50)->format('Y-m-d'), 'estado' => 'Sancionado',
         ]);
@@ -80,7 +80,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $kelly->id, 'nombre' => 'Sofía Vargas', 'cedula' => '50505011',
             'cargo' => 'Asistente de ventas', 'modalidad' => 'Asistente de Ventas',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Leve',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Incumplimiento de horario',
             'descripcion_falta' => 'Incumplimiento de protocolo de atención',
             'fecha_falta' => now()->subDays(1)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -93,7 +93,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $jorge->id, 'nombre' => 'Fernando Ruiz', 'cedula' => '10000001',
             'cargo' => 'Conductor', 'modalidad' => 'Mixto',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Gravísima',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Conducción negligente',
             'descripcion_falta' => 'Consumo de alcohol en horas laborales comprobado con alcotest',
             'fecha_falta' => now()->subDays(40)->format('Y-m-d'), 'estado' => 'Sancionado',
         ]);
@@ -102,7 +102,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $jorge->id, 'nombre' => 'Camila Ortiz', 'cedula' => '20000002',
             'cargo' => 'Inspectora', 'modalidad' => 'Inspectores viales',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Leve',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Porte indebido del uniforme',
             'descripcion_falta' => 'Uso indebido de dotación institucional',
             'fecha_falta' => now()->subDays(5)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -111,7 +111,7 @@ class DemoFullSeeder extends Seeder
         $pJ3 = ProcesoDisciplinario::create([
             'user_id' => $jorge->id, 'nombre' => 'Ramiro Peña', 'cedula' => '30000003',
             'cargo' => 'Taquillero terminal', 'modalidad' => 'Terminal',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Faltante de dinero',
             'descripcion_falta' => 'Descuadre en caja mensual por tercer mes consecutivo',
             'fecha_falta' => now()->subDays(22)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -124,7 +124,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $jorge->id, 'nombre' => 'Beatriz Luna', 'cedula' => '40000004',
             'cargo' => 'Conductor encomiendas', 'modalidad' => 'Encomiendas',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Hurto o apropiación de recursos',
             'descripcion_falta' => 'Pérdida de paquete de valor con cliente',
             'fecha_falta' => now()->subDays(60)->format('Y-m-d'), 'estado' => 'Sancionado',
         ]);
@@ -133,7 +133,7 @@ class DemoFullSeeder extends Seeder
         $pJ5 = ProcesoDisciplinario::create([
             'user_id' => $jorge->id, 'nombre' => 'Ernesto Cárdenas', 'cedula' => '50000005',
             'cargo' => 'Conductor', 'modalidad' => 'Doble Yo PQR y correos',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Agresión verbal o física',
             'descripcion_falta' => 'Reporte de acoso verbal a pasajero',
             'fecha_falta' => now()->subDays(30)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -150,7 +150,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $marshall->id, 'nombre' => 'Roberto Sánchez', 'cedula' => '10000010',
             'cargo' => 'Conductor', 'modalidad' => 'Premium',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Leve',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Uso inadecuado del vehículo',
             'descripcion_falta' => 'Exceso de velocidad registrado por GPS',
             'fecha_falta' => now()->subDays(1)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -159,7 +159,7 @@ class DemoFullSeeder extends Seeder
         $pM2 = ProcesoDisciplinario::create([
             'user_id' => $marshall->id, 'nombre' => 'Héctor Jiménez', 'cedula' => '20000020',
             'cargo' => 'Conductor', 'modalidad' => 'Premium',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Abandono de ruta',
             'descripcion_falta' => 'Desvío de ruta no autorizado con pasajeros a bordo',
             'fecha_falta' => now()->subDays(20)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -172,7 +172,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $marshall->id, 'nombre' => 'Gladys Medina', 'cedula' => '30000030',
             'cargo' => 'Auxiliar de cabina', 'modalidad' => 'Doble Yo',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Gravísima',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Hurto o apropiación de recursos',
             'descripcion_falta' => 'Hurto de pertenencias de pasajero documentado con cámaras',
             'fecha_falta' => now()->subDays(75)->format('Y-m-d'), 'estado' => 'Sancionado',
         ]);
@@ -181,7 +181,7 @@ class DemoFullSeeder extends Seeder
         $pM4 = ProcesoDisciplinario::create([
             'user_id' => $marshall->id, 'nombre' => 'Carlos Espinosa', 'cedula' => '40000040',
             'cargo' => 'Conductor', 'modalidad' => 'Platino Express',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Grave',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Accidente con vehículo',
             'descripcion_falta' => 'Accidente de tránsito con responsabilidad del conductor',
             'fecha_falta' => now()->subDays(35)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
@@ -194,7 +194,7 @@ class DemoFullSeeder extends Seeder
         ProcesoDisciplinario::create([
             'user_id' => $marshall->id, 'nombre' => 'Jaime Suárez', 'cedula' => '50000050',
             'cargo' => 'Conductor', 'modalidad' => 'Platino Jet',
-            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Leve',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Ausencia sin justificación',
             'descripcion_falta' => 'Incumplimiento horario de salida sin aviso',
             'fecha_falta' => now()->subDays(3)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);

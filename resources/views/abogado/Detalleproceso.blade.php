@@ -330,9 +330,33 @@
 
                                     <input type="text"
                                            name="tipo_falta"
+                                           list="lista-faltas"
                                            value="{{ $proceso->tipo_falta }}"
                                            class="form-control campo-editable"
+                                           autocomplete="off"
                                            readonly>
+                                    <datalist id="lista-faltas">
+                                        <option value="Retraso en ruta"></option>
+                                        <option value="Abandono de ruta"></option>
+                                        <option value="Ausencia sin justificación"></option>
+                                        <option value="Tickets no vendidos"></option>
+                                        <option value="Faltante de dinero"></option>
+                                        <option value="Mal manejo de efectivo"></option>
+                                        <option value="Accidente con vehículo"></option>
+                                        <option value="Daño al vehículo"></option>
+                                        <option value="Incumplimiento de horario"></option>
+                                        <option value="Uso inadecuado del vehículo"></option>
+                                        <option value="Maltrato al pasajero"></option>
+                                        <option value="Desobediencia a instrucciones"></option>
+                                        <option value="Porte indebido del uniforme"></option>
+                                        <option value="Uso del celular en conducción"></option>
+                                        <option value="Conducción negligente"></option>
+                                        <option value="Falsificación de documentos"></option>
+                                        <option value="Hurto o apropiación de recursos"></option>
+                                        <option value="Agresión verbal o física"></option>
+                                        <option value="Incumplimiento de la resolución"></option>
+                                        <option value="Otro"></option>
+                                    </datalist>
 
                                 </div>
 
