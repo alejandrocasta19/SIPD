@@ -95,10 +95,10 @@ table.plz tr:hover td { background: #f8fafc; }
 .acts a:hover,
 .acts button:hover { background: #e2e8f0; color: #0f172a; }
 .acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
-.acts button.danger:hover { background: #fff1f2; color: #e11d48; }
 .acts button.warning:hover,
-.acts button.lock-edit { color: #d97706; background: #fffbeb; }
-.acts button.lock-del { color: #e11d48; background: #fff1f2; }
+.acts button.lock-edit:hover { background: #fffbeb; color: #d97706; }
+.acts button.lock-del:hover,
+.acts button.danger:hover { background: #fff1f2; color: #e11d48; }
 table.plz th.col-acts,
 table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 

@@ -64,8 +64,8 @@
     .acts a:hover,
     .acts button:hover { background: #e2e8f0; color: #0f172a; }
     .acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
-    .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
-    .acts button.lock-del { color: #e11d48; background: #fff1f2; }
+    .acts button.danger:hover,
+    .acts button.lock-del:hover { background: #fff1f2; color: #e11d48; }
     table.proc th.col-acts,
     table.proc td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 
