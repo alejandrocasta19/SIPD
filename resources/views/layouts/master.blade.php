@@ -131,6 +131,15 @@
                         <i class="far fa-file-alt"></i> Resoluciones
                     </a>
                     @endif
+                    @if(!$me->esCoordinadora())
+                    <a href="{{ route('notificaciones.index') }}" class="{{ request()->routeIs('notificaciones.*') ? 'active' : '' }}">
+                        <i class="far fa-comments"></i> Bandeja de mensajes
+                        @php $unreadMsgs = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count(); @endphp
+                        @if($unreadMsgs > 0)
+                            <span class="sipd-nav-count">{{ $unreadMsgs }}</span>
+                        @endif
+                    </a>
+                    @endif
                     @if($isManager && $me->puede('registrar_casos'))
                         <a href="{{ route('abogado.registro') }}" class="{{ request()->routeIs('abogado.registro') ? 'active' : '' }}">
                             <i class="fas fa-plus-circle"></i> Nuevo proceso
