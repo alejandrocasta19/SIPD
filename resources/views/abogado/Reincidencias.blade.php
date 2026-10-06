@@ -30,7 +30,11 @@
     table.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
     table.proc th { text-align: left; padding: 10px 20px; color: #64748b; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; white-space: nowrap; text-transform: uppercase; background: #f8fafc; }
     table.proc td { padding: 10px 20px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; background: #fff; }
-    table.proc tbody tr:hover { background: #fafbfc; }
+    table.proc tbody tr:hover td { background: #fafbfc; }
+    table.proc tr.st-pendiente td:first-child { border-left: 3px solid #f59e0b; }
+    table.proc tr.st-en-proceso td:first-child { border-left: 3px solid #3b82f6; }
+    table.proc tr.st-sancionado td:first-child { border-left: 3px solid #f43f5e; }
+    table.proc tr.st-archivado td:first-child { border-left: 3px solid #94a3b8; }
 
     .id { color: var(--cth-green); font-weight: 700; text-decoration: none; }
     .name { font-weight: 600; color: #0f172a; }
@@ -189,7 +193,15 @@
                     </thead>
                     <tbody>
                         @foreach($worker->procesos as $p)
-                            <tr>
+                            @php
+                                $stClass = match($p->estado) {
+                                    'Pendiente'  => 'st-pendiente',
+                                    'En Proceso' => 'st-en-proceso',
+                                    'Sancionado' => 'st-sancionado',
+                                    default      => 'st-archivado',
+                                };
+                            @endphp
+                            <tr class="{{ $stClass }}">
                                 <td>
                                     <a class="id" href="{{ route('abogado.detalleproceso', $p->id) }}">{{ $p->numeroExpediente() }}</a>
                                     @if(($p->anexos_count ?? 0) > 0)

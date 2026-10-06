@@ -70,6 +70,9 @@ table.plz { width: 100%; border-collapse: collapse; border-spacing: 0; }
 table.plz th { font-family: var(--font-head); text-align: left; padding: 12px 14px; color: #64748b; font-size: 12px; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase; border: 1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; background: #f8fafc; }
 table.plz td { padding: 12px 14px; border: 1px solid var(--cth-border); color: var(--p-dark); font-size: 13px; transition: var(--t-smooth); background: #fff; }
 table.plz tr:hover td { background: #f8fafc; }
+table.plz tr.sem-vigente td:first-child { border-left: 3px solid var(--cth-green-bright); }
+table.plz tr.sem-por-vencer td:first-child { border-left: 3px solid #f59e0b; }
+table.plz tr.sem-vencido td:first-child { border-left: 3px solid #ef4444; }
 
 .id:hover { background: #e2e8f0; color: var(--p-dark); }
 .pro { color: var(--cth-green); font-weight: 700; text-decoration: none; font-family: var(--font-head); }
@@ -171,7 +174,14 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
             </thead>
             <tbody>
                 @forelse($plazos as $plazo)
-                    <tr>
+                    @php
+                        $semClass = match($plazo->semaforo) {
+                            'vigente'    => 'sem-vigente',
+                            'por_vencer' => 'sem-por-vencer',
+                            default      => 'sem-vencido',
+                        };
+                    @endphp
+                    <tr class="{{ $semClass }}">
                         <td>
                             <a class="pro" href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}">{{ $codigoProceso($plazo->proceso_id) }}</a>
                         </td>

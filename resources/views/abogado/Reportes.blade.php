@@ -68,9 +68,13 @@
     .case-tbl { background:#fff; border: 1px solid var(--cth-border); border-radius:10px; overflow:auto; }
     .case-tbl table { width:100%; min-width:720px; border-collapse:collapse; font-size:11.5px; }
     .case-tbl thead tr { background:#f8fafc; }
-    .case-tbl th { padding:6px 9px; border:1px solid var(--cth-border); text-align:left; color:#64748b; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
-    .case-tbl td { padding:5px 9px; border:1px solid var(--cth-border); color:#334155; vertical-align:middle; }
+    .case-tbl th { padding:6px 9px; border:1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; text-align:left; color:#64748b; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+    .case-tbl td { padding:5px 9px; border:1px solid var(--cth-border); color:#334155; vertical-align:middle; background:#fff; }
     .case-tbl tr:hover td { background:#f8fafc; }
+    .case-tbl tr.st-pendiente td:first-child  { border-left: 3px solid #f59e0b; }
+    .case-tbl tr.st-en-proceso td:first-child  { border-left: 3px solid #3b82f6; }
+    .case-tbl tr.st-sancionado td:first-child  { border-left: 3px solid #f43f5e; }
+    .case-tbl tr.st-archivado td:first-child   { border-left: 3px solid #94a3b8; }
     .proc-lnk { color:var(--cth-green-text); font-weight:700; text-decoration:none; font-size:10.5px; font-family:monospace; }
     .case-tbl td b { font-weight:600; color:#0f172a; }
     .act-lnk  { width: 28px; height: 28px; border-radius: 6px; background: #f1f5f9; color: #64748b; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 12px; transition: all .15s; }
@@ -229,7 +233,8 @@
             </thead>
             <tbody>
             @forelse($casos as $caso)
-                <tr>
+                @php $stCaso = 'st-' . strtolower(str_replace(' ', '-', $caso->estadoVisible())); @endphp
+                <tr class="{{ $stCaso }}">
                     <td style="width:26px;"><input type="checkbox" name="ids[]" value="{{ $caso->id }}" class="case-check"></td>
                     <td><a href="{{ route('abogado.detalleproceso', $caso->id) }}" class="proc-lnk">PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</a></td>
                     <td><b>{{ $caso->nombre }}</b></td>
@@ -308,7 +313,8 @@
         </thead>
         <tbody>
         @forelse($historial as $h)
-            <tr>
+            @php $stH = 'st-' . strtolower(str_replace(' ', '-', $h->estado)); @endphp
+            <tr class="{{ $stH }}">
                 <td><a href="{{ route('abogado.detalleproceso', $h->id) }}" class="proc-lnk">PRO-{{ str_pad($h->id, 3, '0', STR_PAD_LEFT) }}</a></td>
                 <td><b>{{ $h->nombre }}</b></td>
                 <td>{{ $h->cedula   ?: '—' }}</td>

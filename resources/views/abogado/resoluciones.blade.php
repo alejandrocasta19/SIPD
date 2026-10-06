@@ -37,7 +37,11 @@
     table.proc { width: 100%; border-collapse: collapse; font-size: 13px; }
     table.proc th { text-align: left; padding: 14px 12px; color: #64748b; font-size: 11px; letter-spacing: .06em; font-weight: 700; border: 1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; white-space: nowrap; text-transform: uppercase; background: #f8fafc; }
     table.proc td { padding: 14px 12px; border: 1px solid var(--cth-border); color: #334155; vertical-align: middle; background: #fff; }
-    table.proc tbody tr:hover { background: #fafbfc; }
+    table.proc tbody tr:hover td { background: #fafbfc; }
+    table.proc tr.tipo-sancionatoria td:first-child { border-left: 3px solid #f43f5e; }
+    table.proc tr.tipo-absolutoria   td:first-child { border-left: 3px solid var(--cth-green-bright); }
+    table.proc tr.tipo-nulidad       td:first-child { border-left: 3px solid #f59e0b; }
+    table.proc tr.tipo-archivo       td:first-child { border-left: 3px solid #94a3b8; }
 
     .id { color: var(--cth-green); font-weight: 700; text-decoration: none; }
     .name { font-weight: 600; color: #0f172a; }
@@ -114,7 +118,7 @@
             </thead>
             <tbody>
                 @forelse($resoluciones as $resolucion)
-                    <tr>
+                    <tr class="tipo-{{ $resolucion->tipo }}">
                         <td>
                             <a class="id" style="text-decoration:none;" href="{{ route('abogado.detalleproceso', $resolucion->proceso_id) }}">PRO-{{ str_pad($resolucion->proceso_id, 3, '0', STR_PAD_LEFT) }}</a>
                         </td>
