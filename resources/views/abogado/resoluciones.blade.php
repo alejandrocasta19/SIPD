@@ -102,7 +102,6 @@
         <table class="proc">
             <thead>
                 <tr>
-                    <th>N° RESOLUCIÓN</th>
                     <th>PROCESO</th>
                     <th>CONDUCTOR / AFECTADO</th>
                     <th>MODALIDAD</th>
@@ -116,10 +115,7 @@
                 @forelse($resoluciones as $resolucion)
                     <tr>
                         <td>
-                            <a class="id" href="{{ route('abogado.detalleproceso', $resolucion->proceso_id) }}">{{ $resolucion->numero }}</a>
-                        </td>
-                        <td>
-                            <a class="name" style="text-decoration:none;" href="{{ route('abogado.detalleproceso', $resolucion->proceso_id) }}">PRO-{{ str_pad($resolucion->proceso_id, 3, '0', STR_PAD_LEFT) }}</a>
+                            <a class="id" style="text-decoration:none;" href="{{ route('abogado.detalleproceso', $resolucion->proceso_id) }}">PRO-{{ str_pad($resolucion->proceso_id, 3, '0', STR_PAD_LEFT) }}</a>
                         </td>
                         <td class="name">{{ $resolucion->nombre }}</td>
                         <td>{{ \App\Support\Modalidades::etiquetaCaso($resolucion->modalidad, $resolucion->cargo) }}</td>
@@ -174,7 +170,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="empty">No hay resoluciones registradas</td>
+                        <td colspan="7" class="empty">No hay resoluciones registradas</td>
                     </tr>
                 @endforelse
             </tbody>

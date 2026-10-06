@@ -310,24 +310,32 @@ class ProcesoDisciplinario extends Model
      */
     public static function datosEncabezadoDocumento(?self $proceso = null): array
     {
+        $user = auth()->user();
+        $firmanteNombre = $user ? mb_strtoupper(trim((string) $user->name)) : 'KELLY JOHANNA RODRIGUEZ VARGAS';
+        $firmanteCargo  = $user ? trim((string) ($user->cargo ?: '')) : 'Asesora Jur\u00eddica y de Seguros';
+
         if ($proceso && $proceso->exists) {
             return [
-                'nombre'   => trim((string) $proceso->nombre),
-                'cargo'    => trim((string) ($proceso->cargo ?: $proceso->modalidad ?: '')),
-                'cedula'   => trim((string) ($proceso->cedula ?: '')),
-                'fecha'    => self::fechaExpedicion(),
-                'radicado' => $proceso->numeroRadicado(),
+                'nombre'          => trim((string) $proceso->nombre),
+                'cargo'           => $firmanteCargo,  // cargo del firmante (cuenta RH)
+                'cedula'          => trim((string) ($proceso->cedula ?: '')),
+                'fecha'           => self::fechaExpedicion(),
+                'radicado'        => $proceso->numeroRadicado(),
+                'firmante_nombre' => $firmanteNombre,
+                'firmante_cargo'  => $firmanteCargo,
             ];
         }
 
         $siguiente = self::siguienteId();
 
         return [
-            'nombre'   => '',
-            'cargo'    => '',
-            'cedula'   => '',
-            'fecha'    => self::fechaExpedicion(),
-            'radicado' => date('Y') . '-' . str_pad((string) $siguiente, 3, '0', STR_PAD_LEFT) . '-01',
+            'nombre'          => '',
+            'cargo'           => $firmanteCargo,  // cargo del firmante (cuenta RH)
+            'cedula'          => '',
+            'fecha'           => self::fechaExpedicion(),
+            'radicado'        => date('Y') . '-' . str_pad((string) $siguiente, 3, '0', STR_PAD_LEFT) . '-01',
+            'firmante_nombre' => $firmanteNombre,
+            'firmante_cargo'  => $firmanteCargo,
         ];
     }
 

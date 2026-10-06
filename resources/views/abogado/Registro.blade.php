@@ -840,12 +840,8 @@ function hydratePlantilla(tipo) {
 function syncDocHeader() {
     var map = {
         nombre: ((document.getElementById('inp-nombre') || {}).value || '').trim(),
-        cargo: (function () {
-            var cargo = document.getElementById('inp-cargo');
-            if (cargo && !cargo.disabled && (cargo.value || '').trim()) return cargo.value.trim();
-            return modalidadActual();
-        })(),
         cedula: ((document.getElementById('inp-cedula') || {}).value || '').trim()
+        // 'cargo' se omite: el documento ya tiene el cargo de la cuenta (firmante) inyectado desde el servidor
     };
     document.querySelectorAll('#doc-html-host [data-header]').forEach(function(el) {
         var key = el.getAttribute('data-header');

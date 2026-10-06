@@ -1174,6 +1174,28 @@ class OfficialDocumentService
             }
         }
 
+        // Reemplazar nombre y cargo del firmante hardcodeados en el HTML
+        if (!empty($header['firmante_nombre'])) {
+            $html = str_replace(
+                htmlspecialchars('KELLY JOHANNA RODRIGUEZ VARGAS', ENT_QUOTES),
+                htmlspecialchars($header['firmante_nombre'], ENT_QUOTES),
+                $html
+            );
+        }
+        if (!empty($header['firmante_cargo'])) {
+            $html = str_replace(
+                htmlspecialchars('Asesora Jur\u00eddica y de Seguros', ENT_QUOTES),
+                htmlspecialchars($header['firmante_cargo'], ENT_QUOTES),
+                $html
+            );
+            // Tambien reemplaza la version en mayusculas del cargo en el cuerpo
+            $html = str_replace(
+                htmlspecialchars('ASESORA JUR\u00cdDICA Y DE SEGUROS DEL \u00c1REA DE RECURSOS HUMANOS', ENT_QUOTES),
+                htmlspecialchars(mb_strtoupper($header['firmante_cargo']) . ' DEL \u00c1REA DE RECURSOS HUMANOS', ENT_QUOTES),
+                $html
+            );
+        }
+
         return $html;
     }
 
@@ -1228,6 +1250,39 @@ class OfficialDocumentService
                 $t->nodeValue = $value;
                 if (str_contains($value, ' ')) {
                     $t->setAttribute('xml:space', 'preserve');
+                }
+            }
+        }
+
+        // Reemplazar nombre del firmante hardcodeado (ej: KELLY JOHANNA RODRIGUEZ VARGAS)
+        if (!empty($header['firmante_nombre'])) {
+            foreach ($xpath->query('//w:t') as $t) {
+                if (!($t instanceof \DOMElement)) continue;
+                $val = trim((string) $t->nodeValue);
+                if ($val === 'KELLY JOHANNA RODRIGUEZ VARGAS') {
+                    $t->nodeValue = $header['firmante_nombre'];
+                }
+            }
+        }
+
+        // Reemplazar cargo del firmante en la firma y en el cuerpo en mayúsculas
+        if (!empty($header['firmante_cargo'])) {
+            $cargoFirmante = $header['firmante_cargo'];
+            $cargoMayus    = mb_strtoupper($cargoFirmante);
+            foreach ($xpath->query('//w:t') as $t) {
+                if (!($t instanceof \DOMElement)) continue;
+                $val = (string) $t->nodeValue;
+                // Firma al final del documento
+                if (trim($val) === 'Asesora Jurídica y de Seguros') {
+                    $t->nodeValue = $cargoFirmante;
+                }
+                // Cargo en mayúsculas en el cuerpo del documento
+                if (str_contains($val, 'ASESORA JURÍDICA Y DE SEGUROS DEL ÁREA DE RECURSOS HUMANOS')) {
+                    $t->nodeValue = str_replace(
+                        'ASESORA JURÍDICA Y DE SEGUROS DEL ÁREA DE RECURSOS HUMANOS',
+                        $cargoMayus . ' DEL ÁREA DE RECURSOS HUMANOS',
+                        $val
+                    );
                 }
             }
         }
