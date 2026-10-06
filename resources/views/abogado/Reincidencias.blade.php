@@ -60,7 +60,8 @@
         flex-shrink: 0;
     }
     .acts a:hover,
-    .acts button:hover { background: #ecfdf5; color: var(--cth-green-text); }
+    .acts button:hover { background: #e2e8f0; color: #0f172a; }
+    .acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
     .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
     table.proc th.col-acts,
     table.proc td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
@@ -211,7 +212,7 @@
                                 </td>
                                 <td class="col-acts">
                                     <div class="acts">
-                                        <a href="{{ route('abogado.detalleproceso', $p->id) }}" title="Ver Expediente"><i class="far fa-eye"></i></a>
+                                        <a href="{{ route('abogado.detalleproceso', $p->id) }}" class="btn-view" title="Ver Expediente"><i class="far fa-eye"></i></a>
                                         @if(!$p->soloLoManejaCoordinadora())
                                             @if(auth()->user()->puede('eliminar_casos'))
                                             <form action="{{ route('abogado.eliminarproceso', $p->id) }}" method="POST"

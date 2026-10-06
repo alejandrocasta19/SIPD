@@ -178,7 +178,8 @@
         cursor: pointer;
     }
 
-    .acts a:hover, .acts button:hover { background: #ecfdf5; color: var(--cth-green-text); }
+    .acts a:hover, .acts button:hover { background: #e2e8f0; color: #0f172a; }
+    .acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
     .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
 
     .empty {
@@ -314,7 +315,7 @@
                         </td>
                         <td class="col-acts">
                             <div class="acts">
-                                <a href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}" title="Ver proceso">
+                                <a href="{{ route('abogado.detalleproceso', ['id' => $proceso->id, 'from' => $fromDetalle ?? 'procesos']) }}" class="btn-view" title="Ver proceso">
                                     <i class="far fa-eye"></i>
                                 </a>
                                 @if(!$proceso->soloLoManejaCoordinadora())

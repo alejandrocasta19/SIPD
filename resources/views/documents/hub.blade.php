@@ -61,24 +61,37 @@
 
     .hub-actions {
         display: flex;
-        flex-direction: column;
-        align-items: stretch;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
         gap: 6px;
     }
     .hub-actions form { margin: 0; display: block; }
     .action-btn {
-        background: #f1f5f9; color: #334155; border: 1px solid var(--cth-border);
-        padding: 7px 8px; border-radius: 8px; font-size: 11px; font-weight: 700;
-        text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
-        gap: 5px; white-space: nowrap; line-height: 1.2; cursor: pointer; width: 100%;
+        width: 32px;
+        height: 32px;
+        border: 0;
+        background: #f1f5f9;
+        color: #64748b;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 13px;
+        padding: 0;
+        flex-shrink: 0;
         box-sizing: border-box;
+        transition: all 0.15s ease;
     }
     .action-btn:hover { background: #e2e8f0; color: #0f172a; }
+    .action-btn.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
+    .action-btn.btn-edit:hover { background: #fffbeb; color: #d97706; }
+    .action-btn.btn-down:hover { background: #eff6ff; color: #2563eb; }
     .action-btn.veredicto {
-        background: #3b82f6; color: #fff; border-color: #2563eb;
-        white-space: normal;
+        background: #eff6ff; color: #2563eb;
     }
-    .action-btn.veredicto:hover { background: #2563eb; color: #fff; }
+    .action-btn.veredicto:hover { background: #dbeafe; color: #1d4ed8; }
 </style>
 @endsection
 
@@ -116,7 +129,7 @@
                 <th class="center">2. Acta</th>
                 <th class="center">3. Sanción / llamado / terminación</th>
                 <th class="center">4. Decisión de archivo</th>
-                <th class="center">Gestionar</th>
+                <th class="center">Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -184,12 +197,12 @@
                                 @csrf
                                 @method('PUT')
                                 <button type="submit" class="action-btn veredicto" title="Enviar a En Proceso">
-                                    <i class="fas fa-paper-plane"></i> Enviar
+                                    <i class="fas fa-paper-plane"></i>
                                 </button>
                             </form>
                         @endif
-                        <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn" title="{{ $caso->soloLoManejaCoordinadora() ? 'Ver proceso' : 'Editar datos del proceso' }}">
-                            <i class="fas {{ $caso->soloLoManejaCoordinadora() ? 'fa-eye' : 'fa-edit' }}"></i> {{ $caso->soloLoManejaCoordinadora() ? 'Ver' : 'Editar' }}
+                        <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn {{ $caso->soloLoManejaCoordinadora() ? 'btn-view' : 'btn-edit' }}" title="{{ $caso->soloLoManejaCoordinadora() ? 'Ver proceso' : 'Editar datos del proceso' }}">
+                            <i class="fas {{ $caso->soloLoManejaCoordinadora() ? 'fa-eye' : 'fa-edit' }}"></i>
                         </a>
                         @php
                             $puedeGral = auth()->user()->puede('descargar_documentos');
@@ -222,11 +235,12 @@
                             }
                         @endphp
                         @if($tieneAlMenosUno)
-                            <button type="button" class="action-btn hub-open-dl"
+                            <button type="button" class="action-btn btn-down hub-open-dl"
                                 data-proc="PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}"
                                 data-nombre="{{ $caso->nombre }}"
-                                data-items='@json($descargas)'>
-                                <i class="fas fa-download"></i> Descargar
+                                data-items='@json($descargas)'
+                                title="Descargar documentos">
+                                <i class="fas fa-download"></i>
                             </button>
                         @endif
                     </div>

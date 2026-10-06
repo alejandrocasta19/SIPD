@@ -93,9 +93,10 @@ table.plz tr:hover td { background: #f8fafc; }
     flex-shrink: 0;
 }
 .acts a:hover,
-.acts button:hover { background: #ecfdf5; color: var(--cth-green-text); }
+.acts button:hover { background: #e2e8f0; color: #0f172a; }
+.acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
 .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
-.acts button.warning:hover { background: #fffbeb; color: #d97706; }
+.acts button.warning:hover,
 .acts button.lock-edit { color: #d97706; background: #fffbeb; }
 .acts button.lock-del { color: #e11d48; background: #fff1f2; }
 table.plz th.col-acts,
@@ -227,7 +228,7 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                         </td>
                         <td class="col-acts">
                             <div class="acts">
-                                <a href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}" title="Ver Expediente"><i class="far fa-eye"></i></a>
+                                <a href="{{ route('abogado.detalleproceso', $plazo->proceso_id) }}" class="btn-view" title="Ver Expediente"><i class="far fa-eye"></i></a>
                                 
                                 @if(!$soloCoordinadora)
                                     @if(!$editable && !$yaVencido)
