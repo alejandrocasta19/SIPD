@@ -497,29 +497,7 @@ label.sub-tab-btn .mod-radio {
             <div class="f-grid-2" style="margin-top:14px;">
                 <div class="field-block" style="margin-bottom:0;">
                     <label class="field-label">Tipo de Falta</label>
-                    <input type="text" name="tipo_falta" list="lista-faltas" class="field-input" placeholder="Selecciona o escribe el tipo de falta" value="{{ old('tipo_falta') }}" autocomplete="off">
-                    <datalist id="lista-faltas">
-                        <option value="Retraso en ruta"></option>
-                        <option value="Abandono de ruta"></option>
-                        <option value="Ausencia sin justificación"></option>
-                        <option value="Tickets no vendidos"></option>
-                        <option value="Faltante de dinero"></option>
-                        <option value="Mal manejo de efectivo"></option>
-                        <option value="Accidente con vehículo"></option>
-                        <option value="Daño al vehículo"></option>
-                        <option value="Incumplimiento de horario"></option>
-                        <option value="Uso inadecuado del vehículo"></option>
-                        <option value="Maltrato al pasajero"></option>
-                        <option value="Desobediencia a instrucciones"></option>
-                        <option value="Porte indebido del uniforme"></option>
-                        <option value="Uso del celular en conducción"></option>
-                        <option value="Conducción negligente"></option>
-                        <option value="Falsificación de documentos"></option>
-                        <option value="Hurto o apropiación de recursos"></option>
-                        <option value="Agresión verbal o física"></option>
-                        <option value="Incumplimiento de la resolución"></option>
-                        <option value="Otro"></option>
-                    </datalist>
+                    <input type="text" name="tipo_falta" class="field-input" placeholder="Ej: Abandono de ruta, Retraso..." value="{{ old('tipo_falta') }}" autocomplete="off">
                 </div>
                 <div class="field-block" style="margin-bottom:0;">
                     <label class="field-label">Adjuntar Evidencia (PDF, JPG, PNG)</label>
