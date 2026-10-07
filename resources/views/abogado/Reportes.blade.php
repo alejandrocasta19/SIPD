@@ -185,10 +185,17 @@
         </div>
     </div>
     <div class="ch-card">
-        <h3>Reincidencias</h3><p>Trabajadores con un caso o con varios.</p>
-        <div class="ch-wrap" id="reinc-wrap">
-            <canvas id="reinc-chart"></canvas>
-            <div class="ch-empty">Sin cédulas para comparar.</div>
+        <h3>Casos semanales</h3><p>Tendencia de registros por semana.</p>
+        <div class="ch-wrap" id="weekly-wrap">
+            <canvas id="weekly-chart"></canvas>
+            <div class="ch-empty">Sin datos semanales.</div>
+        </div>
+    </div>
+    <div class="ch-card">
+        <h3>Estado Global</h3><p>Proporción de procesos por su estatus actual.</p>
+        <div class="ch-wrap" id="status-wrap">
+            <canvas id="status-chart"></canvas>
+            <div class="ch-empty">Sin casos registrados.</div>
         </div>
     </div>
 </div>
@@ -485,17 +492,38 @@ document.addEventListener('DOMContentLoaded', function () {
             'Todas las faltas registradas en el período.'
         );
 
-        /* doughnut reincidencias */
-        if (charts.r) charts.r.destroy();
-        var reinc = data.reincidencias || {};
-        var reincSlices = [
-            { label: 'Primera vez', value: reinc.primera_vez||0, color: colors[0] },
-            { label: 'Reincidentes', value: reinc.reincidentes||0, color: '#dc2626' }
+        /* Casos semanales (Bar chart) */
+        if (charts.w) charts.w.destroy();
+        var wLab = (data.weekly||[]).map(function(w){
+            return 'Sem ' + w.period.split('-W')[1] + ' (' + w.period.split('-W')[0] + ')';
+        });
+        var wVals = (data.weekly||[]).map(function(w){ return w.total; });
+        charts.w = new Chart(document.getElementById('weekly-chart'), {
+            type:'bar',
+            data:{ labels:wLab, datasets:[{
+                label:'Casos por semana', data:wVals,
+                backgroundColor:colors[1], borderRadius:4
+            }]},
+            options:{ responsive:true, maintainAspectRatio:false,
+                plugins:{legend:{display:false}},
+                scales:{x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, ticks:{precision:0,font:{size:9}}}} }
+        });
+        showEmpty('weekly-wrap', !wLab.length);
+
+        /* doughnut Estados globales */
+        if (charts.s) charts.s.destroy();
+        var st = data.states || {};
+        var stSlices = [
+            { label: 'Pendiente', value: st['Pendiente']||0, color: '#f59e0b' },
+            { label: 'En proceso', value: st['En Proceso']||st['En proceso']||0, color: '#2563eb' },
+            { label: 'Sancionado', value: st['Sancionado']||0, color: '#dc2626' },
+            { label: 'Archivado', value: st['Archivado']||0, color: '#64748b' }
         ].filter(function (s) { return s.value > 0; });
-        if (reincSlices.length) {
-            charts.r = new Chart(document.getElementById('reinc-chart'),{
+        
+        if (stSlices.length) {
+            charts.s = new Chart(document.getElementById('status-chart'), {
                 type:'doughnut',
-                data:{ labels:reincSlices.map(function(s){return s.label;}), datasets:[{ data:reincSlices.map(function(s){return s.value;}), backgroundColor:reincSlices.map(function(s){return s.color;}), borderWidth:1 }] },
+                data:{ labels:stSlices.map(function(s){return s.label;}), datasets:[{ data:stSlices.map(function(s){return s.value;}), backgroundColor:stSlices.map(function(s){return s.color;}), borderWidth:1 }] },
                 options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
                     plugins:{ legend:{position:'bottom',labels:{boxWidth:9,font:{size:9}}},
                         tooltip:{callbacks:{label:function(ctx){
@@ -504,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         }}} } }
             });
         }
-        showEmpty('reinc-wrap', !reincSlices.length);
+        showEmpty('status-wrap', !stSlices.length);
     }
 
     function loadStats() {

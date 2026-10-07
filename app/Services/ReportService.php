@@ -68,6 +68,27 @@ class ReportService
             }
         }
 
+        $weekSql = $filtered->getConnection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%W', created_at)"
+            : "DATE_FORMAT(created_at, '%x-W%v')"; // ISO Year-Week in MySQL
+
+        $weeklyRows = (clone $filtered)
+            ->selectRaw("{$weekSql} AS period, COUNT(*) AS total")
+            ->groupBy(DB::raw($weekSql))
+            ->orderBy('period')
+            ->get();
+
+        $weekly = [];
+        // To build the exact weeks within range, we'll just return the raw grouped ones to avoid heavy CarbonPeriod week logic
+        foreach ($weeklyRows as $row) {
+            if ($row->period) {
+                $weekly[] = [
+                    'period' => $row->period,
+                    'total' => (int) $row->total,
+                ];
+            }
+        }
+
         $faults = $this->groupedCounts(
             $filtered,
             "COALESCE(NULLIF(tipo_falta, ''), 'Sin tipo de falta')",
@@ -102,6 +123,7 @@ class ReportService
             'total' => $total,
             'states' => $states,
             'monthly' => $monthly,
+            'weekly' => $weekly,
             'pending_faults' => $faults,
             'by_modalidad' => $this->groupedCounts(
                 $filtered,
@@ -330,6 +352,12 @@ class ReportService
                 $st['Archivado'] ?? 0,
             ];
         }
+        $weekRows = [];
+        foreach ($data['weekly'] ?? [] as $w) {
+            $parts = explode('-W', (string)$w['period']);
+            $weekTitle = count($parts) === 2 ? ('Sem ' . $parts[1] . ' (' . $parts[0] . ')') : $w['period'];
+            $weekRows[] = [$weekTitle, $w['total']];
+        }
         $cargoRows = [];
         foreach (array_values($data['by_modalidad'] ?? []) as $i => $row) {
             $cargoRows[] = [$i + 1, $row['label'], $row['total'], $pct($row['total'])];
@@ -378,6 +406,13 @@ class ReportService
                 'headers' => ['Mes', 'Casos'],
                 'rows' => $monthRows,
                 'empty' => 'Sin movimiento mensual.',
+            ],
+            [
+                'title' => '4. Volumen semanal',
+                'note' => 'Tendencia de casos por semana.',
+                'headers' => ['Semana', 'Casos'],
+                'rows' => $weekRows,
+                'empty' => 'Sin datos semanales.',
             ],
             [
                 'title' => '4. Modalidad y cargo',
