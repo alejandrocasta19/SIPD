@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
+use App\Models\Aviso;
 use App\Models\User;
 use App\Models\ProcesoDisciplinario;
 use App\Models\CasoEvidencia;
@@ -100,6 +101,138 @@ class DocumentoTest extends TestCase
         $this->actingAs($abog1)
             ->get(route('documentos.edit', [$caso->id, 'disciplinario']))
             ->assertStatus(404);
+    }
+
+    /** @test */
+    public function el_acta_acepta_dos_firmas_privadas_y_las_inserta_en_el_docx()
+    {
+        Storage::fake('local');
+        $user = $this->makeUser('abogado');
+        $user->update(['name' => 'María Ramírez']);
+        $caso = $this->makeCaso($user, [
+            'nombre' => 'Trabajador De Prueba',
+            'cedula' => '1234567890',
+            'cargo' => 'Auxiliar de Control Interno',
+            'datos_oficiales' => [
+                'yellow_blocks' => ['acta' => $this->filledBlocks('acta')],
+            ],
+        ]);
+        $user->otorgarPermiso('editar_documentos', null);
+
+        $this->actingAs($user)
+            ->post(route('documentos.firmas.store', [$caso->id, 'acta']), [
+                'firma_cuenta' => UploadedFile::fake()->image('firma-rh.png'),
+                'firma_trabajador' => UploadedFile::fake()->image('firma-trabajador.png'),
+            ])
+            ->assertRedirect();
+
+        $caso = $caso->fresh();
+        $user = $user->fresh();
+        Storage::disk('local')->assertExists($user->firma_path);
+        Storage::disk('local')->assertExists($caso->datos_oficiales['firmas_acta']['trabajador']);
+
+        $this->get(route('documentos.edit', [$caso->id, 'acta']))
+            ->assertOk()
+            ->assertSee('Trabajador De Prueba')
+            ->assertSee('data:image/png;base64,', false);
+
+        $documents = app(\App\Services\OfficialDocumentService::class);
+        foreach (['comprobacion', 'disciplinario'] as $apertura) {
+            $htmlApertura = $documents->getInteractiveDocumentHtml($apertura, [], $caso);
+            $this->assertSame(1, substr_count($htmlApertura, 'data:image/png;base64,'));
+        }
+
+        $path = $documents->materializeDocx($caso, 'acta');
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $xml = $zip->getFromName('word/document.xml');
+        $relationships = $zip->getFromName('word/_rels/document.xml.rels');
+        $media = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = $zip->getNameIndex($index);
+            if (strpos($name, 'word/media/sipd-signature-') === 0) {
+                $media[] = $name;
+            }
+        }
+        $zip->close();
+        @unlink($path);
+
+        $this->assertStringContainsString('TRABAJADOR DE PRUEBA', $xml);
+        $this->assertStringContainsString('1234567890', $xml);
+        $this->assertStringContainsString('MARÍA RAMÍREZ', $xml);
+        $this->assertStringContainsString('relationships/image', $relationships);
+        $this->assertCount(2, $media);
+    }
+
+    /** @test */
+    public function el_registro_guarda_en_privado_la_firma_de_apertura_de_la_cuenta_activa()
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $user = $this->makeUser('abogado');
+
+        $this->actingAs($user)
+            ->post(route('abogado.registro.store'), [
+                'tipo_proceso' => 'disciplinario',
+                'nombre' => 'Conductor Demo',
+                'cedula' => '1234567890',
+                'firma_cuenta' => UploadedFile::fake()->image('firma.png'),
+            ])
+            ->assertRedirect(route('documentos.hub'));
+
+        $ruta = $user->fresh()->firma_path;
+        $this->assertNotEmpty($ruta);
+        $this->assertStringStartsWith('firmas/usuarios/' . $user->id . '/', $ruta);
+        Storage::disk('local')->assertExists($ruta);
+        Storage::disk('public')->assertMissing($ruta);
+    }
+
+    /** @test */
+    public function solo_la_coordinadora_puede_cargar_firma_en_sancion_y_no_se_acepta_firma_virtual_en_terminacion()
+    {
+        Storage::fake('local');
+        $equipo = $this->makeUser('abogado');
+        $casoEquipo = $this->makeCaso($equipo);
+        $equipo->otorgarPermiso('editar_documentos', null);
+
+        $this->actingAs($equipo)
+            ->post(route('documentos.firmas.store', [$casoEquipo->id, 'sancion']), [
+                'firma_cuenta' => UploadedFile::fake()->image('firma.png'),
+            ])
+            ->assertForbidden();
+
+        $coordinadora = $this->makeUser('coordinadora');
+        $casoCoordinadora = $this->makeCaso($equipo);
+        $this->actingAs($coordinadora)
+            ->post(route('documentos.firmas.store', [$casoCoordinadora->id, 'terminacion']), [
+                'firma_cuenta' => UploadedFile::fake()->image('firma.png'),
+            ])
+            ->assertForbidden();
+    }
+
+    /** @test */
+    public function firma_de_llamado_usa_a_la_coordinadora_y_no_se_expone_a_equipo()
+    {
+        Storage::fake('local');
+        $coordinadora = $this->makeUser('coordinadora');
+        $coordinadora->update(['name' => 'Coordinadora De Prueba']);
+        $signature = UploadedFile::fake()->image('firma-coordinadora.png');
+        $coordinadora->update([
+            'firma_path' => $signature->store('firmas/usuarios/' . $coordinadora->id, 'local'),
+        ]);
+        $equipo = $this->makeUser('abogado');
+        $caso = $this->makeCaso($equipo);
+        $documents = app(\App\Services\OfficialDocumentService::class);
+
+        $this->actingAs($coordinadora);
+        $htmlFirmado = $documents->getInteractiveDocumentHtml('llamado', [], $caso);
+        $this->assertStringContainsString('data:image/png;base64,', $htmlFirmado);
+        $this->assertStringContainsString('COORDINADORA DE PRUEBA', $htmlFirmado);
+        $this->assertStringNotContainsString('ADRIANA MARIA SANCHEZ RAMIREZ', $htmlFirmado);
+
+        $this->actingAs($equipo);
+        $htmlEquipo = $documents->getInteractiveDocumentHtml('llamado', [], $caso);
+        $this->assertStringNotContainsString('data:image/png;base64,', $htmlEquipo);
     }
 
     /** @test */
@@ -334,6 +467,56 @@ class DocumentoTest extends TestCase
         $this->assertSame('generado', $estado->estado);
         $this->assertNotNull($estado->generado_en);
         $this->assertNull($estado->descargado_en);
+    }
+
+    /** @test */
+    public function generar_documento_que_requiere_firma_avisa_a_la_coordinadora_con_enlace_directo()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->put(route('documentos.save', [$caso->id, 'sancion']), [
+                'yellow_blocks' => $this->filledBlocks('sancion'),
+                'formato' => 'generar',
+            ])
+            ->assertRedirect(route('documentos.hub'));
+
+        $aviso = Aviso::query()
+            ->where('user_id', $coord->id)
+            ->where('tipo', Aviso::TIPO_FIRMA)
+            ->firstOrFail();
+
+        $this->assertSame($caso->id, $aviso->proceso_id);
+        $this->assertSame('sancion', $aviso->tipo_documento);
+
+        $this->actingAs($coord)
+            ->get(route('notificaciones.leer', $aviso->id))
+            ->assertRedirect(route('documentos.edit', [$caso->id, 'sancion']));
+    }
+
+    /** @test */
+    public function primera_descarga_de_documento_que_requiere_firma_avisa_a_la_coordinadora()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user, [
+            'datos_oficiales' => [
+                'yellow_blocks' => ['llamado' => $this->filledBlocks('llamado')],
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'llamado']))
+            ->assertOk();
+
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $coord->id,
+            'tipo' => Aviso::TIPO_FIRMA,
+            'proceso_id' => $caso->id,
+            'tipo_documento' => 'llamado',
+        ]);
     }
 
     /** @test */
@@ -650,7 +833,7 @@ class DocumentoTest extends TestCase
             ->assertSee('Borrador')
             ->assertSee('Generada, no descargada')
             ->assertDontSee('Generada y descargada')
-            ->assertDontSee('hub-open-dl', false);
+            ->assertSee('class="action-btn btn-down hub-open-dl"', false);
     }
 
     /** @test */
@@ -701,23 +884,27 @@ class DocumentoTest extends TestCase
     {
         $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user);
+        $caso->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now(),
+        ]);
 
         $this->actingAs($user)
             ->get(route('documentos.hub'))
             ->assertOk()
-            ->assertDontSee('hub-open-dl', false);
+            ->assertDontSee('class="action-btn btn-down hub-open-dl"', false);
 
         $this->actingAs($user)
             ->get(route('documentos.download', [$caso->id, 'disciplinario']))
-            ->assertRedirect(route('abogado.dashboard'))
-            ->assertSessionHas('error');
+            ->assertForbidden();
 
         $user->otorgarPermiso('descargar_documentos', null);
 
         $this->actingAs($user)
             ->get(route('documentos.hub'))
             ->assertOk()
-            ->assertSee('hub-open-dl', false)
+            ->assertSee('class="action-btn btn-down hub-open-dl"', false)
             ->assertSee('Descargar');
     }
 
@@ -813,6 +1000,75 @@ class DocumentoTest extends TestCase
         $this->assertStringContainsString($caso->numeroRadicado(), $xml);
         $this->assertStringContainsString(now()->format('d/m/Y'), $xml);
         $this->assertStringNotContainsString('202X-XXX', $xml);
+    }
+
+    /** @test */
+    public function formatos_usan_el_nombre_y_cargo_actualizados_del_perfil_como_firmante()
+    {
+        $user = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($user, [
+            'nombre' => 'Trabajador De Prueba',
+            'cedula' => '1234567890',
+            'cargo' => 'Cargo del trabajador',
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('perfil.update'), [
+                'name' => 'María Ramírez',
+                'email' => $user->email,
+                'cargo' => 'Directora Jurídica',
+            ])
+            ->assertSessionHas('profile_success');
+
+        $this->actingAs($user->fresh());
+        $documents = app(\App\Services\OfficialDocumentService::class);
+        $html = $documents->getInteractiveDocumentHtml('disciplinario', [], $caso);
+
+        $this->assertStringContainsString('MARÍA RAMÍREZ', $html);
+        $this->assertStringContainsString('Directora Jurídica', $html);
+        $this->assertStringContainsString('Trabajador De Prueba', $html);
+        $this->assertStringContainsString('Cargo del trabajador', $html);
+        $this->assertStringContainsString('1234567890', $html);
+
+        $path = $documents->materializeDocx($caso, 'disciplinario');
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        @unlink($path);
+
+        $this->assertStringContainsString('MARÍA RAMÍREZ', $xml);
+        $this->assertStringContainsString('Directora Jurídica', $xml);
+        $this->assertStringContainsString('Trabajador De Prueba', $xml);
+        $this->assertStringContainsString('Cargo del trabajador', $xml);
+        $this->assertStringContainsString('1234567890', $xml);
+    }
+
+    /** @test */
+    public function vista_interactiva_prefija_el_nombre_actual_en_todas_las_plantillas()
+    {
+        $user = $this->makeUser('coordinadora');
+        $user->update(['name' => 'María Ramírez']);
+        $documents = app(\App\Services\OfficialDocumentService::class);
+        $templates = [
+            'comprobacion',
+            'disciplinario',
+            'acta',
+            'sancion',
+            'llamado',
+            'terminacion',
+            'archivo',
+        ];
+
+        $this->actingAs($user);
+        foreach ($templates as $template) {
+            $html = $documents->getInteractiveDocumentHtml($template);
+            $this->assertStringContainsString(
+                'MARÍA RAMÍREZ',
+                $html,
+                "La vista de la plantilla {$template} debe usar el nombre actual del firmante."
+            );
+        }
     }
 
     /** @test */

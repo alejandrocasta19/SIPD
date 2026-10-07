@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\PermisoSolicitud;
 use App\Models\ProcesoDisciplinario;
+use App\Models\Aviso;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -27,7 +28,8 @@ class CoordinadoraTest extends TestCase
     {
         $coord = $this->makeUser('coordinadora');
         $rh = $this->makeUser('abogado', ['name' => 'Kelly RH']);
-        $this->makeCaso($rh, ['estado' => 'En Proceso', 'nombre' => 'Conductor Veredicto']);
+        $caso = $this->makeCaso($rh, ['estado' => 'En Proceso', 'nombre' => 'Conductor Veredicto']);
+        $caso->estadoDocumento('disciplinario');
 
         $this->actingAs($coord)
             ->get(route('abogado.dashboard'))
@@ -38,6 +40,57 @@ class CoordinadoraTest extends TestCase
             ->assertSee('Carga del equipo')
             ->assertSee('Kelly RH')
             ->assertDontSee('Sin responsable de RH');
+    }
+
+    /** @test */
+    public function contador_de_solicitudes_del_sidebar_refleja_solicitudes_pendientes_no_avisos_no_leidos()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+
+        foreach ([PermisoSolicitud::PENDIENTE, PermisoSolicitud::PENDIENTE, PermisoSolicitud::OTORGADA] as $estado) {
+            PermisoSolicitud::create([
+                'user_id' => $rh->id,
+                'permiso' => 'editar_casos',
+                'que_hara' => 'Actualizar el expediente',
+                'motivo' => 'Se requiere corregir información',
+                'horas' => 1,
+                'estado' => $estado,
+            ]);
+        }
+
+        Aviso::enviar($coord, [
+            'tipo' => Aviso::TIPO_SOLICITUD,
+            'titulo' => 'Solicitud leída',
+            'leida_at' => now(),
+        ]);
+        Aviso::enviar($coord, [
+            'tipo' => Aviso::TIPO_SESION,
+            'titulo' => 'Inicio de sesión',
+        ]);
+
+        $this->actingAs($coord)
+            ->get(route('abogado.dashboard'))
+            ->assertOk()
+            ->assertSee('id="sidebar-solicitudes-count" class="sipd-nav-count">2', false);
+    }
+
+    /** @test */
+    public function contador_de_bandeja_en_sidebar_coincide_con_campana_al_incluir_alertas_del_sistema()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+        $this->makeCaso($rh, ['estado' => 'Pendiente', 'descargos' => null]);
+        Aviso::enviar($coord, [
+            'tipo' => Aviso::TIPO_SESION,
+            'titulo' => 'Inicio de sesión',
+        ]);
+
+        $this->actingAs($coord)
+            ->get(route('abogado.dashboard'))
+            ->assertOk()
+            ->assertSee('class="badge-dot">2', false)
+            ->assertSee('class="sipd-nav-count">2', false);
     }
 
     /** @test */
@@ -138,6 +191,54 @@ class CoordinadoraTest extends TestCase
             ->assertSessionHas('password_success');
 
         $this->assertTrue(\Illuminate\Support\Facades\Hash::check('nueva123', $rh->fresh()->password));
+    }
+
+    /** @test */
+    public function usuario_autorizado_puede_actualizar_su_perfil_con_su_mismo_correo()
+    {
+        $rh = $this->makeUser('abogado');
+        $rh->otorgarPermiso('editar_perfil', 1);
+        $email = $rh->email;
+
+        $this->actingAs($rh)
+            ->put(route('perfil.update'), [
+                'name' => 'Nombre Actualizado',
+                'email' => $rh->email,
+                'telefono' => '(300) 123-4567',
+                'cedula' => '1.234.567',
+                'cargo' => 'Asesor jurídico',
+                'fecha_ingreso' => '2020-01-15',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('profile_success', 'Perfil actualizado correctamente');
+
+        $this->assertSame('Nombre Actualizado', $rh->fresh()->name);
+        $this->assertSame($email, $rh->fresh()->email);
+        $this->assertSame('3001234567', $rh->fresh()->telefono);
+        $this->assertSame('1234567', $rh->fresh()->cedula);
+        $this->assertSame('Asesor jurídico', $rh->fresh()->cargo);
+        $this->assertSame('2020-01-15', $rh->fresh()->fecha_ingreso->format('Y-m-d'));
+    }
+
+    /** @test */
+    public function el_nombre_actualizado_de_la_coordinadora_se_muestra_en_el_encabezado()
+    {
+        $coord = $this->makeUser('coordinadora', [
+            'name' => 'Adriana Sanchez',
+        ]);
+
+        $this->actingAs($coord)
+            ->put(route('perfil.update'), [
+                'name' => 'Maria Ramirez',
+                'email' => $coord->email,
+            ])
+            ->assertSessionHas('profile_success');
+
+        $this->actingAs($coord->fresh())
+            ->get(route('abogado.dashboard'))
+            ->assertOk()
+            ->assertSee('Maria Ramirez')
+            ->assertSee('Coordinadora de RH');
     }
 
     /** @test */
@@ -439,7 +540,7 @@ class CoordinadoraTest extends TestCase
             ->assertDontSee('Plazos vencidos')
             ->assertDontSee('Pendientes de veredicto')
             ->assertDontSee('Descargos pendientes')
-            ->assertSee('No hay notificaciones');
+            ->assertSee('Tu bandeja está al día');
     }
 
     /** @test */
@@ -526,7 +627,7 @@ class CoordinadoraTest extends TestCase
             ->put(route('coordinadora.abogados.editar', $rh->id), [
                 'name' => 'Kelly Johanna Rodríguez',
                 'email' => 'kellyactualizada@sipd.co',
-                'cargo' => 'Analista de RH',
+                'cargo' => 'Asesor jurídico',
                 'activo' => '1',
             ])
             ->assertRedirect();
@@ -535,7 +636,7 @@ class CoordinadoraTest extends TestCase
             'id' => $rh->id,
             'name' => 'Kelly Johanna Rodríguez',
             'email' => 'kellyactualizada@sipd.co',
-            'cargo' => 'Analista de RH',
+            'cargo' => 'Asesor jurídico',
         ]);
         $this->assertSame($hashAntes, $rh->fresh()->password);
 
@@ -544,31 +645,31 @@ class CoordinadoraTest extends TestCase
             ->put(route('coordinadora.abogados.editar', $rh->id), [
                 'name' => 'Kelly Johanna Rodríguez',
                 'email' => 'kellyactualizada@sipd.co',
-                'cargo' => 'Analista de RH',
+                'cargo' => 'Asesor jurídico',
                 'activo' => '1',
-                'nueva_password' => 'sipd456',
-                'nueva_password_confirmation' => 'sipd456',
+                'nueva_password' => 'sipd45678',
+                'nueva_password_confirmation' => 'sipd45678',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sipd456', $rh->fresh()->password));
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sipd45678', $rh->fresh()->password));
 
         $this->actingAs($coord)
             ->from(route('coordinadora.abogados'))
             ->put(route('coordinadora.abogados.editar', $rh->id), [
                 'name' => 'Kelly Johanna Rodríguez',
                 'email' => 'kellyactualizada@sipd.co',
-                'cargo' => 'Analista de RH',
+                'cargo' => 'Asesor jurídico',
                 'activo' => '1',
-                'nueva_password' => 'otra789',
+                'nueva_password' => 'otra7890',
                 'nueva_password_confirmation' => 'no-coincide',
             ])
             ->assertRedirect()
             ->assertSessionHas('abrir_editar_rh')
             ->assertSessionHasErrors('nueva_password');
 
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sipd456', $rh->fresh()->password));
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sipd45678', $rh->fresh()->password));
     }
 
     /** @test */
@@ -664,13 +765,17 @@ class CoordinadoraTest extends TestCase
     {
         $rh = $this->makeUser('abogado');
         $caso = $this->makeCaso($rh);
+        $caso->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now(),
+        ]);
 
         $this->assertFalse($rh->puede('descargar_documentos'));
 
         $this->actingAs($rh)
             ->get(route('documentos.download', [$caso->id, 'disciplinario']))
-            ->assertRedirect(route('abogado.dashboard'))
-            ->assertSessionHas('error');
+            ->assertForbidden();
     }
 
     /** @test */

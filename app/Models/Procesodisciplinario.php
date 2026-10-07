@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
+use App\Support\Modalidades;
 
 class ProcesoDisciplinario extends Model
 {
@@ -308,16 +309,16 @@ class ProcesoDisciplinario extends Model
      * Encabezado de apertura: trabajador, cargo, cédula, fecha y radicado.
      * Si el caso aún no existe, deja nombre/cargo/cédula vacíos y anticipa el siguiente radicado.
      */
-    public static function datosEncabezadoDocumento(?self $proceso = null): array
+    public static function datosEncabezadoDocumento(?self $proceso = null, ?User $firmante = null): array
     {
-        $user = auth()->user();
+        $user = $firmante ?: auth()->user();
         $firmanteNombre = $user ? mb_strtoupper(trim((string) $user->name)) : 'KELLY JOHANNA RODRIGUEZ VARGAS';
-        $firmanteCargo  = $user ? trim((string) ($user->cargo ?: '')) : 'Asesora Jur\u00eddica y de Seguros';
+        $firmanteCargo  = $user ? trim((string) ($user->cargo ?: '')) : 'Asesora Jurídica y de Seguros';
 
         if ($proceso && $proceso->exists) {
             return [
                 'nombre'          => trim((string) $proceso->nombre),
-                'cargo'           => $firmanteCargo,  // cargo del firmante (cuenta RH)
+                'cargo'           => Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo),
                 'cedula'          => trim((string) ($proceso->cedula ?: '')),
                 'fecha'           => self::fechaExpedicion(),
                 'radicado'        => $proceso->numeroRadicado(),
@@ -330,7 +331,7 @@ class ProcesoDisciplinario extends Model
 
         return [
             'nombre'          => '',
-            'cargo'           => $firmanteCargo,  // cargo del firmante (cuenta RH)
+            'cargo'           => '',
             'cedula'          => '',
             'fecha'           => self::fechaExpedicion(),
             'radicado'        => date('Y') . '-' . str_pad((string) $siguiente, 3, '0', STR_PAD_LEFT) . '-01',

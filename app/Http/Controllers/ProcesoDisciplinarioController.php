@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ReportService;
 use App\Services\OfficialDocumentService;
+use App\Services\FirmaDocumentoService;
 use Illuminate\Validation\ValidationException;
 use App\Support\Formatos;
 use App\Support\Modalidades;
@@ -437,11 +438,40 @@ class ProcesoDisciplinarioController extends Controller
                 });
             }
 
-            return response()->json($reports->statistics(
+            $data = $reports->statistics(
                 $query,
                 $from,
                 $to
-            ));
+            );
+
+            if (auth()->user()->esCoordinadora()) {
+                $filtered = $reports->applyDateRange(clone $query, $from, $to);
+                $ownerIds = (clone $filtered)
+                    ->whereNotNull('user_id')
+                    ->distinct()
+                    ->pluck('user_id');
+                $owners = User::query()
+                    ->whereIn('id', $ownerIds)
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+
+                $data['by_user'] = [];
+                foreach ($owners as $owner) {
+                    $data['by_user'][] = array_merge(
+                        ['name' => $owner->name],
+                        $reports->statistics((clone $query)->where('user_id', $owner->id), $from, $to)
+                    );
+                }
+
+                if ((clone $filtered)->whereNull('user_id')->exists()) {
+                    $data['by_user'][] = array_merge(
+                        ['name' => 'Sin responsable'],
+                        $reports->statistics((clone $query)->whereNull('user_id'), $from, $to)
+                    );
+                }
+            }
+
+            return response()->json($data);
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
@@ -560,7 +590,7 @@ class ProcesoDisciplinarioController extends Controller
     /**
      * Guardar proceso disciplinario
      */
-    public function store(Request $request)
+    public function store(Request $request, FirmaDocumentoService $firmas)
     {
         $seleccion = trim((string) $request->input('modalidad', ''));
         $interpretada = Modalidades::interpretar($seleccion, $request->input('cargo'));
@@ -573,7 +603,25 @@ class ProcesoDisciplinarioController extends Controller
 
         $validated = $request->validate([
             'tipo_proceso' => 'required|in:' . implode(',', CasoDocumentoEstado::TIPOS),
+            'firma_cuenta' => 'sometimes|required|image|mimes:png,jpg,jpeg|max:2048',
+            'firma_trabajador' => 'sometimes|required|image|mimes:png,jpg,jpeg|max:2048',
         ]);
+        if ($request->hasFile('firma_cuenta')) {
+            abort_unless($firmas->puedeCargarFirma($validated['tipo_proceso'], $request->user()), 403);
+            abort_unless(
+                in_array($request->file('firma_cuenta')->getMimeType(), ['image/png', 'image/jpeg'], true),
+                422,
+                'La firma debe ser una imagen PNG o JPEG válida.'
+            );
+        }
+        if ($request->hasFile('firma_trabajador')) {
+            abort_unless($validated['tipo_proceso'] === 'acta', 422);
+            abort_unless(
+                in_array($request->file('firma_trabajador')->getMimeType(), ['image/png', 'image/jpeg'], true),
+                422,
+                'La firma debe ser una imagen PNG o JPEG válida.'
+            );
+        }
         $modalidad = $interpretada['modalidad'] ?? null;
         $cargo = $interpretada['cargo'] ?? null;
 
@@ -651,6 +699,13 @@ class ProcesoDisciplinarioController extends Controller
             'estado'            => 'Pendiente',
             'user_id'           => auth()->id(),
         ]);
+
+        if ($request->hasFile('firma_cuenta')) {
+            $firmas->guardarFirmaCuenta($request->file('firma_cuenta'), $request->user());
+        }
+        if ($request->hasFile('firma_trabajador')) {
+            $firmas->guardarFirmaTrabajador($request->file('firma_trabajador'), $proceso);
+        }
 
         foreach ($evidenciasToSave as $ev) {
             $ev['caso_id'] = $proceso->id;

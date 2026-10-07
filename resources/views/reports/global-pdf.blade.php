@@ -35,6 +35,10 @@
         table.grid th { background: #006837; color: #fff; font-size: 9px; }
         table.grid td.num { text-align: right; white-space: nowrap; }
         .note { font-size: 8px; color: #64748b; margin: 0 0 10px; }
+        .chart-grid { width:100%; border-collapse:collapse; margin:0 0 8px; page-break-inside:avoid; }
+        .chart-grid td { width:50%; border:0; padding:4px 5px 8px; vertical-align:top; page-break-inside:avoid; }
+        .chart-grid h3 { color:#14532d; font-size:9px; margin:0 0 3px; }
+        .chart-grid img { width:100%; height:auto; }
         .foot { position: fixed; bottom: -12mm; left: 0; right: 0; font-size: 8px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 4px; }
     </style>
 </head>
@@ -59,6 +63,23 @@
         <td><small>Finalizados</small><strong>{{ $kpis['finalizados'] ?? 0 }}</strong></td>
     </tr>
 </table>
+
+@if(!empty($data['charts']))
+<h2>Visualizaciones del período</h2>
+<table class="chart-grid">
+    @foreach(array_chunk($data['charts'], 2) as $chartRow)
+        <tr>
+            @foreach($chartRow as $chart)
+                <td>
+                    <h3>{{ $chart['title'] }}</h3>
+                    <img src="{{ $chart['src'] }}" alt="{{ $chart['title'] }}">
+                </td>
+            @endforeach
+            @if(count($chartRow) === 1)<td></td>@endif
+        </tr>
+    @endforeach
+</table>
+@endif
 
 <h2>1. Distribución por estado</h2>
 <p class="note">Estado actual de cada expediente en el período.</p>

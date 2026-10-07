@@ -287,6 +287,9 @@ Route::middleware(['auth', 'role:admin,equipo'])->prefix('documentos')->name('do
     Route::get('/', [DocumentoController::class, 'hub'])
         ->name('hub');
 
+    // Detalle documental del expediente
+    Route::get('/{id}', [DocumentoController::class, 'index'])
+        ->name('index');
 
     // Formulario de diligenciamiento (split-screen)
     Route::get('/{id}/{tipo}/editar', [DocumentoController::class, 'edit'])
@@ -298,6 +301,9 @@ Route::middleware(['auth', 'role:admin,equipo'])->prefix('documentos')->name('do
     // Guardar bloques amarillos
     Route::put('/{id}/{tipo}/guardar', [DocumentoController::class, 'save'])
         ->name('save');
+
+    Route::post('/{id}/{tipo}/firmas', [DocumentoController::class, 'storeFirmas'])
+        ->name('firmas.store');
 
     // Previsualización en iframe (JSON o PDF inline)
     Route::get('/{id}/{tipo}/previsualizar', [DocumentoController::class, 'preview'])

@@ -68,6 +68,41 @@ class ReportService
             }
         }
 
+        $dailySql = $filtered->getConnection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m-%d', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m-%d')";
+        $dailyRows = (clone $filtered)
+            ->selectRaw("{$dailySql} AS period, COUNT(*) AS total")
+            ->groupBy(DB::raw($dailySql))
+            ->orderBy('period')
+            ->get();
+        $dailyByPeriod = [];
+        foreach ($dailyRows as $row) {
+            if ($row->period) {
+                $dailyByPeriod[$row->period] = (int) $row->total;
+            }
+        }
+
+        $dailyBounds = (clone $filtered)
+            ->selectRaw('MIN(created_at) AS min_date, MAX(created_at) AS max_date')
+            ->first();
+        $dailyStart = $from
+            ? Carbon::parse($from)->startOfDay()
+            : ($dailyBounds && $dailyBounds->min_date ? Carbon::parse($dailyBounds->min_date)->startOfDay() : null);
+        $dailyEnd = $to
+            ? Carbon::parse($to)->startOfDay()
+            : ($dailyBounds && $dailyBounds->max_date ? Carbon::parse($dailyBounds->max_date)->startOfDay() : null);
+        $daily = [];
+        if ($dailyStart && $dailyEnd && $dailyStart->lte($dailyEnd)) {
+            foreach (CarbonPeriod::create($dailyStart, '1 day', $dailyEnd) as $day) {
+                $period = $day->format('Y-m-d');
+                $daily[] = [
+                    'period' => $period,
+                    'total' => $dailyByPeriod[$period] ?? 0,
+                ];
+            }
+        }
+
         $weekSql = $filtered->getConnection()->getDriverName() === 'sqlite'
             ? "strftime('%Y-%W', created_at)"
             : "DATE_FORMAT(created_at, '%x-W%v')"; // ISO Year-Week in MySQL
@@ -94,6 +129,9 @@ class ReportService
             "COALESCE(NULLIF(tipo_falta, ''), 'Sin tipo de falta')",
             'tipo_falta'
         );
+        $modalidadCargoExpr = $filtered->getConnection()->getDriverName() === 'sqlite'
+            ? "CASE WHEN NULLIF(modalidad, '') IS NOT NULL AND NULLIF(cargo, '') IS NOT NULL THEN modalidad || ' - ' || cargo ELSE COALESCE(NULLIF(modalidad, ''), NULLIF(cargo, ''), 'Sin modalidad / cargo') END"
+            : "COALESCE(NULLIF(CONCAT_WS(' - ', NULLIF(modalidad, ''), NULLIF(cargo, '')), ''), 'Sin modalidad / cargo')";
 
         $total = array_sum($states);
         $pendientes = (int) ($states['Pendiente'] ?? 0);
@@ -122,12 +160,13 @@ class ReportService
             'to' => $to,
             'total' => $total,
             'states' => $states,
+            'daily' => $daily,
             'monthly' => $monthly,
             'weekly' => $weekly,
             'pending_faults' => $faults,
             'by_modalidad' => $this->groupedCounts(
                 $filtered,
-                "COALESCE(CONCAT_WS(' - ', NULLIF(modalidad, ''), NULLIF(cargo, '')), 'Sin modalidad / cargo')",
+                $modalidadCargoExpr,
                 'modalidad_cargo'
             ),
             'by_ruta' => $this->groupedCounts(
@@ -277,25 +316,53 @@ class ReportService
 
     public function globalPdf(array $data)
     {
-        return Pdf::loadView('reports.global-pdf', ['data' => $data])
-            ->setPaper('a4')
-            ->download('informe-disciplinario-cootranshuila.pdf');
+        $assets = $this->createChartAssets($data);
+        try {
+            $data['charts'] = array_map(function (array $asset) {
+                return [
+                    'title' => $asset['title'],
+                    'src' => 'data:image/png;base64,' . base64_encode($asset['contents']),
+                ];
+            }, $assets);
+
+            return Pdf::loadView('reports.global-pdf', ['data' => $data])
+                ->setPaper('a4')
+                ->download('informe-disciplinario-cootranshuila.pdf');
+        } finally {
+            $this->deleteChartAssets($assets);
+        }
     }
 
     public function globalWord(array $data)
     {
-        return $this->downloadWordDocument(
-            $this->buildWordFromLayout($this->globalLayout($data), false),
-            'informe-disciplinario-cootranshuila.docx'
-        );
+        $assets = $this->createChartAssets($data);
+        try {
+            $layout = $this->globalLayout($data);
+            $layout['chart_assets'] = $assets;
+
+            return $this->downloadWordDocument(
+                $this->buildWordFromLayout($layout, false),
+                'informe-disciplinario-cootranshuila.docx'
+            );
+        } finally {
+            $this->deleteChartAssets($assets);
+        }
     }
 
     public function globalExcel(array $data)
     {
-        return $this->downloadSpreadsheet(
-            $this->buildExcelFromLayout($this->globalLayout($data), false),
-            'informe-disciplinario-cootranshuila.xlsx'
-        );
+        $assets = $this->createChartAssets($data);
+        try {
+            $layout = $this->globalLayout($data);
+            $layout['chart_assets'] = $assets;
+
+            return $this->downloadSpreadsheet(
+                $this->buildExcelFromLayout($layout, false),
+                'informe-disciplinario-cootranshuila.xlsx'
+            );
+        } finally {
+            $this->deleteChartAssets($assets);
+        }
     }
 
     public function casesPdf($cases)
@@ -325,6 +392,294 @@ class ReportService
             $this->buildExcelFromLayout($this->casesLayout($cases), true),
             'expedientes-disciplinarios-cootranshuila.xlsx'
         );
+    }
+
+    private function createChartAssets(array $data): array
+    {
+        if (!function_exists('imagecreatetruecolor')) {
+            throw new \RuntimeException('La extensión GD de PHP es necesaria para incluir los gráficos en los informes.');
+        }
+
+        $specs = $this->reportChartSpecs($data);
+        $assets = [];
+        try {
+            foreach ($specs as $spec) {
+                $contents = $this->renderChartPng($spec);
+                $temporaryPath = tempnam(storage_path('app'), 'sipd-chart-');
+                if ($temporaryPath === false) {
+                    throw new \RuntimeException('No se pudo preparar una gráfica para el informe.');
+                }
+                $path = $temporaryPath . '.png';
+                if (!rename($temporaryPath, $path)) {
+                    if (is_file($temporaryPath)) {
+                        unlink($temporaryPath);
+                    }
+                    throw new \RuntimeException('No se pudo preparar una gráfica para el informe.');
+                }
+                if (file_put_contents($path, $contents) === false) {
+                    if (is_file($path)) {
+                        unlink($path);
+                    }
+                    throw new \RuntimeException('No se pudo preparar una gráfica para el informe.');
+                }
+                $assets[] = [
+                    'title' => $spec['title'],
+                    'path' => $path,
+                    'contents' => $contents,
+                ];
+            }
+        } catch (\Throwable $exception) {
+            $this->deleteChartAssets($assets);
+            throw $exception;
+        }
+
+        return $assets;
+    }
+
+    private function deleteChartAssets(array $assets): void
+    {
+        foreach ($assets as $asset) {
+            if (!empty($asset['path']) && is_file($asset['path'])) {
+                unlink($asset['path']);
+            }
+        }
+    }
+
+    private function reportChartSpecs(array $data): array
+    {
+        $daily = $data['daily'] ?? [];
+        $monthly = $data['monthly'] ?? [];
+        $weekly = $data['weekly'] ?? [];
+        $states = $data['states'] ?? [];
+        $dailyLabels = [];
+        foreach ($daily as $day) {
+            $dailyLabels[] = !empty($day['period'])
+                ? Carbon::createFromFormat('Y-m-d', $day['period'])->locale('es')->isoFormat('DD MMM')
+                : '';
+        }
+        $monthlyLabels = [];
+        foreach ($monthly as $month) {
+            $monthlyLabels[] = !empty($month['period'])
+                ? Carbon::createFromFormat('Y-m', $month['period'])->locale('es')->isoFormat('MMM YY')
+                : '';
+        }
+        $weeklyLabels = [];
+        foreach ($weekly as $week) {
+            $period = (string) ($week['period'] ?? '');
+            if (preg_match('/^(\d{4})-W?(\d{1,2})$/', $period, $matches)) {
+                $weeklyLabels[] = 'Sem ' . (int) $matches[2] . ' - ' . $matches[1];
+            } else {
+                $weeklyLabels[] = $period;
+            }
+        }
+
+        return [
+            [
+                'title' => 'Casos diarios',
+                'kind' => 'line',
+                'labels' => $dailyLabels,
+                'values' => array_map(function ($day) {
+                    return (int) ($day['total'] ?? 0);
+                }, $daily),
+                'color' => [8, 145, 178],
+            ],
+            [
+                'title' => 'Casos semanales',
+                'kind' => 'line',
+                'labels' => $weeklyLabels,
+                'values' => array_map(function ($week) {
+                    return (int) ($week['total'] ?? 0);
+                }, $weekly),
+                'color' => [37, 99, 235],
+            ],
+            [
+                'title' => 'Casos por mes',
+                'kind' => 'line',
+                'labels' => $monthlyLabels,
+                'values' => array_map(function ($month) {
+                    return (int) ($month['total'] ?? array_sum($month['states'] ?? []));
+                }, $monthly),
+                'color' => [22, 163, 74],
+            ],
+            [
+                'title' => 'Estado global',
+                'kind' => 'doughnut',
+                'labels' => array_keys($states),
+                'values' => array_map('intval', array_values($states)),
+                'color' => [245, 158, 11],
+                'colors' => [[245, 158, 11], [37, 99, 235], [220, 38, 38], [100, 116, 139]],
+            ],
+            [
+                'title' => 'Modalidad y cargo',
+                'kind' => 'bar',
+                'labels' => array_column(array_slice($data['by_modalidad'] ?? [], 0, 8), 'label'),
+                'values' => array_map('intval', array_column(array_slice($data['by_modalidad'] ?? [], 0, 8), 'total')),
+                'color' => [37, 99, 235],
+            ],
+            [
+                'title' => 'Tipos de falta',
+                'kind' => 'bar',
+                'labels' => array_column(array_slice($data['pending_faults'] ?? [], 0, 8), 'label'),
+                'values' => array_map('intval', array_column(array_slice($data['pending_faults'] ?? [], 0, 8), 'total')),
+                'color' => [245, 158, 11],
+            ],
+        ];
+    }
+
+    private function renderChartPng(array $spec): string
+    {
+        $width = 960;
+        $height = 480;
+        $image = imagecreatetruecolor($width, $height);
+        if (!$image) {
+            throw new \RuntimeException('No se pudo crear una imagen para las gráficas del informe.');
+        }
+
+        $white = imagecolorallocate($image, 255, 255, 255);
+        $ink = imagecolorallocate($image, 15, 23, 42);
+        $muted = imagecolorallocate($image, 100, 116, 139);
+        $grid = imagecolorallocate($image, 226, 232, 240);
+        $color = imagecolorallocate($image, $spec['color'][0], $spec['color'][1], $spec['color'][2]);
+        imagefilledrectangle($image, 0, 0, $width, $height, $white);
+        if ($spec['kind'] === 'line') {
+            $this->drawLineChart($image, $spec, $ink, $muted, $grid, $color);
+        } elseif ($spec['kind'] === 'doughnut') {
+            $this->drawDoughnutChart($image, $spec, $ink, $muted);
+        } else {
+            $this->drawBarChart($image, $spec, $ink, $muted, $grid, $color);
+        }
+
+        ob_start();
+        imagepng($image);
+        $contents = ob_get_clean();
+        imagedestroy($image);
+        if (!is_string($contents) || $contents === '') {
+            throw new \RuntimeException('No se pudo codificar una gráfica del informe.');
+        }
+
+        return $contents;
+    }
+
+    private function drawLineChart($image, array $spec, int $ink, int $muted, int $grid, int $color): void
+    {
+        $left = 86;
+        $top = 90;
+        $plotWidth = 820;
+        $plotHeight = 300;
+        $values = $spec['values'];
+        $max = max(1, $values ? max($values) : 0);
+        $pointCenter = imagecolorallocate($image, 255, 255, 255);
+        $steps = 4;
+        for ($step = 0; $step <= $steps; $step++) {
+            $y = $top + (int) round($plotHeight * $step / $steps);
+            imageline($image, $left, $y, $left + $plotWidth, $y, $grid);
+            $value = (int) round($max * ($steps - $step) / $steps);
+            imagestring($image, 2, 42, $y - 7, (string) $value, $muted);
+        }
+
+        if (!$values) {
+            imagestring($image, 4, 370, 235, 'Sin datos para el periodo', $muted);
+            return;
+        }
+
+        $points = [];
+        $count = count($values);
+        foreach ($values as $index => $value) {
+            $x = $count === 1 ? $left + (int) ($plotWidth / 2) : $left + (int) round($plotWidth * $index / ($count - 1));
+            $y = $top + $plotHeight - (int) round($plotHeight * max(0, (int) $value) / $max);
+            $points[] = [$x, $y];
+        }
+        for ($index = 1; $index < count($points); $index++) {
+            imagesetthickness($image, 4);
+            imageline($image, $points[$index - 1][0], $points[$index - 1][1], $points[$index][0], $points[$index][1], $color);
+            imagesetthickness($image, 1);
+        }
+        foreach ($points as $index => $point) {
+            imagefilledellipse($image, $point[0], $point[1], 12, 12, $color);
+            imagefilledellipse($image, $point[0], $point[1], 5, 5, $pointCenter);
+            $labelEvery = max(1, (int) ceil($count / 10));
+            if ($index % $labelEvery === 0 || $index === $count - 1) {
+                $label = $this->chartText((string) ($spec['labels'][$index] ?? ''));
+                imagestring($image, 2, max($left, min($point[0] - 24, $left + $plotWidth - 54)), $top + $plotHeight + 14, substr($label, 0, 16), $muted);
+            }
+        }
+    }
+
+    private function drawBarChart($image, array $spec, int $ink, int $muted, int $grid, int $color): void
+    {
+        $labels = $spec['labels'];
+        $values = $spec['values'];
+        if (!$values) {
+            imagestring($image, 4, 370, 235, 'Sin datos para el periodo', $muted);
+            return;
+        }
+        $left = 360;
+        $top = 86;
+        $plotWidth = 520;
+        $max = max(1, max($values));
+        $rowHeight = min(42, (int) floor(350 / count($values)));
+        $barHeight = max(12, min(24, $rowHeight - 8));
+        foreach ($values as $index => $value) {
+            $y = $top + $index * $rowHeight;
+            $label = $this->chartText((string) ($labels[$index] ?? ''));
+            imagestring($image, 3, 36, $y + 2, substr($label, 0, 44), $ink);
+            imageline($image, $left, $y + $rowHeight - 4, $left + $plotWidth, $y + $rowHeight - 4, $grid);
+            $barWidth = (int) round($plotWidth * max(0, (int) $value) / $max);
+            if ($barWidth > 0) {
+                imagefilledrectangle($image, $left, $y + 5, $left + $barWidth, $y + 5 + $barHeight, $color);
+            }
+            imagestring($image, 3, min($left + $plotWidth + 8, $left + $barWidth + 10), $y + 9, (string) $value, $ink);
+        }
+    }
+
+    private function drawDoughnutChart($image, array $spec, int $ink, int $muted): void
+    {
+        $labels = $spec['labels'];
+        $values = $spec['values'];
+        $total = array_sum($values);
+        if ($total <= 0) {
+            imagestring($image, 4, 370, 235, 'Sin casos registrados', $muted);
+            return;
+        }
+
+        $colors = $spec['colors'] ?? [];
+        $start = 270;
+        $centerX = 330;
+        $centerY = 255;
+        $diameter = 310;
+        foreach ($values as $index => $value) {
+            if ($value <= 0) {
+                continue;
+            }
+            $angle = (int) round(360 * $value / $total);
+            $rgb = $colors[$index] ?? [100, 116, 139];
+            $slice = imagecolorallocate($image, $rgb[0], $rgb[1], $rgb[2]);
+            imagefilledarc($image, $centerX, $centerY, $diameter, $diameter, $start, $start + $angle, $slice, IMG_ARC_PIE);
+            $start += $angle;
+        }
+        imagefilledellipse($image, $centerX, $centerY, 172, 172, imagecolorallocate($image, 255, 255, 255));
+        imagestring($image, 5, $centerX - 30, $centerY - 10, (string) $total, $ink);
+        imagestring($image, 2, $centerX - 25, $centerY + 12, 'CASOS', $muted);
+
+        $y = 145;
+        foreach ($values as $index => $value) {
+            if ($value <= 0) {
+                continue;
+            }
+            $rgb = $colors[$index] ?? [100, 116, 139];
+            $slice = imagecolorallocate($image, $rgb[0], $rgb[1], $rgb[2]);
+            imagefilledrectangle($image, 600, $y, 618, $y + 17, $slice);
+            $label = $this->chartText((string) ($labels[$index] ?? ''));
+            $percent = number_format($value * 100 / $total, 1, ',', '.');
+            imagestring($image, 3, 630, $y + 2, substr($label, 0, 24) . '  ' . $value . ' (' . $percent . '%)', $ink);
+            $y += 42;
+        }
+    }
+
+    private function chartText(string $text): string
+    {
+        $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+        return $converted === false ? $text : $converted;
     }
 
     private function globalLayout(array $data): array
@@ -596,6 +951,32 @@ class ReportService
             $section->addTextBreak(1);
         }
 
+        if (!empty($layout['chart_assets'])) {
+            $section->addText('Visualizaciones del período', ['bold' => true, 'size' => 12, 'color' => '006837']);
+            foreach (array_chunk($layout['chart_assets'], 2) as $chartRow) {
+                $chartTable = $section->addTable([
+                    'borderSize' => 0,
+                    'cellMargin' => 60,
+                    'width' => 5000,
+                    'unit' => 'pct',
+                ]);
+                $chartTable->addRow();
+                foreach ($chartRow as $asset) {
+                    $cell = $chartTable->addCell(2500, ['valign' => 'center']);
+                    $cell->addText($asset['title'], ['bold' => true, 'size' => 8, 'color' => '14532D'], ['alignment' => Jc::CENTER]);
+                    $cell->addImage($asset['path'], [
+                        'width' => 250,
+                        'height' => 125,
+                        'alignment' => Jc::CENTER,
+                    ]);
+                }
+                if (count($chartRow) === 1) {
+                    $chartTable->addCell(2500);
+                }
+            }
+            $section->addTextBreak(1);
+        }
+
         foreach ($layout['blocks'] as $block) {
             if (!empty($block['title'])) {
                 $section->addText($block['title'], ['bold' => true, 'size' => 11, 'color' => '006837']);
@@ -740,6 +1121,44 @@ class ReportService
             $sheet->mergeCells('A' . $row . ':F' . $row);
             $sheet->setCellValue('A' . $row, $layout['footer']);
             $sheet->getStyle('A' . $row)->getFont()->setSize(8)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('64748B'));
+        }
+
+        if (!empty($layout['chart_assets'])) {
+            $chartSheet = $spreadsheet->createSheet();
+            $chartSheet->setTitle('Gráficas');
+            $chartSheet->mergeCells('A1:R1');
+            $chartSheet->setCellValue('A1', 'Visualizaciones del informe');
+            $this->styleExcelHeader($chartSheet, 'A1:R1');
+            $chartSheet->getStyle('A1')->getFont()->setSize(15);
+            $chartSheet->setShowGridlines(false);
+            foreach (range('A', 'R') as $column) {
+                $chartSheet->getColumnDimension($column)->setWidth(12);
+            }
+            $positions = [
+                [['A2', 'J2'], ['A3', 'J3']],
+                [['A17', 'J17'], ['A18', 'J18']],
+                [['A32', 'J32'], ['A33', 'J33']],
+            ];
+            foreach ($layout['chart_assets'] as $index => $asset) {
+                $row = intdiv($index, 2);
+                $column = $index % 2;
+                $titleCell = $positions[$row][0][$column];
+                $titleColumn = preg_replace('/\d+$/', '', $titleCell);
+                $titleRow = preg_replace('/^\D+/', '', $titleCell);
+                $endColumn = $column === 0 ? 'I' : 'R';
+                $chartSheet->mergeCells($titleColumn . $titleRow . ':' . $endColumn . $titleRow);
+                $chartSheet->setCellValue($titleCell, $asset['title']);
+                $chartSheet->getStyle($titleCell)->getFont()->setBold(true)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('14532D'));
+
+                $drawing = new Drawing();
+                $drawing->setPath($asset['path']);
+                $drawing->setName($asset['title']);
+                $drawing->setDescription($asset['title']);
+                $drawing->setHeight(210);
+                $drawing->setCoordinates($positions[$row][1][$column]);
+                $drawing->setWorksheet($chartSheet);
+            }
+            $spreadsheet->setActiveSheetIndex(0);
         }
 
         $this->autosize($sheet, 'M');

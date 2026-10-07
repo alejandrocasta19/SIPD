@@ -464,7 +464,7 @@ label.sub-tab-btn .mod-radio {
             </div>
             @php
                 $placaAplica = \App\Support\Modalidades::usaPlaca($modalidadSeleccionada);
-                $cargoAplica = \App\Support\Modalidades::pideCargo($modalidadSeleccionada);
+                $cargoAplica = in_array($modalidadSeleccionada, \App\Support\Modalidades::opcionesConCampoCargo(), true);
             @endphp
             <div class="f-grid-2">
                 <div class="field-block" style="margin-bottom:0;">
@@ -558,14 +558,19 @@ label.sub-tab-btn .mod-radio {
                     </div>
                 </div>
                 <div class="doc-actions-btns">
-                    <label class="btn-toolbar btn-firma">
-                        <i class="fas fa-signature"></i> Subir firma
-                        <input type="file" id="firma-registro" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
+                    <label id="firma-cuenta-control" class="btn-toolbar btn-firma">
+                        <i class="fas fa-signature"></i> <span id="firma-cuenta-label">Subir mi firma</span>
+                        <input type="file" name="firma_cuenta" id="firma-registro" accept="image/png, image/jpeg" style="display:none;" onchange="mostrarFirmaSeleccionada(this, 'firma-cuenta-label')">
+                    </label>
+                    <label id="firma-trabajador-control" class="btn-toolbar btn-firma">
+                        <i class="fas fa-signature"></i> <span id="firma-trabajador-label">Firma del trabajador</span>
+                        <input type="file" name="firma_trabajador" id="firma-trabajador-registro" accept="image/png, image/jpeg" style="display:none;" onchange="mostrarFirmaSeleccionada(this, 'firma-trabajador-label')">
                     </label>
                     <button type="submit" class="btn-toolbar btn-registrar">
                         <i class="fas fa-save"></i> Registrar proceso
                     </button>
                 </div>
+                <div id="firma-politica-nota" style="display:none;width:100%;font-size:12px;color:#475569;"></div>
             </div>
         </div>
     </div>
@@ -578,6 +583,7 @@ label.sub-tab-btn .mod-radio {
 var SLOT_VARIANTES = @json(\App\Models\CasoDocumentoEstado::SLOTS);
 var SLOT_ETIQUETAS = @json(\App\Models\CasoDocumentoEstado::ETIQUETAS);
 var PLANTILLA_URL = @json(route('abogado.registro.plantilla'));
+var USER_IS_COORDINATOR = @json(auth()->user()->esCoordinadora());
 var TIPO_SERVIDOR = @json($tipoInicial);
 var hadValidationError = @json($errors->any());
 var currentSlot = @json($slotInicial);
@@ -585,7 +591,7 @@ var currentTipo = @json($tipoInicial);
 var etapaAbierta = false;
 var plantillaCache = {};
 var MODALIDADES_PLACA = @json(\App\Support\Modalidades::conPlaca());
-var AREAS_ADMIN = @json(\App\Support\Modalidades::areasAdministrativas());
+var MODALIDADES_CAMPO_CARGO = @json(\App\Support\Modalidades::opcionesConCampoCargo());
 var DRAFT_KEY = 'sipd_nuevo_proceso';
 var persistTimer;
 
@@ -677,7 +683,7 @@ function syncModalidadVista() {
 
 function syncCargoVista() {
     var actual = modalidadActual();
-    var aplica = actual !== '' && AREAS_ADMIN.indexOf(actual) === -1;
+    var aplica = MODALIDADES_CAMPO_CARGO.indexOf(actual) !== -1;
     var box = document.getElementById('cargo-field');
     var input = document.getElementById('inp-cargo');
     if (box) box.hidden = !aplica;
@@ -840,8 +846,8 @@ function hydratePlantilla(tipo) {
 function syncDocHeader() {
     var map = {
         nombre: ((document.getElementById('inp-nombre') || {}).value || '').trim(),
+        cargo: ((document.getElementById('inp-cargo') || {}).value || '').trim(),
         cedula: ((document.getElementById('inp-cedula') || {}).value || '').trim()
-        // 'cargo' se omite: el documento ya tiene el cargo de la cuenta (firmante) inyectado desde el servidor
     };
     document.querySelectorAll('#doc-html-host [data-header]').forEach(function(el) {
         var key = el.getAttribute('data-header');
@@ -920,6 +926,33 @@ function syncTipoHidden(tipo) {
     document.getElementById('tipo_proceso').value = tipo;
     var hint = document.getElementById('terminacion-hint');
     if (hint) hint.style.display = tipo === 'terminacion' ? 'flex' : 'none';
+    var cuentaControl = document.getElementById('firma-cuenta-control');
+    var trabajadorControl = document.getElementById('firma-trabajador-control');
+    var cuentaInput = document.getElementById('firma-registro');
+    var trabajadorInput = document.getElementById('firma-trabajador-registro');
+    var firmaCoordinadora = ['sancion', 'llamado', 'archivo'].indexOf(tipo) !== -1;
+    var permiteCuenta = ['comprobacion', 'disciplinario', 'acta'].indexOf(tipo) !== -1
+        || (firmaCoordinadora && USER_IS_COORDINATOR);
+    cuentaControl.style.display = permiteCuenta ? 'inline-flex' : 'none';
+    trabajadorControl.style.display = tipo === 'acta' ? 'inline-flex' : 'none';
+    cuentaInput.disabled = !permiteCuenta;
+    trabajadorInput.disabled = tipo !== 'acta';
+    document.getElementById('firma-cuenta-label').textContent = firmaCoordinadora
+        ? 'Firma de la coordinadora'
+        : 'Subir mi firma (RH)';
+    var notaFirma = document.getElementById('firma-politica-nota');
+    if (tipo === 'terminacion') {
+        notaFirma.textContent = 'La terminación no admite firma virtual: imprímela para firma del gerente y sube el escaneo en Anexos.';
+        notaFirma.style.display = 'block';
+    } else if (firmaCoordinadora) {
+        notaFirma.textContent = USER_IS_COORDINATOR
+            ? 'Solo la coordinadora puede cargar y aplicar su firma virtual en este formato.'
+            : 'La firma virtual de este formato solo puede cargarla y aplicarla la coordinadora.';
+        notaFirma.style.display = 'block';
+    } else {
+        notaFirma.textContent = '';
+        notaFirma.style.display = 'none';
+    }
 }
 
 function loadPlantilla(tipo, slot) {
@@ -1119,15 +1152,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-function previewFirma(input) {
+function mostrarFirmaSeleccionada(input, labelId) {
     if (input.files && input.files[0]) {
-        var reader = new FileReader();
-        reader.onload = function(e) {
-            document.querySelectorAll('#doc-html-host .sig-zone').forEach(function(z) {
-                z.innerHTML = '<img src="' + e.target.result + '" style="max-height:80px; display:block; margin:0 auto; margin-bottom: 5px;">';
-            });
-        };
-        reader.readAsDataURL(input.files[0]);
+        var label = document.getElementById(labelId);
+        label.textContent = input.files[0].name;
     }
 }
 </script>

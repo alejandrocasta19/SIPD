@@ -51,8 +51,9 @@
         $bandejaCount = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count();
         $alertasSistema = \App\Support\AlertasSistema::visibles($me);
         $notifSolicitudes = $isManager
-            ? \App\Models\Aviso::where('user_id', $me->id)->where('tipo', 'solicitud')->whereNull('leida_at')->count()
+            ? \App\Models\PermisoSolicitud::where('estado', \App\Models\PermisoSolicitud::PENDIENTE)->count()
             : 0;
+        $unreadMsgs = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count();
         $notifTotal = $bandejaCount + count($alertasSistema);
         $solicitablesPermiso = \App\Support\RhPermisos::solicitables();
         $duracionesHoras = \App\Support\RhPermisos::duracionesHoras();
@@ -88,7 +89,7 @@
                         <a href="{{ route('coordinadora.solicitudes') }}" class="{{ request()->routeIs('coordinadora.solicitudes') ? 'active' : '' }}">
                             <i class="fas fa-key"></i> Solicitudes
                             @if($notifSolicitudes > 0)
-                                <span class="sipd-nav-count">{{ $notifSolicitudes }}</span>
+                                <span id="sidebar-solicitudes-count" class="sipd-nav-count">{{ $notifSolicitudes }}</span>
                             @endif
                         </a>
                         <a href="{{ route('coordinadora.abogados') }}" class="{{ request()->routeIs('coordinadora.abogados') ? 'active' : '' }}">
@@ -96,9 +97,8 @@
                         </a>
                         <a href="{{ route('notificaciones.index') }}" class="{{ request()->routeIs('notificaciones.*') ? 'active' : '' }}">
                             <i class="far fa-comments"></i> Bandeja de mensajes
-                            @php $unreadMsgs = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count(); @endphp
-                            @if($unreadMsgs > 0)
-                                <span class="sipd-nav-count">{{ $unreadMsgs }}</span>
+                            @if($notifTotal > 0)
+                                <span class="sipd-nav-count">{{ $notifTotal }}</span>
                             @endif
                         </a>
                     @else
@@ -141,9 +141,8 @@
                     @if(!$me->esCoordinadora())
                     <a href="{{ route('notificaciones.index') }}" class="{{ request()->routeIs('notificaciones.*') ? 'active' : '' }}">
                         <i class="far fa-comments"></i> Bandeja de mensajes
-                        @php $unreadMsgs = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count(); @endphp
-                        @if($unreadMsgs > 0)
-                            <span class="sipd-nav-count">{{ $unreadMsgs }}</span>
+                        @if($notifTotal > 0)
+                            <span class="sipd-nav-count">{{ $notifTotal }}</span>
                         @endif
                     </a>
                     @endif

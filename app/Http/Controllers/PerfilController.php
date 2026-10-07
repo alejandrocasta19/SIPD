@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Support\Formatos;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class PerfilController extends Controller
 {

@@ -133,6 +133,7 @@ class ModalidadTest extends TestCase
             ->post(route('abogado.registro.store'), [
                 'tipo_proceso' => 'disciplinario',
                 'nombre' => 'Conductor Demo',
+                'cedula' => '1075000001',
                 'modalidad' => 'Recursos humanos',
             ])
             ->assertRedirect();
@@ -149,6 +150,7 @@ class ModalidadTest extends TestCase
             ->post(route('abogado.registro.store'), [
                 'tipo_proceso' => 'disciplinario',
                 'nombre' => 'Caso Terminal',
+                'cedula' => '1075000002',
                 'modalidad' => 'Terminal',
                 'placa' => 'GRK206',
                 'cargo' => 'Conductor',
@@ -158,8 +160,6 @@ class ModalidadTest extends TestCase
         $this->assertDatabaseHas('disciplinario', [
             'nombre' => 'Caso Terminal',
             'modalidad' => 'Terminal',
-            'placa' => 'GRK206',
-            'cargo' => 'Conductor',
             'placa' => 'GRK-206',
             'cargo' => 'Conductor',
         ]);
@@ -272,8 +272,8 @@ class ModalidadTest extends TestCase
         $this->assertTrue(Modalidades::usaPlaca('Doble Yo'));
         $this->assertFalse(Modalidades::usaPlaca('Administrativos'));
         $this->assertFalse(Modalidades::usaPlaca('Recursos humanos'));
-        $this->assertSame('N/A', Modalidades::textoPlaca('Administrativos', 'ABC123'));
-        $this->assertSame('N/A', Modalidades::textoPlaca('Estación toma', 'GRK206'));
+        $this->assertSame('No aplica', Modalidades::textoPlaca('Administrativos', 'ABC123'));
+        $this->assertSame('No aplica', Modalidades::textoPlaca('Estación toma', 'GRK206'));
 
         $kelly = $this->makeUser('equipo', 'Asesora jurídica');
 
@@ -323,3 +323,7 @@ class ModalidadTest extends TestCase
             'nombre' => 'Conductor Toma',
             'modalidad' => 'Estación toma',
             'placa' => null,
+            'cargo' => 'Conductor',
+        ]);
+    }
+}

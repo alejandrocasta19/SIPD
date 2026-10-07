@@ -128,6 +128,14 @@ class Modalidades
         return self::CON_PLACA;
     }
 
+    public static function opcionesConCampoCargo(): array
+    {
+        return array_values(array_diff(
+            array_merge(self::todas(), self::ESTACIONES, ['Administrativos', 'Estaciones']),
+            self::AREAS_ADMINISTRATIVAS
+        ));
+    }
+
     public static function usaPlaca(?string $nombre): bool
     {
         return in_array(trim((string) $nombre), self::CON_PLACA, true);

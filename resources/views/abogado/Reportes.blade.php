@@ -26,14 +26,13 @@
     .kpi-card strong { font-size:22px; font-weight:800; color:#0f172a; display:block; margin-top:2px; line-height:1; }
 
     /* ── CHARTS ──────────────────────────────────── */
-    .charts-wrap { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3, minmax(0,1fr)); gap:10px; margin-bottom:16px; }
-    .ch-card     { background:#fff; border: 1px solid var(--cth-border); border-radius:10px; padding:12px 14px; min-width:0; display:flex; flex-direction:column; }
-    .ch-card h3  { margin:0 0 1px; font-size:12px; font-weight:700; color:#0f172a; }
-    .ch-card p   { color:#64748b; font-size:10px; margin:0 0 8px; }
-    .ch-wrap     { position:relative; height:160px; flex:0 0 160px; }
-    .ch-wrap.ch-rank { display:flex; flex-direction:column; overflow:hidden; }
-    .ch-empty    { display:none; color:#94a3b8; text-align:center; padding:40px 8px; font-size:12px; }
-    .top-more    { border:1px solid #dbeafe; background:#f8fafc; color:#1d4ed8; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer; display:none; width:100%; margin-top:auto; justify-content:center; flex-shrink:0; }
+    .charts-wrap { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-bottom:20px; }
+    .ch-card     { background:linear-gradient(180deg,#fff 0%,#fbfdff 100%); border:1px solid #dbe3ed; border-radius:14px; padding:13px 15px; min-width:0; min-height:245px; display:flex; flex-direction:column; box-shadow:0 4px 14px rgba(15,23,42,.045); }
+    .ch-card h3  { margin:0 0 3px; font-size:14px; font-weight:800; color:#0f172a; }
+    .ch-card p   { color:#64748b; font-size:11px; margin:0 0 12px; }
+    .ch-wrap     { position:relative; height:170px; flex:0 0 170px; min-height:0; }
+    .ch-empty    { display:none; color:#94a3b8; text-align:center; padding:48px 8px; font-size:12px; }
+    .top-more    { border:1px solid #dbeafe; background:#f8fafc; color:#1d4ed8; border-radius:8px; padding:7px 10px; font-size:11px; font-weight:700; cursor:pointer; display:none; width:100%; margin-top:9px; justify-content:center; flex-shrink:0; }
     .top-more:hover { background:#eff6ff; }
     .top-list    { list-style:none; margin:0; padding:0; flex:1; min-height:0; overflow:hidden; }
     .top-list li { padding:4px 0; border-bottom: 1px solid var(--cth-line); }
@@ -90,14 +89,14 @@
     .sb.archivado  { background:#f1f5f9; color:#334155; border-color:#e2e8f0; }
 
     @media (max-width:1200px) {
-        .charts-wrap { grid-template-columns:1fr 1fr; }
-        .charts-wrap .ch-card:first-child { grid-column: 1 / -1; }
+        .charts-wrap { grid-template-columns:1fr 1fr; gap:12px; }
         .hist-kpis { grid-template-columns:repeat(3, minmax(0,1fr)); }
     }
     @media (max-width:900px) {
         .kpi-row { grid-template-columns:repeat(2, minmax(0,1fr)); }
         .charts-wrap { grid-template-columns:1fr; }
-        .charts-wrap .ch-card:first-child { grid-column: auto; }
+        .ch-card { min-height:235px; }
+        .ch-wrap { height:165px; flex-basis:165px; }
         .hist-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
     }
     @media (max-width:560px) {
@@ -160,28 +159,10 @@
 {{-- CHARTS --}}
 <div class="charts-wrap">
     <div class="ch-card">
-        <h3>Casos por mes</h3><p>Volumen registrado en el período.</p>
-        <div class="ch-wrap" id="monthly-wrap">
-            <canvas id="monthly-chart"></canvas>
-            <div class="ch-empty">Sin datos para el período.</div>
-        </div>
-    </div>
-    <div class="ch-card">
-        <h3>Modalidad y cargo</h3>
-        <p>Top 3 modalidades con más procesos.</p>
-        <div class="ch-wrap ch-rank" id="cargo-wrap">
-            <ol class="top-list" id="cargo-list"></ol>
-            <button type="button" class="top-more" id="cargo-more">Ampliar vista</button>
-            <div class="ch-empty">Sin cargos registrados.</div>
-        </div>
-    </div>
-    <div class="ch-card">
-        <h3>Tipo de falta</h3>
-        <p>Top 3 faltas con más casos.</p>
-        <div class="ch-wrap ch-rank" id="fault-wrap">
-            <ol class="top-list" id="fault-list"></ol>
-            <button type="button" class="top-more" id="fault-more">Ampliar vista</button>
-            <div class="ch-empty">Sin faltas.</div>
+        <h3>Casos diarios</h3><p>Registros por día en el período.</p>
+        <div class="ch-wrap" id="daily-wrap">
+            <canvas id="daily-chart"></canvas>
+            <div class="ch-empty">Sin datos diarios.</div>
         </div>
     </div>
     <div class="ch-card">
@@ -192,11 +173,35 @@
         </div>
     </div>
     <div class="ch-card">
+        <h3>Casos por mes</h3><p>Volumen registrado en cada mes.</p>
+        <div class="ch-wrap" id="monthly-wrap">
+            <canvas id="monthly-chart"></canvas>
+            <div class="ch-empty">Sin datos mensuales.</div>
+        </div>
+    </div>
+    <div class="ch-card">
         <h3>Estado Global</h3><p>Proporción de procesos por su estatus actual.</p>
         <div class="ch-wrap" id="status-wrap">
             <canvas id="status-chart"></canvas>
             <div class="ch-empty">Sin casos registrados.</div>
         </div>
+    </div>
+
+    <div class="ch-card">
+        <h3>Modalidad y cargo</h3><p>Distribución de los principales cargos por número de procesos.</p>
+        <div class="ch-wrap" id="cargo-wrap">
+            <canvas id="cargo-chart"></canvas>
+            <div class="ch-empty">Sin cargos registrados.</div>
+        </div>
+        <button type="button" class="top-more" id="cargo-more">Ampliar vista</button>
+    </div>
+    <div class="ch-card">
+        <h3>Tipo de falta</h3><p>Faltas con más procesos dentro del período seleccionado.</p>
+        <div class="ch-wrap" id="fault-wrap">
+            <canvas id="fault-chart"></canvas>
+            <div class="ch-empty">Sin faltas.</div>
+        </div>
+        <button type="button" class="top-more" id="fault-more">Ampliar vista</button>
     </div>
 </div>
 
@@ -419,11 +424,54 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderTopList(listId, emptyWrapId, btnId, items, color, modalTitle, modalSub) {
-        var list = document.getElementById(listId);
+        var chartId = listId.replace('-list', '-chart');
+        var canvas = document.getElementById(chartId);
         var btn = document.getElementById(btnId);
         var all = items || [];
-        list.innerHTML = rankItemsHtml(all.slice(0, 3), color);
-        list.style.display = all.length ? 'block' : 'none';
+        if (charts[chartId]) charts[chartId].destroy();
+        var chartItems = all.slice(0, 8);
+        if (chartItems.length) {
+            charts[chartId] = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: chartItems.map(function (item) { return item.label; }),
+                    datasets: [{
+                        label: 'Casos',
+                        data: chartItems.map(function (item) { return item.total; }),
+                        backgroundColor: color,
+                        borderRadius: 6,
+                        maxBarThickness: 22
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: function (ctx) { return ' ' + ctx.raw + ' caso(s)'; } } }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148,163,184,.18)' },
+                            ticks: { precision: 0, font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                autoSkip: false,
+                                font: { size: 10 },
+                                callback: function (value) {
+                                    var label = String(this.getLabelForValue(value));
+                                    return label.length > 28 ? label.slice(0, 25) + '…' : label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
         showEmpty(emptyWrapId, !all.length);
         if (!btn) return;
         btn.style.display = all.length ? 'inline-flex' : 'none';
@@ -443,7 +491,71 @@ document.addEventListener('DOMContentLoaded', function () {
     pop.addEventListener('click', function (e) { if (e.target === pop) closeRankPop(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRankPop(); });
 
+    function ownerColor(index) {
+        var palette = ['#006837', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#4d7c0f'];
+        return palette[index % palette.length];
+    }
+
+    function ownerTimeSeries(owners, key, periods) {
+        return owners.map(function (owner, index) {
+            var totals = {};
+            (owner[key] || []).forEach(function (point) { totals[point.period] = point.total; });
+            return {
+                label: owner.name,
+                data: periods.map(function (period) { return totals[period] || 0; }),
+                borderColor: ownerColor(index),
+                backgroundColor: ownerColor(index),
+                pointBackgroundColor: '#fff',
+                pointBorderColor: ownerColor(index),
+                pointBorderWidth: 2,
+                tension: .35,
+                borderWidth: 2,
+                pointRadius: 2,
+                pointHoverRadius: 5,
+                fill: false
+            };
+        });
+    }
+
+    function renderOwnerStatusChart(owners) {
+        if (charts.s) charts.s.destroy();
+        var labels = ['Pendiente', 'En proceso', 'Sancionado', 'Archivado'];
+        var datasets = owners.map(function (owner, index) {
+            var states = owner.states || {};
+            return {
+                label: owner.name,
+                data: [
+                    states['Pendiente'] || 0,
+                    states['En proceso'] || states['En Proceso'] || 0,
+                    states['Sancionado'] || 0,
+                    states['Archivado'] || 0
+                ],
+                backgroundColor: ownerColor(index),
+                borderRadius: 4,
+                maxBarThickness: 26
+            };
+        });
+        charts.s = new Chart(document.getElementById('status-chart'), {
+            type: 'bar',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 10 } } } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } }
+                }
+            }
+        });
+        showEmpty('status-wrap', !owners.some(function (owner) {
+            return Object.keys(owner.states || {}).some(function (state) { return owner.states[state] > 0; });
+        }));
+    }
+
     function renderReport(data) {
+        var hasOwnerBreakdown = Array.isArray(data.by_user);
+        var owners = data.by_user || [];
         var states = data.states || {};
         var finals = Object.keys(states).filter(function(s){ return ['Sancionado','Archivado'].indexOf(s)>-1; });
 
@@ -456,59 +568,39 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('card-anexos-previo').textContent = anexos.archivo_previo||0;
         document.getElementById('card-anexos-firmado').textContent = anexos.firmado||0;
 
-        /* línea mensual: solo volumen, el estado ya está en las tarjetas */
-        if (charts.m) charts.m.destroy();
+        var dLab = (data.daily||[]).map(function(d){
+            return new Intl.DateTimeFormat('es-CO',{day:'2-digit',month:'short'}).format(new Date(d.period+'T00:00:00'));
+        });
+        var dVals = (data.daily||[]).map(function(d){ return d.total; });
+        renderTrendChart('daily-chart', 'daily-wrap', dLab, dVals, '#0891b2', 'Casos por día',
+            hasOwnerBreakdown ? ownerTimeSeries(owners, 'daily', (data.daily||[]).map(function(d){ return d.period; })) : null);
+
+        var wLab = (data.weekly||[]).map(function(w){
+            var parts = String(w.period).match(/^(\d{4})-W?(\d{1,2})$/);
+            return parts ? 'Sem ' + parseInt(parts[2], 10) + ' · ' + parts[1] : String(w.period);
+        });
+        var wVals = (data.weekly||[]).map(function(w){ return w.total; });
+        renderTrendChart('weekly-chart', 'weekly-wrap', wLab, wVals, '#2563eb', 'Casos por semana',
+            hasOwnerBreakdown ? ownerTimeSeries(owners, 'weekly', (data.weekly||[]).map(function(w){ return w.period; })) : null);
+
         var mLab = (data.monthly||[]).map(function(m){
             return new Intl.DateTimeFormat('es-CO',{month:'short',year:'2-digit'}).format(new Date(m.period+'-01T00:00:00'));
         });
         var mVals = (data.monthly||[]).map(function(m){
             return typeof m.total === 'number' ? m.total : Object.keys(m.states||{}).reduce(function(s,k){return s+(m.states[k]||0);},0);
         });
-        charts.m = new Chart(document.getElementById('monthly-chart'),{
-            type:'line',
-            data:{ labels:mLab, datasets:[{
-                label:'Casos', data:mVals,
-                borderColor:colors[0], backgroundColor:'rgba(22,163,74,.12)',
-                fill:true, tension:.3, pointRadius:3, pointBackgroundColor:colors[0]
-            }]},
-            options:{ responsive:true, maintainAspectRatio:false,
-                plugins:{legend:{display:false}},
-                scales:{x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, ticks:{precision:0,font:{size:9}}}} }
-        });
-        showEmpty('monthly-wrap', !mLab.length);
+        renderTrendChart('monthly-chart', 'monthly-wrap', mLab, mVals, colors[0], 'Casos por mes',
+            hasOwnerBreakdown ? ownerTimeSeries(owners, 'monthly', (data.monthly||[]).map(function(m){ return m.period; })) : null);
 
-        renderTopList(
-            'cargo-list', 'cargo-wrap', 'cargo-more',
-            data.by_modalidad || [],
-            '#2563eb',
-            'Modalidad y cargo',
-            'Modalidad y cargo de los procesos del período.'
-        );
-        renderTopList(
-            'fault-list', 'fault-wrap', 'fault-more',
-            data.pending_faults || [],
-            '#f59e0b',
-            'Tipo de falta',
-            'Todas las faltas registradas en el período.'
-        );
+        renderTopList('cargo-list', 'cargo-wrap', 'cargo-more', data.by_modalidad || [], '#2563eb',
+            'Modalidad y cargo', 'Modalidad y cargo de los procesos del período.');
+        renderTopList('fault-list', 'fault-wrap', 'fault-more', data.pending_faults || [], '#f59e0b',
+            'Tipo de falta', 'Todas las faltas registradas en el período.');
 
-        /* Casos semanales (Bar chart) */
-        if (charts.w) charts.w.destroy();
-        var wLab = (data.weekly||[]).map(function(w){
-            return 'Sem ' + w.period.split('-W')[1] + ' (' + w.period.split('-W')[0] + ')';
-        });
-        var wVals = (data.weekly||[]).map(function(w){ return w.total; });
-        charts.w = new Chart(document.getElementById('weekly-chart'), {
-            type:'bar',
-            data:{ labels:wLab, datasets:[{
-                label:'Casos por semana', data:wVals,
-                backgroundColor:colors[1], borderRadius:4
-            }]},
-            options:{ responsive:true, maintainAspectRatio:false,
-                plugins:{legend:{display:false}},
-                scales:{x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, ticks:{precision:0,font:{size:9}}}} }
-        });
-        showEmpty('weekly-wrap', !wLab.length);
+        if (hasOwnerBreakdown) {
+            renderOwnerStatusChart(owners);
+            return;
+        }
 
         /* doughnut Estados globales */
         if (charts.s) charts.s.destroy();
@@ -525,7 +617,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 type:'doughnut',
                 data:{ labels:stSlices.map(function(s){return s.label;}), datasets:[{ data:stSlices.map(function(s){return s.value;}), backgroundColor:stSlices.map(function(s){return s.color;}), borderWidth:1 }] },
                 options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
-                    plugins:{ legend:{position:'bottom',labels:{boxWidth:9,font:{size:9}}},
+                    plugins:{ legend:{position:'bottom',labels:{boxWidth:10,padding:16,font:{size:10}}},
                         tooltip:{callbacks:{label:function(ctx){
                             var t=ctx.dataset.data.reduce(function(a,b){return a+b;},0);
                             return ctx.label+': '+ctx.raw+' ('+(t?((ctx.raw/t)*100).toFixed(1):0)+'%)';
@@ -533,6 +625,57 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
         showEmpty('status-wrap', !stSlices.length);
+    }
+
+    function renderTrendChart(canvasId, wrapId, labels, values, color, datasetLabel, ownerDatasets) {
+        if (charts[canvasId]) charts[canvasId].destroy();
+        if (labels.length) {
+            var datasets = ownerDatasets || [{
+                label: datasetLabel,
+                data: values,
+                borderColor: color,
+                backgroundColor: color === colors[0] ? 'rgba(22,163,74,.12)' : 'rgba(37,99,235,.12)',
+                fill: true,
+                tension: .35,
+                borderWidth: 3,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: color,
+                pointBorderWidth: 2
+            }];
+            charts[canvasId] = new Chart(document.getElementById(canvasId), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: {
+                            display: Array.isArray(ownerDatasets),
+                            position: 'bottom',
+                            labels: { boxWidth: 10, padding: 10, font: { size: 10 } }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { autoSkip: true, maxTicksLimit: 9, maxRotation: 0, font: { size: 10 } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148,163,184,.18)' },
+                            ticks: { precision: 0, font: { size: 10 }, padding: 8 }
+                        }
+                    }
+                }
+            });
+        }
+        showEmpty(wrapId, !labels.length);
     }
 
     function loadStats() {

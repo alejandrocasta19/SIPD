@@ -104,6 +104,8 @@
     /* 🔵 Sistema — azul */
     .av-item.av-sys, .av-sys.is-unread { border-left-color: #3b82f6 !important; background: linear-gradient(145deg, #eff6ff 0%, #fff 100%); }
     .av-item.av-sys:hover { box-shadow: 0 12px 24px rgba(59,130,246,.10); }
+    .av-item.av-info, .av-info.is-unread { border-left-color: #3b82f6 !important; background: linear-gradient(145deg, #eff6ff 0%, #fff 100%); }
+    .av-item.av-info:hover { box-shadow: 0 12px 24px rgba(59,130,246,.10); }
     
     .av-main {
         display: grid;
@@ -349,4 +351,3 @@
     </div>
     @include('partials.paginacion', ['paginador' => $avisos])
 @endsection
-

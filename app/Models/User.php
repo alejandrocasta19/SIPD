@@ -147,10 +147,6 @@ class User extends Authenticatable
 
     public function nombreCorto(): string
     {
-        if ($this->esCoordinadora()) {
-            return $this->cargo ?: (string) $this->name;
-        }
-
         $nombre = $this->primerNombre();
         $apellido = self::primerApellidoDe((string) $this->name);
 

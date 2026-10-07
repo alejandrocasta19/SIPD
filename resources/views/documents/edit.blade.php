@@ -132,6 +132,50 @@
     </div>
 </div>
 
+@if($tipo !== 'terminacion')
+    <div class="panel-card" style="margin-bottom:20px;padding:16px 20px;">
+        <strong style="display:block;margin-bottom:8px;">Firmas para este formato</strong>
+        @if($puedeSubirFirma)
+            <form action="{{ route('documentos.firmas.store', [$caso->id, $tipo]) }}" method="POST" enctype="multipart/form-data" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+                @csrf
+                <label style="display:grid;gap:5px;font-size:12px;font-weight:700;">
+                    {{ in_array($tipo, ['sancion', 'llamado', 'archivo'], true) ? 'Firma de la coordinadora' : 'Mi firma (RH)' }}
+                    <input type="file" name="firma_cuenta" accept="image/png,image/jpeg">
+                </label>
+                @if($tipo === 'acta')
+                    <label style="display:grid;gap:5px;font-size:12px;font-weight:700;">
+                        Firma del trabajador
+                        <input type="file" name="firma_trabajador" accept="image/png,image/jpeg">
+                    </label>
+                @endif
+                <button type="submit" class="btn-toolbar btn-save"><i class="fas fa-upload"></i> Guardar firma(s)</button>
+            </form>
+            <small style="display:block;margin-top:8px;color:#64748b;">PNG o JPG, máximo 2 MB. Las imágenes se almacenan en privado.</small>
+        @elseif(in_array($tipo, ['sancion', 'llamado', 'archivo'], true))
+            <div style="color:#475569;font-size:13px;">
+                Solo la coordinadora puede cargar o usar esta firma.
+                @if(!auth()->user()->esCoordinadora())
+                    La firma virtual solo se insertará cuando la coordinadora genere o descargue este formato.
+                @elseif(!empty($firmasGuardadas['coordinadora']))
+                    La firma de la coordinadora ya está disponible para este formato.
+                @else
+                    Aún no hay una firma de coordinadora guardada en el sistema.
+                @endif
+            </div>
+        @endif
+        @if($tipo === 'acta')
+            <small style="display:block;margin-top:8px;color:#475569;">
+                Estado: firma del trabajador {{ !empty($firmasGuardadas['trabajador']) ? 'guardada' : 'pendiente' }};
+                firma de RH {{ !empty($firmasGuardadas['cuenta']) ? 'guardada' : 'pendiente' }}.
+            </small>
+        @elseif(in_array($tipo, ['comprobacion', 'disciplinario'], true))
+            <small style="display:block;margin-top:8px;color:#475569;">
+                Firma de la cuenta activa {{ !empty($firmasGuardadas['cuenta']) ? 'guardada' : 'pendiente' }}.
+            </small>
+        @endif
+    </div>
+@endif
+
 <form action="{{ route('documentos.save', [$caso->id, $tipo]) }}" method="POST" id="edit-form"@if(!$puedeEscribir) data-lock="1"@endif>
     @csrf
     @method('PUT')
@@ -200,10 +244,6 @@
                 </div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <label class="btn-toolbar btn-ghost" style="cursor:pointer;">
-                    <i class="fas fa-signature"></i> Firma
-                    <input type="file" name="firma_digital" accept="image/png, image/jpeg" style="display:none;" onchange="previewFirma(this)">
-                </label>
                 <a href="{{ route('documentos.hub') }}" class="btn-toolbar btn-ghost" style="text-decoration:none;">
                     <i class="fas fa-arrow-left"></i> Generar documentos
                 </a>
@@ -266,18 +306,6 @@ function autosizeTextareas(root) {
         el.addEventListener('input', grow);
         grow();
     });
-}
-
-function previewFirma(input) {
-    if (input.files && input.files[0]) {
-        var reader = new FileReader();
-        reader.onload = function(e) {
-            document.querySelectorAll('.sig-zone').forEach(function(z) {
-                z.innerHTML = '<img src="' + e.target.result + '" style="max-height:80px; display:block; margin:0 auto; margin-bottom: 5px;">';
-            });
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {

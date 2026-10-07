@@ -25,6 +25,13 @@ class OfficialDocumentService
         'archivo'       => 'Desición de Archivo.docx',
     ];
 
+    private const LEGACY_SIGNER_NAMES = [
+        'KELLY JOHANNA RODRIGUEZ VARGAS',
+        'KELLY JOHANNA RODRÍGUEZ VARGAS',
+        'Kelly Johanna Rodriguez Vargas',
+        'Kelly Johanna Rodríguez Vargas',
+    ];
+
     /**
      * Definición exacta de etiquetas de bloques amarillos derivados de los XML reales.
      */
@@ -333,7 +340,400 @@ class OfficialDocumentService
 
         $html = $this->applyOptionalClauseState($html, $tipo, $this->clauseModeFor($tipo, $proceso, $clauseMode));
 
-        return $this->fillHeaderInHtml($html, ProcesoDisciplinario::datosEncabezadoDocumento($proceso));
+        $user = auth()->user();
+        $signatureService = app(FirmaDocumentoService::class);
+        $firmante = $user ? $signatureService->usuarioFirmante($tipo, $user) : null;
+        $header = ProcesoDisciplinario::datosEncabezadoDocumento($proceso, $firmante);
+        if ($firmante && in_array($tipo, ['sancion', 'llamado', 'archivo'], true)) {
+            $header['firmante_coordinadora_nombre'] = mb_strtoupper(trim((string) $firmante->name));
+        }
+        if ($proceso && $tipo === 'acta') {
+            $header['acta_trabajador_nombre'] = mb_strtoupper(trim((string) $proceso->nombre));
+            $header['acta_trabajador_cedula'] = trim((string) $proceso->cedula);
+            $header['acta_trabajador_cargo'] = trim((string) $header['cargo']);
+        }
+        $html = $this->fillHeaderInHtml($html, $header);
+
+        return $proceso && $user
+            ? $this->applySignaturesInHtml($html, $tipo, $proceso, $user, $firmante, $header)
+            : $html;
+    }
+
+    private function applySignaturesInHtml(
+        string $html,
+        string $tipo,
+        ProcesoDisciplinario $proceso,
+        User $usuario,
+        ?User $firmante,
+        array $header
+    ): string {
+        $paths = app(FirmaDocumentoService::class)->rutasParaDocumento($tipo, $proceso, $usuario);
+        if (!$paths || !$firmante) {
+            return $html;
+        }
+
+        $previousSetting = libxml_use_internal_errors(true);
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $document->loadHTML('<?xml encoding="UTF-8"><div id="sipd-signature-root">' . $html . '</div>');
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousSetting);
+        $xpath = new DOMXPath($document);
+
+        foreach ($paths as $role => $path) {
+            $targetName = $role === 'trabajador'
+                ? (string) $proceso->nombre
+                : (string) ($header['firmante_nombre'] ?? $firmante->name);
+            $target = $this->lastParagraphContaining($xpath, $targetName);
+            if (!$target || !$target->parentNode) {
+                continue;
+            }
+
+            $imageInfo = getimagesize($path);
+            if (!$imageInfo) {
+                throw new \RuntimeException('No se pudo leer una imagen de firma almacenada.');
+            }
+            $image = $document->createElement('img');
+            $bytes = file_get_contents($path);
+            if ($bytes === false) {
+                throw new \RuntimeException('No se pudo leer una imagen de firma almacenada.');
+            }
+            $image->setAttribute('src', 'data:' . $imageInfo['mime'] . ';base64,' . base64_encode($bytes));
+            $image->setAttribute('alt', 'Firma ' . $role);
+            $image->setAttribute('style', 'display:block;max-width:240px;max-height:70px;margin:0 auto;');
+            $paragraph = $this->previousParagraph($target);
+            $paragraphText = $paragraph ? trim($paragraph->textContent) : '';
+            $classNames = $paragraph ? preg_split('/\s+/', $paragraph->getAttribute('class')) : [];
+            $isSignatureLine = $paragraph && (
+                $paragraphText === ''
+                || preg_match('/^_{5,}$/u', $paragraphText)
+                || in_array('sig-zone', $classNames, true)
+            );
+            if (!$isSignatureLine) {
+                $paragraph = $document->createElement('p');
+                $target->parentNode->insertBefore($paragraph, $target);
+            } else {
+                while ($paragraph->firstChild) {
+                    $paragraph->removeChild($paragraph->firstChild);
+                }
+            }
+            $paragraph->setAttribute('style', 'text-align:center;margin:0;');
+            $paragraph->appendChild($image);
+        }
+
+        $root = $xpath->query('//*[@id="sipd-signature-root"]')->item(0);
+        if (!$root) {
+            return $html;
+        }
+
+        $result = '';
+        foreach ($root->childNodes as $child) {
+            $result .= $document->saveHTML($child);
+        }
+        return $result;
+    }
+
+    private function applySignaturesInXml(
+        ZipArchive $zip,
+        string $xml,
+        string $tipo,
+        ProcesoDisciplinario $proceso,
+        User $usuario,
+        ?User $firmante,
+        array $header
+    ): string {
+        $paths = app(FirmaDocumentoService::class)->rutasParaDocumento($tipo, $proceso, $usuario);
+        if (!$paths || !$firmante) {
+            return $xml;
+        }
+
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $document->preserveWhiteSpace = true;
+        if (!$document->loadXML($xml, LIBXML_NOERROR | LIBXML_NOWARNING)) {
+            throw new \RuntimeException('No se pudo preparar el documento para insertar las firmas.');
+        }
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        $xpath->registerNamespace('wp', 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing');
+        $relationships = $this->loadDocumentRelationships($zip);
+        $contentTypes = $this->loadContentTypes($zip);
+        $drawingId = $this->nextDrawingId($xpath);
+
+        foreach ($paths as $role => $path) {
+            $targetName = $role === 'trabajador'
+                ? (string) $proceso->nombre
+                : (string) ($header['firmante_nombre'] ?? $firmante->name);
+            $target = $this->lastParagraphContaining($xpath, $targetName);
+            if (!$target || !$target->parentNode) {
+                continue;
+            }
+
+            $imageInfo = getimagesize($path);
+            if (!$imageInfo || !in_array($imageInfo['mime'] ?? '', ['image/png', 'image/jpeg'], true)) {
+                throw new \RuntimeException('La firma almacenada no es una imagen PNG o JPEG válida.');
+            }
+
+            $extension = $imageInfo['mime'] === 'image/png' ? 'png' : 'jpg';
+            $mediaName = 'sipd-signature-' . count($relationships->documentElement->childNodes) . '.' . $extension;
+            $mediaPath = 'word/media/' . $mediaName;
+            $imageBytes = file_get_contents($path);
+            if ($imageBytes === false || !$zip->addFromString($mediaPath, $imageBytes)) {
+                throw new \RuntimeException('No se pudo agregar una firma al documento DOCX.');
+            }
+            $relationshipId = $this->addImageRelationship($relationships, $mediaName);
+            $this->ensureImageContentType($contentTypes, $extension, $imageInfo['mime']);
+
+            $run = $this->createSignatureDrawingRun(
+                $document,
+                $relationshipId,
+                (int) $imageInfo[0],
+                (int) $imageInfo[1],
+                $mediaName,
+                $drawingId++
+            );
+            $signatureParagraph = $this->previousParagraph($target);
+            $paragraphText = $signatureParagraph
+                ? trim(preg_replace('/\s+/u', ' ', $signatureParagraph->textContent) ?? '')
+                : '';
+            $isSignatureLine = $signatureParagraph && (
+                $paragraphText === ''
+                || preg_match('/^_{5,}$/u', $paragraphText)
+            );
+            if (!$isSignatureLine) {
+                $signatureParagraph = $document->createElementNS(
+                    'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+                    'w:p'
+                );
+                $target->parentNode->insertBefore($signatureParagraph, $target);
+            }
+            $this->centerSignatureParagraph($signatureParagraph);
+            foreach (iterator_to_array($signatureParagraph->childNodes) as $child) {
+                if ($child->localName !== 'pPr') {
+                    $signatureParagraph->removeChild($child);
+                }
+            }
+            $signatureParagraph->appendChild($run);
+        }
+
+        if (!$zip->addFromString('word/_rels/document.xml.rels', $relationships->saveXML())
+            || !$zip->addFromString('[Content_Types].xml', $contentTypes->saveXML())) {
+            throw new \RuntimeException('No se pudieron guardar los recursos de firma en el DOCX.');
+        }
+        return $document->saveXML();
+    }
+
+    private function lastParagraphContaining(DOMXPath $xpath, string $text): ?\DOMElement
+    {
+        $needle = mb_strtolower(trim($text), 'UTF-8');
+        if ($needle === '') {
+            return null;
+        }
+        $matches = [];
+        $paragraphs = $xpath->query('//p');
+        if (!$paragraphs || $paragraphs->length === 0) {
+            $paragraphs = $xpath->query('//w:p');
+        }
+        foreach ($paragraphs ?: [] as $paragraph) {
+            $plain = trim(preg_replace('/\s+/u', ' ', $paragraph->textContent) ?? '');
+            if (mb_stripos($plain, $needle, 0, 'UTF-8') !== false) {
+                $matches[] = $paragraph;
+            }
+        }
+        $match = $matches ? end($matches) : null;
+        return $match instanceof \DOMElement ? $match : null;
+    }
+
+    private function previousParagraph(\DOMElement $target): ?\DOMElement
+    {
+        for ($sibling = $target->previousSibling; $sibling; $sibling = $sibling->previousSibling) {
+            if ($sibling instanceof \DOMElement && $sibling->localName === 'p') {
+                return $sibling;
+            }
+        }
+        return null;
+    }
+
+    private function centerSignatureParagraph(\DOMElement $paragraph): void
+    {
+        $main = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        $properties = null;
+        foreach ($paragraph->childNodes as $child) {
+            if ($child instanceof \DOMElement && $child->localName === 'pPr') {
+                $properties = $child;
+                break;
+            }
+        }
+        if (!$properties) {
+            $properties = $paragraph->ownerDocument->createElementNS($main, 'w:pPr');
+            $paragraph->insertBefore($properties, $paragraph->firstChild);
+        }
+
+        $alignment = null;
+        foreach ($properties->childNodes as $child) {
+            if ($child instanceof \DOMElement && $child->localName === 'jc') {
+                $alignment = $child;
+                break;
+            }
+        }
+        if (!$alignment) {
+            $alignment = $paragraph->ownerDocument->createElementNS($main, 'w:jc');
+            $properties->appendChild($alignment);
+        }
+        $alignment->setAttributeNS($main, 'w:val', 'center');
+    }
+
+    private function loadDocumentRelationships(ZipArchive $zip): DOMDocument
+    {
+        $xml = $zip->getFromName('word/_rels/document.xml.rels');
+        $document = new DOMDocument('1.0', 'UTF-8');
+        if ($xml === false || !$document->loadXML($xml, LIBXML_NOERROR | LIBXML_NOWARNING)) {
+            throw new \RuntimeException('No se pudieron leer las relaciones del DOCX.');
+        }
+        return $document;
+    }
+
+    private function loadContentTypes(ZipArchive $zip): DOMDocument
+    {
+        $xml = $zip->getFromName('[Content_Types].xml');
+        $document = new DOMDocument('1.0', 'UTF-8');
+        if ($xml === false || !$document->loadXML($xml, LIBXML_NOERROR | LIBXML_NOWARNING)) {
+            throw new \RuntimeException('No se pudieron leer los tipos de contenido del DOCX.');
+        }
+        return $document;
+    }
+
+    private function addImageRelationship(DOMDocument $relationships, string $mediaName): string
+    {
+        $namespace = 'http://schemas.openxmlformats.org/package/2006/relationships';
+        $usedIds = [];
+        foreach ($relationships->getElementsByTagNameNS($namespace, 'Relationship') as $relationship) {
+            $usedIds[] = $relationship->getAttribute('Id');
+        }
+        $number = 1;
+        while (in_array('rId' . $number, $usedIds, true)) {
+            $number++;
+        }
+        $id = 'rId' . $number;
+        $relationship = $relationships->createElementNS($namespace, 'Relationship');
+        $relationship->setAttribute('Id', $id);
+        $relationship->setAttribute('Type', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image');
+        $relationship->setAttribute('Target', 'media/' . $mediaName);
+        $relationships->documentElement->appendChild($relationship);
+        return $id;
+    }
+
+    private function ensureImageContentType(DOMDocument $contentTypes, string $extension, string $mime): void
+    {
+        $namespace = 'http://schemas.openxmlformats.org/package/2006/content-types';
+        foreach ($contentTypes->getElementsByTagNameNS($namespace, 'Default') as $default) {
+            if (strtolower($default->getAttribute('Extension')) === $extension) {
+                return;
+            }
+        }
+        $default = $contentTypes->createElementNS($namespace, 'Default');
+        $default->setAttribute('Extension', $extension);
+        $default->setAttribute('ContentType', $mime);
+        $firstOverride = $contentTypes->getElementsByTagNameNS($namespace, 'Override')->item(0);
+        if ($firstOverride) {
+            $contentTypes->documentElement->insertBefore($default, $firstOverride);
+        } else {
+            $contentTypes->documentElement->appendChild($default);
+        }
+    }
+
+    private function nextDrawingId(DOMXPath $xpath): int
+    {
+        $next = 1;
+        foreach ($xpath->query('//wp:docPr') as $drawing) {
+            $next = max($next, (int) $drawing->getAttribute('id') + 1);
+        }
+        return $next;
+    }
+
+    private function createSignatureDrawingRun(
+        DOMDocument $document,
+        string $relationshipId,
+        int $width,
+        int $height,
+        string $name,
+        int $drawingId
+    ): \DOMElement {
+        $main = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        $wp = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+        $a = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+        $pic = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
+        $r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+        $maxWidth = 2 * 914400;
+        $maxHeight = (int) (0.65 * 914400);
+        $scale = min($maxWidth / max(1, $width), $maxHeight / max(1, $height));
+        $cx = (int) round($width * $scale);
+        $cy = (int) round($height * $scale);
+
+        $run = $document->createElementNS($main, 'w:r');
+        $drawingNode = $document->createElementNS($main, 'w:drawing');
+        $inline = $document->createElementNS($wp, 'wp:inline');
+        foreach (['distT', 'distB', 'distL', 'distR'] as $attribute) {
+            $inline->setAttribute($attribute, '0');
+        }
+        $extent = $document->createElementNS($wp, 'wp:extent');
+        $extent->setAttribute('cx', (string) $cx);
+        $extent->setAttribute('cy', (string) $cy);
+        $inline->appendChild($extent);
+        $effectExtent = $document->createElementNS($wp, 'wp:effectExtent');
+        foreach (['l', 't', 'r', 'b'] as $side) {
+            $effectExtent->setAttribute($side, '0');
+        }
+        $inline->appendChild($effectExtent);
+        $docProperties = $document->createElementNS($wp, 'wp:docPr');
+        $docProperties->setAttribute('id', (string) $drawingId);
+        $docProperties->setAttribute('name', $name);
+        $inline->appendChild($docProperties);
+        $frameProperties = $document->createElementNS($wp, 'wp:cNvGraphicFramePr');
+        $locks = $document->createElementNS($a, 'a:graphicFrameLocks');
+        $locks->setAttribute('noChangeAspect', '1');
+        $frameProperties->appendChild($locks);
+        $inline->appendChild($frameProperties);
+
+        $graphic = $document->createElementNS($a, 'a:graphic');
+        $graphicData = $document->createElementNS($a, 'a:graphicData');
+        $graphicData->setAttribute('uri', $pic);
+        $picture = $document->createElementNS($pic, 'pic:pic');
+        $nonVisual = $document->createElementNS($pic, 'pic:nvPicPr');
+        $properties = $document->createElementNS($pic, 'pic:cNvPr');
+        $properties->setAttribute('id', '0');
+        $properties->setAttribute('name', $name);
+        $nonVisual->appendChild($properties);
+        $nonVisual->appendChild($document->createElementNS($pic, 'pic:cNvPicPr'));
+        $picture->appendChild($nonVisual);
+        $fill = $document->createElementNS($pic, 'pic:blipFill');
+        $blip = $document->createElementNS($a, 'a:blip');
+        $blip->setAttributeNS($r, 'r:embed', $relationshipId);
+        $fill->appendChild($blip);
+        $stretch = $document->createElementNS($a, 'a:stretch');
+        $stretch->appendChild($document->createElementNS($a, 'a:fillRect'));
+        $fill->appendChild($stretch);
+        $picture->appendChild($fill);
+        $shape = $document->createElementNS($pic, 'pic:spPr');
+        $transform = $document->createElementNS($a, 'a:xfrm');
+        $offset = $document->createElementNS($a, 'a:off');
+        $offset->setAttribute('x', '0');
+        $offset->setAttribute('y', '0');
+        $transform->appendChild($offset);
+        $shapeExtent = $document->createElementNS($a, 'a:ext');
+        $shapeExtent->setAttribute('cx', (string) $cx);
+        $shapeExtent->setAttribute('cy', (string) $cy);
+        $transform->appendChild($shapeExtent);
+        $shape->appendChild($transform);
+        $geometry = $document->createElementNS($a, 'a:prstGeom');
+        $geometry->setAttribute('prst', 'rect');
+        $geometry->appendChild($document->createElementNS($a, 'a:avLst'));
+        $shape->appendChild($geometry);
+        $picture->appendChild($shape);
+        $graphicData->appendChild($picture);
+        $graphic->appendChild($graphicData);
+        $inline->appendChild($graphic);
+        $drawingNode->appendChild($inline);
+        $run->appendChild($drawingNode);
+        return $run;
     }
 
     private function generateInteractiveHtmlFromDocx(string $path, string $tipo): string
@@ -802,7 +1202,22 @@ class OfficialDocumentService
             $template,
             $this->clauseModeFor($template, $proceso)
         );
-        $updatedXml  = $this->fillHeaderInXml($updatedXml, ProcesoDisciplinario::datosEncabezadoDocumento($proceso));
+        $user = auth()->user();
+        $signatureService = app(FirmaDocumentoService::class);
+        $firmante = $user ? $signatureService->usuarioFirmante($template, $user) : null;
+        $header = ProcesoDisciplinario::datosEncabezadoDocumento($proceso, $firmante);
+        if ($firmante && in_array($template, ['sancion', 'llamado', 'archivo'], true)) {
+            $header['firmante_coordinadora_nombre'] = mb_strtoupper(trim((string) $firmante->name));
+        }
+        if ($template === 'acta') {
+            $header['acta_trabajador_nombre'] = mb_strtoupper(trim((string) $proceso->nombre));
+            $header['acta_trabajador_cedula'] = trim((string) $proceso->cedula);
+            $header['acta_trabajador_cargo'] = trim((string) $header['cargo']);
+        }
+        $updatedXml = $this->fillHeaderInXml($updatedXml, $header);
+        if ($user && $firmante) {
+            $updatedXml = $this->applySignaturesInXml($zip, $updatedXml, $template, $proceso, $user, $firmante, $header);
+        }
 
         $zip->deleteName($entryName);
         $zip->addFromString($entryName, $updatedXml);
@@ -1176,24 +1591,50 @@ class OfficialDocumentService
 
         // Reemplazar nombre y cargo del firmante hardcodeados en el HTML
         if (!empty($header['firmante_nombre'])) {
-            $html = str_replace(
-                htmlspecialchars('KELLY JOHANNA RODRIGUEZ VARGAS', ENT_QUOTES),
-                htmlspecialchars($header['firmante_nombre'], ENT_QUOTES),
-                $html
+            foreach (self::LEGACY_SIGNER_NAMES as $legacyName) {
+                $html = $this->replaceHtmlText($html, $legacyName, $header['firmante_nombre']);
+            }
+        }
+        if (!empty($header['firmante_coordinadora_nombre'])) {
+            $html = $this->replaceHtmlText(
+                $html,
+                'ADRIANA MARIA SANCHEZ RAMIREZ',
+                $header['firmante_coordinadora_nombre']
             );
         }
+        if (!empty($header['acta_trabajador_nombre'])) {
+            $html = $this->replaceHtmlText($html, 'DILAN ALEJANDRO RAMIREZ SOLANO', $header['acta_trabajador_nombre']);
+            $html = $this->replaceHtmlText($html, '1.193.110.82', $header['acta_trabajador_cedula']);
+            $html = $this->replaceHtmlText($html, 'Auxiliar de Control Interno', $header['acta_trabajador_cargo']);
+        }
         if (!empty($header['firmante_cargo'])) {
-            $html = str_replace(
-                htmlspecialchars('Asesora Jur\u00eddica y de Seguros', ENT_QUOTES),
-                htmlspecialchars($header['firmante_cargo'], ENT_QUOTES),
-                $html
+            $html = $this->replaceHtmlText(
+                $html,
+                'Asesora Jurídica y de Seguros',
+                $header['firmante_cargo']
             );
             // Tambien reemplaza la version en mayusculas del cargo en el cuerpo
-            $html = str_replace(
-                htmlspecialchars('ASESORA JUR\u00cdDICA Y DE SEGUROS DEL \u00c1REA DE RECURSOS HUMANOS', ENT_QUOTES),
-                htmlspecialchars(mb_strtoupper($header['firmante_cargo']) . ' DEL \u00c1REA DE RECURSOS HUMANOS', ENT_QUOTES),
-                $html
+            $html = $this->replaceHtmlText(
+                $html,
+                'ASESORA JURÍDICA Y DE SEGUROS DEL ÁREA DE RECURSOS HUMANOS',
+                mb_strtoupper($header['firmante_cargo']) . ' DEL ÁREA DE RECURSOS HUMANOS'
             );
+        }
+
+        return $html;
+    }
+
+    private function replaceHtmlText(string $html, string $search, string $replacement): string
+    {
+        $variants = [
+            $search,
+            htmlspecialchars($search, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+            htmlentities($search, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'),
+        ];
+        $replacement = htmlspecialchars($replacement, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        foreach (array_unique($variants) as $variant) {
+            $html = str_ireplace($variant, $replacement, $html);
         }
 
         return $html;
@@ -1256,13 +1697,51 @@ class OfficialDocumentService
 
         // Reemplazar nombre del firmante hardcodeado (ej: KELLY JOHANNA RODRIGUEZ VARGAS)
         if (!empty($header['firmante_nombre'])) {
-            foreach ($xpath->query('//w:t') as $t) {
-                if (!($t instanceof \DOMElement)) continue;
-                $val = trim((string) $t->nodeValue);
-                if ($val === 'KELLY JOHANNA RODRIGUEZ VARGAS') {
-                    $t->nodeValue = $header['firmante_nombre'];
+            foreach ($xpath->query('//w:p') as $paragraph) {
+                $textNodes = $xpath->query('.//w:t', $paragraph);
+                $plain = '';
+                foreach ($textNodes as $textNode) {
+                    $plain .= $textNode->textContent;
+                }
+
+                foreach (self::LEGACY_SIGNER_NAMES as $legacyName) {
+                    $position = mb_stripos($plain, $legacyName, 0, 'UTF-8');
+                    if ($position === false) {
+                        continue;
+                    }
+
+                    $matchEnd = $position + mb_strlen($legacyName, 'UTF-8');
+                    $offset = 0;
+                    $inserted = false;
+                    foreach ($textNodes as $textNode) {
+                        $nodeValue = (string) $textNode->nodeValue;
+                        $nodeLength = mb_strlen($nodeValue, 'UTF-8');
+                        $overlapStart = max($position, $offset);
+                        $overlapEnd = min($matchEnd, $offset + $nodeLength);
+
+                        if ($overlapStart < $overlapEnd) {
+                            $prefix = mb_substr($nodeValue, 0, $overlapStart - $offset, 'UTF-8');
+                            $suffix = mb_substr($nodeValue, $overlapEnd - $offset, null, 'UTF-8');
+                            $textNode->nodeValue = $prefix
+                                . ($inserted ? '' : $header['firmante_nombre'])
+                                . $suffix;
+                            $inserted = true;
+                        }
+
+                        $offset += $nodeLength;
+                    }
+                    break;
                 }
             }
+        }
+
+        if (!empty($header['firmante_coordinadora_nombre'])) {
+            $this->replaceTextInXml($xpath, 'ADRIANA MARIA SANCHEZ RAMIREZ', $header['firmante_coordinadora_nombre']);
+        }
+        if (!empty($header['acta_trabajador_nombre'])) {
+            $this->replaceTextInXml($xpath, 'DILAN ALEJANDRO RAMIREZ SOLANO', $header['acta_trabajador_nombre']);
+            $this->replaceTextInXml($xpath, '1.193.110.82', $header['acta_trabajador_cedula']);
+            $this->replaceTextInXml($xpath, 'Auxiliar de Control Interno', $header['acta_trabajador_cargo']);
         }
 
         // Reemplazar cargo del firmante en la firma y en el cuerpo en mayúsculas
@@ -1288,6 +1767,42 @@ class OfficialDocumentService
         }
 
         return $document->saveXML() ?: $xml;
+    }
+
+    private function replaceTextInXml(DOMXPath $xpath, string $search, string $replacement): void
+    {
+        if ($search === '' || $replacement === '') {
+            return;
+        }
+
+        foreach ($xpath->query('//w:p') as $paragraph) {
+            $textNodes = $xpath->query('.//w:t', $paragraph);
+            $plain = '';
+            foreach ($textNodes as $textNode) {
+                $plain .= $textNode->textContent;
+            }
+            $position = mb_stripos($plain, $search, 0, 'UTF-8');
+            if ($position === false) {
+                continue;
+            }
+
+            $matchEnd = $position + mb_strlen($search, 'UTF-8');
+            $offset = 0;
+            $inserted = false;
+            foreach ($textNodes as $textNode) {
+                $nodeValue = (string) $textNode->nodeValue;
+                $nodeLength = mb_strlen($nodeValue, 'UTF-8');
+                $overlapStart = max($position, $offset);
+                $overlapEnd = min($matchEnd, $offset + $nodeLength);
+                if ($overlapStart < $overlapEnd) {
+                    $prefix = mb_substr($nodeValue, 0, $overlapStart - $offset, 'UTF-8');
+                    $suffix = mb_substr($nodeValue, $overlapEnd - $offset, null, 'UTF-8');
+                    $textNode->nodeValue = $prefix . ($inserted ? '' : $replacement) . $suffix;
+                    $inserted = true;
+                }
+                $offset += $nodeLength;
+            }
+        }
     }
 
     public function materializeDocx(ProcesoDisciplinario $proceso, string $template): string

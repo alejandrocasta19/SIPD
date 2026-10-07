@@ -6,10 +6,12 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use App\Models\ProcesoDisciplinario;
+use App\Models\Aviso;
 use App\Models\CasoEvidencia;
 use App\Models\CasoDocumentoEstado;
 use App\Support\Paginacion;
 use App\Services\OfficialDocumentService;
+use App\Services\FirmaDocumentoService;
 use Throwable;
 
 class DocumentoController extends Controller
@@ -53,6 +55,25 @@ class DocumentoController extends Controller
     private function assertValidTipo(string $tipo): void
     {
         abort_unless(in_array($tipo, CasoDocumentoEstado::TIPOS, true), 404);
+    }
+
+    private function notificarFirmaPendiente(ProcesoDisciplinario $caso, string $tipo): void
+    {
+        if (!in_array($tipo, FirmaDocumentoService::TIPOS_FIRMA_COORDINADORA, true)
+            || auth()->user()->esCoordinadora()) {
+            return;
+        }
+
+        $codigo = 'PRO-' . str_pad((string) $caso->id, 3, '0', STR_PAD_LEFT);
+        Aviso::aCoordinadoras([
+            'remitente_id' => auth()->id(),
+            'tipo' => Aviso::TIPO_FIRMA,
+            'titulo' => 'Documento pendiente de firma: ' . CasoDocumentoEstado::etiqueta($tipo),
+            'cuerpo' => $codigo . ' · ' . $caso->nombre . ' fue generado por ' . auth()->user()->name
+                . ' y requiere la firma de la coordinadora.',
+            'proceso_id' => $caso->id,
+            'tipo_documento' => $tipo,
+        ], auth()->id());
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -117,7 +138,12 @@ class DocumentoController extends Controller
      * GET /documentos/{id}/{tipo}/editar
      * Muestra el formulario de diligenciamiento de un subdocumento.
      */
-    public function edit(int $id, string $tipo, OfficialDocumentService $documents)
+    public function edit(
+        int $id,
+        string $tipo,
+        OfficialDocumentService $documents,
+        FirmaDocumentoService $firmas
+    )
     {
         $this->assertValidTipo($tipo);
         $caso   = $this->accessibleCase($id);
@@ -153,7 +179,58 @@ class DocumentoController extends Controller
             'interactiveHtml' => $documents->getInteractiveDocumentHtml($tipo, $bloques, $caso),
             'profileUser'  => auth()->user(),
             'requiereFirmaGerente' => $documents->requiresGerentePrint($tipo),
+            'puedeSubirFirma' => $firmas->puedeCargarFirma($tipo, auth()->user())
+                && auth()->user()->puede($yaGenerado ? 'editar_generados' : 'editar_documentos')
+                && (!$bloqueado || auth()->user()->esCoordinadora()),
+            'firmasGuardadas' => $firmas->rutasParaDocumento($tipo, $caso, auth()->user()),
         ]);
+    }
+
+    public function storeFirmas(Request $request, int $id, string $tipo, FirmaDocumentoService $firmas)
+    {
+        $this->assertValidTipo($tipo);
+        $caso = $this->accessibleCase($id);
+        $user = auth()->user();
+        $bloqueado = $caso->soloLoManejaCoordinadora();
+
+        abort_unless(!$bloqueado || $user->esCoordinadora(), 403);
+        $estadoDoc = $caso->estadoDocumento($tipo);
+        $user->exigir($estadoDoc->estado === 'generado' ? 'editar_generados' : 'editar_documentos');
+
+        if (!$request->hasFile('firma_cuenta') && !$request->hasFile('firma_trabajador')) {
+            throw ValidationException::withMessages([
+                'firma_cuenta' => 'Selecciona al menos una firma para cargar.',
+            ]);
+        }
+
+        $request->validate([
+            'firma_cuenta' => 'sometimes|required|image|mimes:png,jpg,jpeg|max:2048',
+            'firma_trabajador' => 'sometimes|required|image|mimes:png,jpg,jpeg|max:2048',
+        ]);
+
+        if ($request->hasFile('firma_cuenta')) {
+            abort_unless($firmas->puedeCargarFirma($tipo, $user), 403, 'No tienes permiso para cargar esta firma.');
+            $archivo = $request->file('firma_cuenta');
+            abort_unless(
+                in_array($archivo->getMimeType(), ['image/png', 'image/jpeg'], true),
+                422,
+                'La firma debe ser una imagen PNG o JPEG válida.'
+            );
+            $firmas->guardarFirmaCuenta($archivo, $user);
+        }
+
+        if ($request->hasFile('firma_trabajador')) {
+            abort_unless($tipo === 'acta', 422, 'La firma del trabajador solo se puede cargar para el acta.');
+            $archivo = $request->file('firma_trabajador');
+            abort_unless(
+                in_array($archivo->getMimeType(), ['image/png', 'image/jpeg'], true),
+                422,
+                'La firma debe ser una imagen PNG o JPEG válida.'
+            );
+            $firmas->guardarFirmaTrabajador($archivo, $caso);
+        }
+
+        return back()->with('success', 'Firma(s) guardada(s) de forma privada para este expediente.');
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -171,6 +248,11 @@ class DocumentoController extends Controller
         $quiereGenerar = in_array($formato, ['docx', 'pdf', 'generar'], true);
 
         $caso = $this->accessibleCase($id);
+        $redireccionBloqueado = $caso->redireccionSiBloqueado();
+        if ($redireccionBloqueado) {
+            return $redireccionBloqueado;
+        }
+
         $slot = CasoDocumentoEstado::slotDe($tipo);
         if ($slot) {
             $caso->guardarVarianteSlot($slot, $tipo);
@@ -208,6 +290,10 @@ class DocumentoController extends Controller
                 'estado' => 'generado',
                 'generado_en' => $estadoDoc->generado_en ?? now(),
             ]);
+
+            if (!$yaGenerado) {
+                $this->notificarFirmaPendiente($caso, $tipo);
+            }
 
             $mensaje = $tipo === 'terminacion'
                 ? 'Documento generado. Descárgalo en Generar documentos, imprímelo para firma del gerente y sube el escaneo en Anexos.'
@@ -278,6 +364,7 @@ class DocumentoController extends Controller
         // Verificar acceso: la primera descarga de un documento es libre.
         // Si ya fue descargado antes, se necesita el permiso descargar_documentos.
         $estadoDocPrev = $caso->estadoDocumento($tipo);
+        $yaGenerado = $estadoDocPrev->estado === 'generado';
         $esPrimeraDescarga = $estadoDocPrev->descargado_en === null;
         if (!$esPrimeraDescarga) {
             auth()->user()->exigir('descargar_documentos');
@@ -301,15 +388,6 @@ class DocumentoController extends Controller
                 $response = $documents->downloadOfficial($caso, $tipo, $filename);
             }
 
-            $estadoDoc = $caso->estadoDocumento($tipo);
-            $payload = ['descargado_en' => now()];
-            if ($estadoDoc->estado !== 'generado') {
-                $payload['estado'] = 'generado';
-                $payload['generado_en'] = $estadoDoc->generado_en ?? now();
-            }
-            $estadoDoc->update($payload);
-
-            return $response;
         } catch (ValidationException $e) {
             return back()
                 ->withErrors($e->errors())
@@ -318,6 +396,20 @@ class DocumentoController extends Controller
             report($e);
             return back()->with('error', 'No fue posible generar el documento institucional.');
         }
+
+        $estadoDoc = $caso->estadoDocumento($tipo);
+        $payload = ['descargado_en' => now()];
+        if (!$yaGenerado) {
+            $payload['estado'] = 'generado';
+            $payload['generado_en'] = $estadoDoc->generado_en ?? now();
+        }
+        $estadoDoc->update($payload);
+
+        if (!$yaGenerado) {
+            $this->notificarFirmaPendiente($caso, $tipo);
+        }
+
+        return $response;
     }
 
     // ─────────────────────────────────────────────────────────────

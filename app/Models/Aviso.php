@@ -11,6 +11,8 @@ class Aviso extends Model
     public const TIPO_SOLICITUD = 'solicitud';
     public const TIPO_PERMISO = 'permiso_respuesta';
     public const TIPO_AVISO = 'aviso';
+    public const TIPO_FIRMA = 'firma_pendiente';
+    public const TIPO_SESION = 'actividad_sesion';
 
     protected $table = 'sipd_avisos';
 
@@ -23,6 +25,7 @@ class Aviso extends Model
         'motivo',
         'proceso_id',
         'solicitud_id',
+        'tipo_documento',
         'leida_at',
     ];
 
@@ -67,6 +70,8 @@ class Aviso extends Model
             self::TIPO_PERMISO   => 'Permiso respondido',
             self::TIPO_SOLICITUD => 'Solicitud de permiso',
             self::TIPO_VEREDICTO => 'Requiere veredicto',
+            self::TIPO_FIRMA     => 'Firma pendiente',
+            self::TIPO_SESION    => 'Actividad de sesión',
         ];
 
         return $etiquetas[$this->tipo] ?? 'Notificación';
@@ -79,6 +84,8 @@ class Aviso extends Model
             self::TIPO_PERMISO   => 'fa-check-circle',
             self::TIPO_SOLICITUD => 'fa-user-lock',
             self::TIPO_VEREDICTO => 'fa-gavel',
+            self::TIPO_FIRMA     => 'fa-file-signature',
+            self::TIPO_SESION    => 'fa-sign-in-alt',
         ];
 
         return $iconos[$this->tipo] ?? 'fa-bell';
@@ -91,6 +98,8 @@ class Aviso extends Model
             self::TIPO_PERMISO   => 'ok',
             self::TIPO_SOLICITUD => 'warn',
             self::TIPO_VEREDICTO => 'danger',
+            self::TIPO_FIRMA     => 'warn',
+            self::TIPO_SESION    => 'info',
         ];
 
         return $tonos[$this->tipo] ?? 'info';
@@ -112,13 +121,32 @@ class Aviso extends Model
         ]));
     }
 
-    public static function aCoordinadoras(array $data): Collection
+    public static function aCoordinadoras(array $data, ?int $exceptUserId = null): Collection
     {
-        $coords = User::where('role', User::ROLE_ADMIN)->get();
+        $coords = User::where('role', User::ROLE_ADMIN)
+            ->when($exceptUserId, fn ($query) => $query->where('id', '!=', $exceptUserId))
+            ->get();
 
         return $coords->map(function (User $coord) use ($data) {
             return self::enviar($coord, $data);
         });
+    }
+
+    public static function registrarActividadSesion(User $usuario, bool $inicio): Collection
+    {
+        if (!$usuario->esEquipo()) {
+            return collect();
+        }
+
+        $accion = $inicio ? 'inició sesión' : 'cerró sesión';
+        $fechaHora = now()->format('d/m/Y H:i:s');
+
+        return self::aCoordinadoras([
+            'remitente_id' => $usuario->id,
+            'tipo' => self::TIPO_SESION,
+            'titulo' => $inicio ? 'Inicio de sesión del equipo' : 'Cierre de sesión del equipo',
+            'cuerpo' => $usuario->name . ' ' . $accion . '. Fecha y hora: ' . $fechaHora . '.',
+        ], $usuario->id);
     }
 
     public static function noLeidosPara(User $user)

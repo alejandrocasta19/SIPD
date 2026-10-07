@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Support\Formatos;
+use App\Models\Aviso;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 
@@ -43,6 +43,8 @@ class LoginController extends Controller
     protected function authenticated(Request $request, $user)
     {
         if ($user->estaActivo()) {
+            Aviso::registrarActividadSesion($user, true);
+
             return null;
         }
 
@@ -53,6 +55,20 @@ class LoginController extends Controller
         return redirect()->route('login')->withErrors([
             $this->username() => 'Tu perfil está desactivado. Consulta con la coordinadora.',
         ]);
+    }
+
+    public function logout(Request $request)
+    {
+        $user = $request->user();
+        if ($user) {
+            Aviso::registrarActividadSesion($user, false);
+        }
+
+        $this->guard()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return $this->loggedOut($request) ?: redirect('/');
     }
 
     /**
