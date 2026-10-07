@@ -105,8 +105,8 @@ class ReportService
             'pending_faults' => $faults,
             'by_modalidad' => $this->groupedCounts(
                 $filtered,
-                "COALESCE(NULLIF(modalidad, ''), 'Sin cargo')",
-                'modalidad'
+                "COALESCE(CONCAT_WS(' - ', NULLIF(modalidad, ''), NULLIF(cargo, '')), 'Sin modalidad / cargo')",
+                'modalidad_cargo'
             ),
             'by_ruta' => $this->groupedCounts(
                 $filtered,
