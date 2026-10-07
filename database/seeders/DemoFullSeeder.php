@@ -85,8 +85,30 @@ class DemoFullSeeder extends Seeder
             'fecha_falta' => now()->subDays(1)->format('Y-m-d'), 'estado' => 'Pendiente',
         ]);
 
+        // 6. En Proceso con descargos
+        $pK6 = ProcesoDisciplinario::create([
+            'user_id' => $kelly->id, 'nombre' => 'Manuel Castañeda', 'cedula' => '60606011',
+            'cargo' => 'Auxiliar call center', 'modalidad' => 'Call center',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Agresión verbal o física',
+            'descripcion_falta' => 'Agresión verbal a un compañero en horario laboral',
+            'fecha_falta' => now()->subDays(25)->format('Y-m-d'), 'estado' => 'Pendiente',
+        ]);
+        CasoDocumentoEstado::create([
+            'caso_id' => $pK6->id, 'tipo_documento' => 'fallo',
+            'estado' => 'borrador',
+        ]);
+
+        // 7. Archivado
+        ProcesoDisciplinario::create([
+            'user_id' => $kelly->id, 'nombre' => 'Lucía Mendoza', 'cedula' => '70707011',
+            'cargo' => 'Asistente de ventas', 'modalidad' => 'Asistente de Ventas',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Incumplimiento de la resolución',
+            'descripcion_falta' => 'Se verificó que los argumentos no constituían falta disciplinaria',
+            'fecha_falta' => now()->subDays(60)->format('Y-m-d'), 'estado' => 'Archivado',
+        ]);
+
         // ====================================================================
-        // JORGE — 5 casos (Modalidades: Terminal, Mixto, Inspectores viales, etc.)
+        // JORGE — 7 casos (Modalidades: Terminal, Mixto, Inspectores viales, etc.)
         // ====================================================================
 
         // 1. Sancionado
@@ -142,8 +164,30 @@ class DemoFullSeeder extends Seeder
             'estado' => 'completo', 'descargado_en' => now()->subDays(3), 'generado_en' => now()->subDays(4),
         ]);
 
+        // 6. Pendiente con evidencia
+        ProcesoDisciplinario::create([
+            'user_id' => $jorge->id, 'nombre' => 'Gustavo Alarcón', 'cedula' => '60000006',
+            'cargo' => 'Conductor', 'modalidad' => 'Doble Yo PQR y correos',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Retraso en ruta',
+            'descripcion_falta' => 'Múltiples retrasos en la semana sin reportar novedades',
+            'fecha_falta' => now()->subDays(2)->format('Y-m-d'), 'estado' => 'Pendiente',
+        ]);
+
+        // 7. En Proceso (fase descargos)
+        $pJ7 = ProcesoDisciplinario::create([
+            'user_id' => $jorge->id, 'nombre' => 'Natalia Ospina', 'cedula' => '70000007',
+            'cargo' => 'Inspectora', 'modalidad' => 'Inspectores viales',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Ausencia sin justificación',
+            'descripcion_falta' => 'No se presentó a laborar y no responde el celular',
+            'fecha_falta' => now()->subDays(15)->format('Y-m-d'), 'estado' => 'Pendiente',
+        ]);
+        CasoDocumentoEstado::create([
+            'caso_id' => $pJ7->id, 'tipo_documento' => 'fallo',
+            'estado' => 'completo', 'descargado_en' => now()->subDays(1),
+        ]);
+
         // ====================================================================
-        // MARSHALL — 5 casos (Modalidades: Premium, Doble Yo, Platino Express, etc.)
+        // MARSHALL — 7 casos (Modalidades: Premium, Doble Yo, Platino Express, etc.)
         // ====================================================================
 
         // 1. Pendiente
@@ -197,6 +241,28 @@ class DemoFullSeeder extends Seeder
             'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Ausencia sin justificación',
             'descripcion_falta' => 'Incumplimiento horario de salida sin aviso',
             'fecha_falta' => now()->subDays(3)->format('Y-m-d'), 'estado' => 'Pendiente',
+        ]);
+
+        // 6. Archivado
+        ProcesoDisciplinario::create([
+            'user_id' => $marshall->id, 'nombre' => 'Julián Ríos', 'cedula' => '60000060',
+            'cargo' => 'Conductor', 'modalidad' => 'Platino Jet',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Uso inadecuado del vehículo',
+            'descripcion_falta' => 'Se determinó que el sistema GPS presentó un error de lectura',
+            'fecha_falta' => now()->subDays(80)->format('Y-m-d'), 'estado' => 'Archivado',
+        ]);
+
+        // 7. En Proceso (inicial)
+        $pM7 = ProcesoDisciplinario::create([
+            'user_id' => $marshall->id, 'nombre' => 'Carmen Buitrago', 'cedula' => '70000070',
+            'cargo' => 'Auxiliar de cabina', 'modalidad' => 'Doble Yo',
+            'tipo_proceso' => 'disciplinario', 'tipo_falta' => 'Maltrato al pasajero',
+            'descripcion_falta' => 'Queja escrita recibida en PQR por mala atención',
+            'fecha_falta' => now()->subDays(8)->format('Y-m-d'), 'estado' => 'Pendiente',
+        ]);
+        CasoDocumentoEstado::create([
+            'caso_id' => $pM7->id, 'tipo_documento' => 'disciplinario',
+            'estado' => 'borrador',
         ]);
 
         // ====================================================================
@@ -276,10 +342,10 @@ class DemoFullSeeder extends Seeder
             'motivo' => 'Te otorgo acceso para descargar el acta del caso Héctor Jiménez. Tienes 1 hora desde este aviso.',
         ]);
 
-        echo "✅ 15 casos cargados en el sistema.\n";
-        echo "   → Kelly:    5 casos (2 Pendientes, 2 En Proceso, 1 Sancionado)\n";
-        echo "   → Jorge:    5 casos (1 Pendiente, 2 En Proceso, 2 Sancionados)\n";
-        echo "   → Marshall: 5 casos (2 Pendientes, 2 En Proceso, 1 Sancionado)\n";
-        echo "   → Coordinadora: ve los 15 globales + 4 notificaciones + 2 solicitudes pendientes\n";
+        echo "✅ 21 casos cargados en el sistema.\n";
+        echo "   → Kelly:    7 casos (2 Pendientes, 3 En Proceso, 1 Sancionado, 1 Archivado)\n";
+        echo "   → Jorge:    7 casos (2 Pendientes, 3 En Proceso, 2 Sancionados)\n";
+        echo "   → Marshall: 7 casos (2 Pendientes, 3 En Proceso, 1 Sancionado, 1 Archivado)\n";
+        echo "   → Coordinadora: ve los 21 globales + 4 notificaciones + 2 solicitudes pendientes\n";
     }
 }
