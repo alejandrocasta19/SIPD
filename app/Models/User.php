@@ -187,11 +187,6 @@ class User extends Authenticatable
             . '@sipd.co';
     }
 
-    public static function claveInstitucional(string $name): string
-    {
-        return self::slugParte(self::primerNombreDe($name)) . '123';
-    }
-
     public function permisos()
     {
         return $this->hasMany(UserPermiso::class);

@@ -62,5 +62,9 @@ class RouteServiceProvider extends ServiceProvider
                 optional($request->user())->id ?: $request->ip()
             );
         });
+
+        RateLimiter::for('public-case-lookup', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
     }
 }

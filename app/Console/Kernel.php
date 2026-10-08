@@ -15,7 +15,9 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule->command('sipd:archive-closed-cases')
+            ->monthlyOn(1, '00:15')
+            ->timezone('America/Bogota');
     }
 
     /**

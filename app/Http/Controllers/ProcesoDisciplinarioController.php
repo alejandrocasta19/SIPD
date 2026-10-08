@@ -8,6 +8,7 @@ use App\Models\CasoDocumentoEstado;
 use App\Models\ProcesoDisciplinario;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ReportService;
 use App\Services\OfficialDocumentService;
@@ -76,23 +77,33 @@ class ProcesoDisciplinarioController extends Controller
         $hora = (int) now()->format('G');
         $saludo = $hora < 12 ? 'Buenos días' : ($hora < 19 ? 'Buenas tardes' : 'Buenas noches');
 
-        $casosAbiertos = (clone $visible)
-            ->whereIn('estado', ['Pendiente', 'En Proceso'])
+        $casosAbiertosQuery = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso']);
+        $hoy = now()->startOfDay();
+        $plazosVencidos = (clone $casosAbiertosQuery)
+            ->whereDate('created_at', '<=', $hoy->copy()->subDays(5)->toDateString())
+            ->count();
+        $plazosPorVencer = (clone $casosAbiertosQuery)
+            ->whereBetween('created_at', [
+                $hoy->copy()->subDays(4)->toDateString(),
+                $hoy->copy()->subDays(3)->endOfDay(),
+            ])
+            ->count();
+        $atencionIds = (clone $casosAbiertosQuery)
+            ->orderBy('created_at')
+            ->take(6)
+            ->pluck('id');
+        $atencion = (clone $casosAbiertosQuery)
+            ->whereIn('id', $atencionIds)
             ->with(['documentoEstados', 'anexos', 'user'])
             ->get()
             ->sortBy(fn ($proceso) => $proceso->diasPlazo())
             ->values();
-
-        $plazosVencidos = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'vencido')->count();
-        $plazosPorVencer = $casosAbiertos->filter(fn ($proceso) => $proceso->semaforoPlazo() === 'por_vencer')->count();
 
         $descargosPendientes = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])
             ->where(function ($query) {
                 $query->whereNull('descargos')->orWhere('descargos', '');
             })
             ->count();
-
-        $atencion = $casosAbiertos->take(6);
 
         $recientes = (clone $visible)->with(['user', 'documentoEstados', 'anexos'])
             ->latest()
@@ -375,12 +386,29 @@ class ProcesoDisciplinarioController extends Controller
         );
 
         // Historial: cerrados (Sancionado + Archivado)
-        $historial = (clone $query)->whereIn('estado', ['Sancionado', 'Archivado'])
-            ->with('user')
-            ->withCount('anexos')
-            ->latest('updated_at')
-            ->get()
-            ->map(function ($p) {
+        $historialQuery = (clone $query)->withTrashed()->whereIn('estado', ['Sancionado', 'Archivado']);
+        $driver = DB::connection()->getDriverName();
+        $duracionSql = $driver === 'sqlite'
+            ? 'CAST(julianday(updated_at) - julianday(created_at) AS INTEGER)'
+            : 'DATEDIFF(updated_at, created_at)';
+        $hStats = [
+            'total' => (clone $historialQuery)->count(),
+            'sancionados' => (clone $historialQuery)->where('estado', 'Sancionado')->count(),
+            'archivados' => (clone $historialQuery)->where('estado', 'Archivado')->count(),
+            'prom_dias' => (clone $historialQuery)
+                ->selectRaw("AVG({$duracionSql}) AS promedio")
+                ->value('promedio'),
+            'anexos' => CasoAnexo::whereIn('caso_id', (clone $historialQuery)->select('id'))->count(),
+        ];
+        $historialPaginado = Paginacion::deQuery(
+            (clone $historialQuery)
+                ->with('user')
+                ->withCount('anexos')
+                ->latest('updated_at'),
+            10,
+            'historial_page'
+        );
+        $historialPaginado->getCollection()->transform(function ($p) {
                 $inicio  = $p->created_at;
                 $cierre  = $p->updated_at ?? $p->created_at;
                 $duracion = $inicio ? (int) $inicio->diffInDays($cierre) : null;
@@ -403,17 +431,6 @@ class ProcesoDisciplinarioController extends Controller
                 ];
             });
 
-        // Stats rápidas del historial (sobre colección completa)
-        $hStats = [
-            'total'      => $historial->count(),
-            'sancionados'=> $historial->where('estado', 'Sancionado')->count(),
-            'archivados' => $historial->where('estado', 'Archivado')->count(),
-            'prom_dias'  => $historial->whereNotNull('duracion_dias')->avg('duracion_dias'),
-            'anexos'     => $historial->sum('anexos'),
-        ];
-
-        $historialPaginado = Paginacion::deColeccion($historial, 10, 'historial_page');
-
         return view('abogado.Reportes', [
             'pageTitle' => 'Estadísticas y reportes',
             'casos'     => $casos,
@@ -427,7 +444,7 @@ class ProcesoDisciplinarioController extends Controller
         try {
             [$from, $to] = $this->reportRange($request);
             
-            $query = $this->visibleProcesses();
+            $query = $this->visibleProcesses()->withTrashed();
             if ($request->filled('q')) {
                 $q = $request->q;
                 $query->where(function ($sub) use ($q) {
@@ -488,7 +505,7 @@ class ProcesoDisciplinarioController extends Controller
         try {
             [$from, $to] = $this->reportRange($request);
             
-            $query = $this->visibleProcesses();
+            $query = $this->visibleProcesses()->withTrashed();
             if ($request->filled('q')) {
                 $q = $request->q;
                 $query->where(function ($sub) use ($q) {
@@ -530,7 +547,7 @@ class ProcesoDisciplinarioController extends Controller
         ]);
 
         try {
-            $casos = $this->visibleProcesses()
+            $casos = $this->visibleProcesses()->withTrashed()
                 ->whereIn('id', $validated['ids'])
                 ->with(['user', 'documentoEstados'])
                 ->withCount('anexos')

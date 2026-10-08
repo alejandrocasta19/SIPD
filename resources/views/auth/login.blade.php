@@ -98,41 +98,25 @@
                     <button type="submit" class="btn-submit" id="login-submit">Ingresar al sistema</button>
                 </form>
 
-                <div class="quick">
-                    <div class="quick-title">Acceso rápido</div>
-                    <button type="button" class="quick-btn" data-email="coordinadora@sipd.co" data-password="admin123">
-                        <span class="avatar">CR</span>
-                        <span class="quick-copy">
-                            <strong>Coordinadora de RH</strong>
-                            <span>coordinadora@sipd.co</span>
-                        </span>
-                        <span class="quick-go">Entrar →</span>
-                    </button>
-                    <button type="button" class="quick-btn" data-email="kellyrodriguez@sipd.co" data-password="kelly123">
-                        <span class="avatar">KR</span>
-                        <span class="quick-copy">
-                            <strong>Asesora jurídica</strong>
-                            <span>Kelly Rodriguez</span>
-                        </span>
-                        <span class="quick-go">Entrar →</span>
-                    </button>
-                    <button type="button" class="quick-btn" data-email="marshallrincon@sipd.co" data-password="marshall123">
-                        <span class="avatar">MR</span>
-                        <span class="quick-copy">
-                            <strong>Jefe de personal</strong>
-                            <span>Marshall Rincón</span>
-                        </span>
-                        <span class="quick-go">Entrar →</span>
-                    </button>
-                    <button type="button" class="quick-btn" data-email="jorgerosado@sipd.co" data-password="jorge123">
-                        <span class="avatar">JR</span>
-                        <span class="quick-copy">
-                            <strong>Asesor jurídico</strong>
-                            <span>Jorge Rosado</span>
-                        </span>
-                        <span class="quick-go">Entrar →</span>
-                    </button>
-                </div>
+                @if (app()->environment('local'))
+                    @php($quickAccess = collect(config('sipd.quick_access', []))->filter(fn ($account) => filled($account['email'] ?? null) && filled($account['password'] ?? null)))
+                    @if ($quickAccess->isNotEmpty())
+                        <div class="quick">
+                            <div class="quick-title">Acceso rápido · solo desarrollo local</div>
+                            @foreach ($quickAccess as $account)
+                                <button type="button" class="quick-btn"
+                                        data-email="{{ $account['email'] }}"
+                                        data-password="{{ $account['password'] }}">
+                                    <span class="quick-copy">
+                                        <strong>{{ $account['label'] }}</strong>
+                                        <span>{{ $account['email'] }}</span>
+                                    </span>
+                                    <span class="quick-go">Entrar →</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+                @endif
 
                 <div class="guest-note">Acceso exclusivo para personal institucional de Cootranshuila.</div>
             </div>

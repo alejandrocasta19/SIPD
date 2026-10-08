@@ -155,57 +155,39 @@ class ConsultaPublicaTest extends TestCase
             ->assertSee('Cootranshuila')
             ->assertSee('logo-sipd.png', false)
             ->assertDontSee('logo-sipd.svg', false)
-            ->assertSee('Acceso rápido')
-            ->assertSee('Coordinadora de RH')
-            ->assertSee('Asesora jurídica')
-            ->assertSee('Jefe de personal')
-            ->assertSee('Asesor jurídico')
-            ->assertSee('kellyrodriguez@sipd.co', false)
-            ->assertSee('marshallrincon@sipd.co', false)
-            ->assertSee('jorgerosado@sipd.co', false)
-            ->assertSee('Kelly Rodriguez')
-            ->assertSee('Marshall Rincón')
-            ->assertSee('Jorge Rosado')
-            ->assertDontSee('rh@sipd.co')
-            ->assertDontSee('kelly.johanna.rodriguez@pendiente.local', false);
+            ->assertDontSee('Acceso rápido')
+            ->assertDontSee('data-password=', false)
+            ->assertDontSee('kellyrodriguez@sipd.co', false)
+            ->assertDontSee('marshallrincon@sipd.co', false)
+            ->assertDontSee('jorgerosado@sipd.co', false);
     }
 
     /** @test */
-    public function seeder_crea_equipo_rh_con_correo_y_clave_del_nombre()
+    public function accesos_rapidos_se_muestran_solo_en_entorno_local_con_credenciales_configuradas()
     {
-        User::factory()->create([
-            'name' => 'Equipo de RH',
-            'email' => 'rh@sipd.co',
-            'role' => User::ROLE_EQUIPO,
-            'cargo' => 'Equipo de RH',
+        app()->detectEnvironment(function () {
+            return 'local';
+        });
+        config([
+            'sipd.quick_access' => [[
+                'label' => 'Cuenta temporal',
+                'email' => 'temporal@sipd.co',
+                'password' => 'temporary-test-password',
+            ]],
         ]);
 
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('Acceso rápido · solo desarrollo local')
+            ->assertSee('temporal@sipd.co')
+            ->assertSee('data-password="temporary-test-password"', false);
+    }
+
+    /** @test */
+    public function seeder_no_crea_cuentas_con_credenciales_predeterminadas()
+    {
         $this->seed();
 
-        $kelly = User::where('email', 'kellyrodriguez@sipd.co')->first();
-        $marshall = User::where('email', 'marshallrincon@sipd.co')->first();
-        $jorge = User::where('email', 'jorgerosado@sipd.co')->first();
-
-        $this->assertNotNull($kelly);
-        $this->assertSame('equipo', $kelly->role);
-        $this->assertSame('Asesora jurídica', $kelly->cargo);
-        $this->assertSame('Kelly Rodriguez', $kelly->nombreCorto());
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('kelly123', $kelly->password));
-
-        $this->assertNotNull($marshall);
-        $this->assertSame('equipo', $marshall->role);
-        $this->assertSame('Jefe de personal', $marshall->cargo);
-        $this->assertSame('Marshall Rincón', $marshall->nombreCorto());
-        $this->assertSame('MR', $marshall->inicialesCortas());
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('marshall123', $marshall->password));
-
-        $this->assertNotNull($jorge);
-        $this->assertSame('equipo', $jorge->role);
-        $this->assertSame('Asesor jurídico', $jorge->cargo);
-        $this->assertSame('Jorge Rosado', $jorge->nombreCorto());
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('jorge123', $jorge->password));
-
-        $this->assertNull(User::where('email', 'rh@sipd.co')->first());
-        $this->assertSame(3, User::where('role', User::ROLE_EQUIPO)->count());
+        $this->assertDatabaseCount('users', 0);
     }
 }

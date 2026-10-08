@@ -8,11 +8,16 @@ use App\Models\ProcesoDisciplinario;
 use App\Models\CasoDocumentoEstado;
 use App\Models\Aviso;
 use App\Models\PermisoSolicitud;
+use RuntimeException;
 
 class DemoFullSeeder extends Seeder
 {
     public function run()
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('DemoFullSeeder no puede ejecutarse en producción.');
+        }
+
         $admin    = User::where('role', 'admin')->first();
         $marshall = User::where('name', 'like', '%Marshall%')->first();
         $jorge    = User::where('name', 'like', '%Jorge%')->first();

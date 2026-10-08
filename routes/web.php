@@ -32,6 +32,7 @@ Auth::routes(['register' => false]);
 Route::get('/consultar-caso', [ConsultaPublicaController::class, 'create'])
     ->name('consulta.publica');
 Route::post('/consultar-caso', [ConsultaPublicaController::class, 'buscar'])
+    ->middleware('throttle:public-case-lookup')
     ->name('consulta.publica.buscar');
 
 /*

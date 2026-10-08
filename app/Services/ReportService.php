@@ -9,6 +9,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -1102,7 +1103,7 @@ class ReportService
                 $this->styleExcelHeader($sheet, 'A' . $row . ':' . $last . $row);
                 $row++;
                 foreach ($rows as $dataRow) {
-                    $sheet->fromArray([array_values($dataRow)], null, 'A' . $row);
+                    $this->setExcelRow($sheet, array_values($dataRow), $row);
                     $row++;
                 }
                 $tableEnd = $row - 1;
@@ -1246,10 +1247,22 @@ class ReportService
         $sheet->fromArray([$headers], null, 'A1');
         $row = 2;
         foreach ($items as $item) {
-            $sheet->fromArray([[$item['label'] ?? '', $item['total'] ?? 0]], null, 'A' . $row++);
+            $this->setExcelRow($sheet, [$item['label'] ?? '', $item['total'] ?? 0], $row++);
         }
         $this->styleExcelHeader($sheet, 'A1:' . chr(64 + count($headers)) . '1');
         $this->autosize($sheet, chr(64 + count($headers)));
+    }
+
+    private function setExcelRow($sheet, array $values, int $row): void
+    {
+        foreach ($values as $index => $value) {
+            $cell = $this->excelCol($index + 1) . $row;
+            if (is_string($value)) {
+                $sheet->setCellValueExplicit($cell, $value, DataType::TYPE_STRING);
+            } else {
+                $sheet->setCellValue($cell, $value);
+            }
+        }
     }
 
     private function styleExcelTitle($sheet, string $range): void

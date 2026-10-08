@@ -165,6 +165,41 @@ class ReporteExportTest extends TestCase
     }
 
     /** @test */
+    public function datos_de_casos_que_parecen_formulas_se_exportan_como_texto_en_excel()
+    {
+        $user = User::factory()->create(['role' => 'equipo']);
+        $case = ProcesoDisciplinario::factory()->create([
+            'user_id' => $user->id,
+            'nombre' => '=HYPERLINK("https://example.invalid","abrir")',
+        ]);
+        $case->load('user');
+        $case->anexos_count = 0;
+
+        $service = app(ReportService::class);
+        $reflection = new \ReflectionClass($service);
+        $layoutMethod = $reflection->getMethod('casesLayout');
+        $layoutMethod->setAccessible(true);
+        $buildMethod = $reflection->getMethod('buildExcelFromLayout');
+        $buildMethod->setAccessible(true);
+
+        $spreadsheet = $buildMethod->invoke($service, $layoutMethod->invoke($service, collect([$case])), false);
+        $sheet = $spreadsheet->getActiveSheet();
+        $formulaCell = null;
+
+        foreach ($sheet->getRowIterator() as $row) {
+            foreach ($row->getCellIterator() as $cell) {
+                if ($cell->getValue() === $case->nombre) {
+                    $formulaCell = $cell;
+                    break 2;
+                }
+            }
+        }
+
+        $this->assertNotNull($formulaCell);
+        $this->assertSame(\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING, $formulaCell->getDataType());
+    }
+
+    /** @test */
     public function se_puede_descargar_el_informe_global_en_pdf_word_y_excel()
     {
         $user = User::factory()->create(['role' => 'equipo']);
