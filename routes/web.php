@@ -250,6 +250,10 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
         ->name('coordinadora.abogados.permisos');
     Route::get('/coordinadora/solicitudes', [CoordinadoraController::class, 'solicitudes'])
         ->name('coordinadora.solicitudes');
+    Route::get('/coordinadora/recuperaciones-contrasena', [CoordinadoraController::class, 'recuperaciones'])
+        ->name('coordinadora.recuperaciones');
+    Route::put('/coordinadora/recuperaciones-contrasena/{id}', [CoordinadoraController::class, 'responderRecuperacion'])
+        ->name('coordinadora.recuperaciones.responder');
     Route::put('/coordinadora/solicitudes/{id}', [CoordinadoraController::class, 'responderSolicitud'])
         ->name('coordinadora.solicitudes.responder');
     Route::delete('/coordinadora/solicitudes/historial', [CoordinadoraController::class, 'vaciarHistorial'])

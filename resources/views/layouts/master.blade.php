@@ -16,8 +16,6 @@
 
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=49">
     @yield('styles')
-    {{-- Pre-scroll: page starts hidden, scroll restored before first paint --}}
-    <style>html{opacity:0;transition:opacity .12s ease}</style>
     <script>
     (function(){
         var rawState = sessionStorage.getItem('sipd_scroll_restore');
@@ -887,7 +885,7 @@
         })();
     </script>
     @yield('scripts')
-    {{-- Scroll restore + page reveal: runs AFTER full DOM is in place --}}
+    {{-- Restore scroll after the destination page has rendered. --}}
     <script>
     (function(){
         var state = window.__sipdScrollState;
@@ -933,8 +931,6 @@
             }
             restoreTimer = window.setTimeout(restoreScroll, 300);
         }
-        // Reveal the page (was hidden by CSS in <head>)
-        document.documentElement.style.opacity = '1';
     })();
     </script>
 </body>

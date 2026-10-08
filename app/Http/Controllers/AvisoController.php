@@ -67,6 +67,10 @@ class AvisoController extends Controller
             return redirect()->route('coordinadora.veredictos');
         }
 
+        if ($aviso->tipo === Aviso::TIPO_RECUPERACION && auth()->user()->esCoordinadora()) {
+            return redirect()->route('coordinadora.recuperaciones');
+        }
+
         if ($aviso->tipo === Aviso::TIPO_FIRMA
             && $aviso->proceso_id
             && $aviso->tipo_documento

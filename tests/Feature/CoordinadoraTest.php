@@ -622,6 +622,7 @@ class CoordinadoraTest extends TestCase
             ->assertSee('sidebarTop', false)
             ->assertSee("document.addEventListener('pointerdown', guardarScrollEnEnlace, true)", false)
             ->assertSee("window.addEventListener('load', restoreScroll, { once: true })", false)
+            ->assertDontSee('html{opacity:0', false)
             ->assertSee("document.body.style.position = 'fixed'", false)
             ->assertSee('data-permisos=', false)
             ->assertDontSee('Dependencia')

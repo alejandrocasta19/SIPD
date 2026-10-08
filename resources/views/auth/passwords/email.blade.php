@@ -4,18 +4,18 @@
 
 @section('content')
     <h2>Recuperar contraseña</h2>
-    <p class="guest-lead">Ingresa el correo de tu cuenta institucional. Te enviaremos un enlace para restablecerla.</p>
+    <p class="guest-lead">Ingresa el correo de tu cuenta institucional. La coordinadora revisará la solicitud y, si la aprueba, recibirás un enlace para crear una contraseña nueva.</p>
 
     @if(session('status'))
         <div class="sipd-alert sipd-alert-success" role="status">
-            Te enviamos el enlace al correo si esa cuenta existe en el sistema.
+            Si el correo pertenece a una cuenta activa del equipo, la solicitud fue enviada a coordinación. Si se aprueba, llegará un enlace de un solo uso al correo registrado.
         </div>
     @endif
 
     @if($errors->any())
         <div class="sipd-alert sipd-alert-error" role="alert">
             <div>
-                <strong>No se pudo enviar el enlace</strong>
+                <strong>No se pudo enviar la solicitud</strong>
                 <ul>
                     @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -31,7 +31,7 @@
             <label for="email">Correo electrónico <span class="req">*</span></label>
             <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="usuario@cootranshuila.com" autocomplete="username" required autofocus class="{{ $errors->has('email') ? 'is-invalid' : '' }}">
         </div>
-        <button type="submit" class="btn-submit" id="forgot-submit">Enviar enlace</button>
+        <button type="submit" class="btn-submit" id="forgot-submit">Solicitar recuperación</button>
     </form>
 
     <a class="guest-back" href="{{ route('login') }}">← Volver al acceso</a>
@@ -46,7 +46,7 @@
         if (!form || !submit) return;
         form.addEventListener('submit', function () {
             submit.disabled = true;
-            submit.textContent = 'Enviando…';
+            submit.textContent = 'Enviando solicitud…';
         });
     })();
 </script>

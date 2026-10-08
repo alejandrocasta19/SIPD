@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Aviso;
 use App\Models\PermisoSolicitud;
 use App\Models\ProcesoDisciplinario;
+use App\Models\RecuperacionContrasena;
 use App\Models\User;
 use App\Support\Paginacion;
 use App\Support\RhPermisos;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
 
 class CoordinadoraController extends Controller
 {
@@ -55,6 +57,79 @@ class CoordinadoraController extends Controller
             'duraciones' => RhPermisos::duracionesHoras(),
             'solicitables' => RhPermisos::solicitables(),
         ]);
+    }
+
+    public function recuperaciones()
+    {
+        abort_unless(auth()->user()->esCoordinadora(), 403);
+
+        $pendientes = Paginacion::deQuery(
+            RecuperacionContrasena::with('user')
+                ->where('estado', RecuperacionContrasena::PENDIENTE)
+                ->latest(),
+            10,
+            'recuperaciones_page'
+        );
+
+        $historial = Paginacion::deQuery(
+            RecuperacionContrasena::with(['user', 'respondente'])
+                ->where('estado', '!=', RecuperacionContrasena::PENDIENTE)
+                ->latest('responded_at'),
+            10,
+            'recuperaciones_historial_page'
+        );
+
+        return view('coordinadora.recuperaciones', [
+            'pageTitle' => 'Recuperar contraseñas',
+            'pendientes' => $pendientes,
+            'historial' => $historial,
+        ]);
+    }
+
+    public function responderRecuperacion(Request $request, $id)
+    {
+        abort_unless(auth()->user()->esCoordinadora(), 403);
+
+        $validated = $request->validate([
+            'accion' => 'required|in:enviar_enlace,rechazar',
+        ]);
+
+        $solicitud = RecuperacionContrasena::with('user')->findOrFail($id);
+        abort_unless(
+            $solicitud->estado === RecuperacionContrasena::PENDIENTE,
+            422,
+            'Esta solicitud ya fue resuelta.'
+        );
+
+        if ($validated['accion'] === 'rechazar') {
+            $solicitud->update([
+                'estado' => RecuperacionContrasena::RECHAZADA,
+                'responded_by' => auth()->id(),
+                'responded_at' => now(),
+            ]);
+
+            return back()->with('success', 'Solicitud rechazada.');
+        }
+
+        if (!$solicitud->user->esEquipo() || !$solicitud->user->estaActivo()) {
+            return back()->with('error', 'Solo se puede recuperar la contraseña de una cuenta activa del equipo.');
+        }
+
+        $resultado = Password::sendResetLink([
+            'email' => $solicitud->user->email,
+        ]);
+
+        if ($resultado !== Password::RESET_LINK_SENT) {
+            return back()->with('error', 'No se pudo enviar el enlace. La solicitud sigue pendiente; inténtalo más tarde.');
+        }
+
+        $solicitud->update([
+            'estado' => RecuperacionContrasena::ENLACE_ENVIADO,
+            'responded_by' => auth()->id(),
+            'responded_at' => now(),
+        ]);
+
+        return back()->with('success', 'Se envió al correo del usuario un enlace de un solo uso para crear su contraseña.');
     }
 
     public function responderSolicitud(Request $request, $id)
