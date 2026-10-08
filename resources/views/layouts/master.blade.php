@@ -1,5 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
+@php
+    $sipdClientStateId = session()->get('sipd_client_state_id');
+    if (!$sipdClientStateId) {
+        $sipdClientStateId = (string) \Illuminate\Support\Str::uuid();
+        session()->put('sipd_client_state_id', $sipdClientStateId);
+    }
+@endphp
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,6 +25,37 @@
     @yield('styles')
     <script>
     (function(){
+        var currentDraftKey = 'sipd_nuevo_proceso_' + @json($sipdClientStateId);
+        window.__sipdEndingSession = false;
+        window.sipdEndClientSession = function () {
+            window.__sipdEndingSession = true;
+            try {
+                Object.keys(localStorage).forEach(function (key) {
+                    if (key.indexOf('sipd_nuevo_') === 0 && key !== currentDraftKey) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                localStorage.removeItem(currentDraftKey);
+            } catch (error) {
+                console.warn('No se pudo limpiar el borrador local al cerrar la sesión.', error);
+            }
+            try {
+                sessionStorage.removeItem('sipd_scroll_restore');
+            } catch (error) {
+                console.warn('No se pudo limpiar la posición guardada al cerrar la sesión.', error);
+            }
+        };
+
+        try {
+            Object.keys(localStorage).forEach(function (key) {
+                if (key.indexOf('sipd_nuevo_') === 0 && key !== currentDraftKey) {
+                    localStorage.removeItem(key);
+                }
+            });
+        } catch (error) {
+            console.warn('No se pudieron limpiar borradores de sesiones anteriores.', error);
+        }
+
         var rawState = sessionStorage.getItem('sipd_scroll_restore');
         var state = null;
         sessionStorage.removeItem('sipd_scroll_restore');
@@ -28,8 +66,8 @@
         }
         window.__sipdScrollState = state && state.path === location.pathname
             && Number.isFinite(state.top) ? state : null;
-        if (window.__sipdScrollState && 'scrollRestoration' in history) {
-            history.scrollRestoration = 'manual';
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = window.__sipdScrollState ? 'manual' : 'auto';
         }
     })();
     </script>
@@ -171,7 +209,7 @@
 
             <div class="sipd-side-user">
                 <a class="sipd-logout" href="{{ route('logout') }}"
-                   onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                   onclick="event.preventDefault(); window.sipdEndClientSession(); document.getElementById('logout-form').submit();">
                     <i class="fas fa-sign-out-alt"></i> Cerrar sesión
                 </a>
             </div>
@@ -313,7 +351,7 @@
                                 </a>
                                 <div class="dropdown-divider"></div>
                                 <a class="dropdown-item danger" href="{{ route('logout') }}"
-                                   onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                   onclick="event.preventDefault(); window.sipdEndClientSession(); document.getElementById('logout-form').submit();">
                                     <span class="umi"><i class="fas fa-sign-out-alt"></i></span>
                                     Cerrar sesión
                                 </a>
@@ -540,6 +578,7 @@
             var cierreTimer = null;
 
             function cerrar() {
+                window.sipdEndClientSession();
                 form.submit();
             }
 
@@ -876,6 +915,7 @@
             }, true);
 
             window.addEventListener('beforeunload', function() {
+                if (window.__sipdEndingSession) return;
                 if (!sessionStorage.getItem('sipd_scroll_restore')) {
                     guardarScrollAntesDeNavegar(window.location.href, null);
                 }

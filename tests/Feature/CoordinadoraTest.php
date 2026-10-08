@@ -43,6 +43,26 @@ class CoordinadoraTest extends TestCase
     }
 
     /** @test */
+    public function la_clave_del_estado_del_navegador_se_mantiene_entre_modulos_de_la_misma_sesion()
+    {
+        $coord = $this->makeUser('coordinadora');
+
+        $this->actingAs($coord)
+            ->get(route('abogado.dashboard'))
+            ->assertOk();
+
+        $stateId = session()->get('sipd_client_state_id');
+        $this->assertNotEmpty($stateId);
+
+        $this->get(route('coordinadora.abogados'))
+            ->assertOk()
+            ->assertSee("var currentDraftKey = 'sipd_nuevo_proceso_' +", false)
+            ->assertSee(json_encode($stateId), false);
+
+        $this->assertSame($stateId, session()->get('sipd_client_state_id'));
+    }
+
+    /** @test */
     public function contador_de_solicitudes_del_sidebar_refleja_solicitudes_pendientes_no_avisos_no_leidos()
     {
         $coord = $this->makeUser('coordinadora');
@@ -624,6 +644,9 @@ class CoordinadoraTest extends TestCase
             ->assertSee("window.addEventListener('load', restoreScroll, { once: true })", false)
             ->assertDontSee('html{opacity:0', false)
             ->assertSee("document.body.style.position = 'fixed'", false)
+            ->assertSee('window.sipdEndClientSession = function ()', false)
+            ->assertSee('window.__sipdEndingSession = true', false)
+            ->assertSee('currentDraftKey', false)
             ->assertSee('data-permisos=', false)
             ->assertDontSee('Dependencia')
             ->assertDontSee('Rango IP')

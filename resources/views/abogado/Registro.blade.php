@@ -592,7 +592,7 @@ var etapaAbierta = false;
 var plantillaCache = {};
 var MODALIDADES_PLACA = @json(\App\Support\Modalidades::conPlaca());
 var MODALIDADES_CAMPO_CARGO = @json(\App\Support\Modalidades::opcionesConCampoCargo());
-var DRAFT_KEY = 'sipd_nuevo_proceso';
+var DRAFT_KEY = 'sipd_nuevo_proceso_' + @json(session()->get('sipd_client_state_id'));
 var persistTimer;
 
 function emptyDraft() {
@@ -782,6 +782,7 @@ function hostMatchesTipo(tipo) {
 }
 
 function persistDraft() {
+    if (window.__sipdEndingSession) return;
     var d = readDraft();
     d.slot = currentSlot;
     d.tipo = currentTipo;
