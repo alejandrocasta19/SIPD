@@ -14,19 +14,23 @@
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=46">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=49">
     @yield('styles')
     {{-- Pre-scroll: page starts hidden, scroll restored before first paint --}}
     <style>html{opacity:0;transition:opacity .12s ease}</style>
     <script>
     (function(){
-        var _pos  = sessionStorage.getItem('sipd_scroll_pos');
-        var _path = sessionStorage.getItem('sipd_scroll_path');
-        sessionStorage.removeItem('sipd_scroll_pos');
-        sessionStorage.removeItem('sipd_scroll_path');
-        // Store target scroll for the body script to apply once DOM is ready
-        window.__sipdScroll = (_pos && _path === location.pathname) ? parseInt(_pos, 10) : null;
-        if (window.__sipdScroll !== null && 'scrollRestoration' in history) {
+        var rawState = sessionStorage.getItem('sipd_scroll_restore');
+        var state = null;
+        sessionStorage.removeItem('sipd_scroll_restore');
+        try {
+            state = rawState ? JSON.parse(rawState) : null;
+        } catch (error) {
+            state = null;
+        }
+        window.__sipdScrollState = state && state.path === location.pathname
+            && Number.isFinite(state.top) ? state : null;
+        if (window.__sipdScrollState && 'scrollRestoration' in history) {
             history.scrollRestoration = 'manual';
         }
     })();
@@ -588,9 +592,25 @@
             var app = document.querySelector('.sipd-app');
             var toggle = document.getElementById('sipd-nav-toggle');
             var scrim = document.getElementById('sipd-nav-scrim');
+            var lockedScrollTop = 0;
 
             function setNav(open) {
                 if (!app) return;
+                var wasOpen = app.classList.contains('is-nav-open');
+                if (open === wasOpen) return;
+                if (open) {
+                    lockedScrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+                    document.body.style.position = 'fixed';
+                    document.body.style.top = '-' + lockedScrollTop + 'px';
+                    document.body.style.width = '100%';
+                } else {
+                    var savedTop = document.body.style.top;
+                    var scrollTop = savedTop ? Math.abs(parseFloat(savedTop)) : lockedScrollTop;
+                    document.body.style.position = '';
+                    document.body.style.top = '';
+                    document.body.style.width = '';
+                    window.scrollTo(0, scrollTop);
+                }
                 app.classList.toggle('is-nav-open', open);
                 document.body.style.overflow = open ? 'hidden' : '';
                 if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -780,7 +800,10 @@
                     if (go) go.classList.toggle('is-hidden', !custom);
                     if (!custom) {
                         input.value = choice.value;
-                        if (submitPreset) form.submit();
+                        if (submitPreset) {
+                            guardarScrollAntesDeNavegar(form.action, form.closest('.sipd-pager'));
+                            form.submit();
+                        }
                     } else if (submitPreset) {
                         input.focus();
                         input.select();
@@ -789,20 +812,126 @@
                 choice.addEventListener('change', function () { sync(true); });
             });
 
-            // Guardar posición de scroll al salir (para paginación dentro del mismo módulo)
+            function guardarScrollAntesDeNavegar(url, ancla) {
+                var destino;
+                try {
+                    destino = new URL(url || window.location.href, window.location.href);
+                } catch (error) {
+                    return;
+                }
+                if (destino.origin !== window.location.origin) return;
+
+                var bodyTop = document.body.style.position === 'fixed'
+                    ? Math.abs(parseFloat(document.body.style.top) || 0)
+                    : 0;
+                var estado = {
+                    path: destino.pathname,
+                    top: bodyTop || window.scrollY || document.documentElement.scrollTop || 0,
+                    anchorTop: null,
+                    pagerIndex: null,
+                    sidebarTop: null
+                };
+                if (ancla) {
+                    estado.anchorTop = ancla.getBoundingClientRect().top;
+                    estado.pagerIndex = Array.prototype.indexOf.call(
+                        document.querySelectorAll('.sipd-pager'), ancla
+                    );
+                }
+                var sidebarNav = document.querySelector('.sipd-sidebar-nav');
+                if (sidebarNav) estado.sidebarTop = sidebarNav.scrollTop;
+                sessionStorage.setItem('sipd_scroll_restore', JSON.stringify(estado));
+            }
+
+            function guardarScrollEnEnlace(event) {
+                var target = event.target instanceof Element ? event.target : event.target.parentElement;
+                var link = target && target.closest('a[href]');
+                if (!link || (event.type === 'click' && event.button !== 0)
+                    || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey
+                    || link.target === '_blank' || link.hasAttribute('download')) return;
+
+                var destination;
+                try {
+                    destination = new URL(link.href, window.location.href);
+                } catch (error) {
+                    return;
+                }
+                if (destination.origin !== window.location.origin
+                    || (destination.pathname === window.location.pathname
+                        && destination.search === window.location.search
+                        && destination.hash)) return;
+
+                var pager = link.closest('.sipd-pager');
+                guardarScrollAntesDeNavegar(destination.href, pager);
+            }
+
+            document.addEventListener('pointerdown', guardarScrollEnEnlace, true);
+            document.addEventListener('click', guardarScrollEnEnlace, true);
+
+            document.addEventListener('submit', function (event) {
+                var form = event.target;
+                if (!(form instanceof HTMLFormElement)) return;
+
+                var method = (form.method || 'get').toLowerCase();
+                var target = method === 'get' ? form.action : window.location.href;
+                var pager = form.closest('.sipd-pager');
+                guardarScrollAntesDeNavegar(target, pager);
+            }, true);
+
             window.addEventListener('beforeunload', function() {
-                sessionStorage.setItem('sipd_scroll_pos', window.scrollY);
-                sessionStorage.setItem('sipd_scroll_path', window.location.pathname);
+                if (!sessionStorage.getItem('sipd_scroll_restore')) {
+                    guardarScrollAntesDeNavegar(window.location.href, null);
+                }
             });
+
+            window.guardarScrollAntesDeNavegar = guardarScrollAntesDeNavegar;
         })();
     </script>
     @yield('scripts')
     {{-- Scroll restore + page reveal: runs AFTER full DOM is in place --}}
     <script>
     (function(){
-        var target = window.__sipdScroll;
-        if (target !== null && target !== undefined) {
-            window.scrollTo({ top: target, left: 0, behavior: 'instant' });
+        var state = window.__sipdScrollState;
+        if (state) {
+            var cancelled = false;
+            var restoreTimer;
+
+            function restoreScroll() {
+                if (cancelled) return;
+                var top = Math.max(0, state.top);
+                var pagers = document.querySelectorAll('.sipd-pager');
+                var pager = state.pagerIndex !== null && state.pagerIndex >= 0
+                    ? pagers[state.pagerIndex] : null;
+                if (state.anchorTop !== null && pager) {
+                    top = window.scrollY + pager.getBoundingClientRect().top - state.anchorTop;
+                }
+                window.scrollTo({ top: Math.max(0, top), left: 0, behavior: 'instant' });
+                var sidebarNav = document.querySelector('.sipd-sidebar-nav');
+                if (sidebarNav && Number.isFinite(state.sidebarTop)) {
+                    sidebarNav.scrollTop = state.sidebarTop;
+                }
+            }
+
+            function cancelRestore() {
+                cancelled = true;
+                clearTimeout(restoreTimer);
+                window.removeEventListener('wheel', cancelRestore);
+                window.removeEventListener('touchstart', cancelRestore);
+                window.removeEventListener('pointerdown', cancelRestore);
+                window.removeEventListener('keydown', cancelRestore);
+            }
+
+            window.addEventListener('wheel', cancelRestore, { once: true, passive: true });
+            window.addEventListener('touchstart', cancelRestore, { once: true, passive: true });
+            window.addEventListener('pointerdown', cancelRestore, { once: true, passive: true });
+            window.addEventListener('keydown', cancelRestore, { once: true });
+            restoreScroll();
+            requestAnimationFrame(restoreScroll);
+            window.addEventListener('load', restoreScroll, { once: true });
+            window.addEventListener('pageshow', restoreScroll, { once: true });
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(restoreScroll);
+            }
+            restoreTimer = window.setTimeout(restoreScroll, 300);
         }
         // Reveal the page (was hidden by CSS in <head>)
         document.documentElement.style.opacity = '1';

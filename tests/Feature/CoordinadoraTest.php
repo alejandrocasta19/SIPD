@@ -606,9 +606,29 @@ class CoordinadoraTest extends TestCase
             ->assertSee('data-activo="1"', false)
             ->assertSee(route('coordinadora.abogados.editar', $rh->id), false)
             ->assertSee('Agregar nuevo integrante')
-            ->assertSee('Configurar permisos')
-            ->assertSee('Distribuye cargos y permisos')
-            ->assertSee('class="eq-card"', false)
+            ->assertSee('Nombre completo')
+            ->assertSee('Correo electrónico')
+            ->assertSee('Rol principal')
+            ->assertSee('Permisos')
+            ->assertSee('Habilitado')
+            ->assertSee('Editar integrante ·')
+            ->assertSee('Guardar integrante y permisos')
+            ->assertSee('.team-actions button.edit-rh:hover i', false)
+            ->assertSee('color: #f97316 !important', false)
+            ->assertSee('.team-actions button.edit-rh i { color: #94a3b8; }', false)
+            ->assertSee('sipd_scroll_restore', false)
+            ->assertSee('anchorTop', false)
+            ->assertSee('pagerIndex', false)
+            ->assertSee('sidebarTop', false)
+            ->assertSee("document.addEventListener('pointerdown', guardarScrollEnEnlace, true)", false)
+            ->assertSee("window.addEventListener('load', restoreScroll, { once: true })", false)
+            ->assertSee("document.body.style.position = 'fixed'", false)
+            ->assertSee('data-permisos=', false)
+            ->assertDontSee('Dependencia')
+            ->assertDontSee('Rango IP')
+            ->assertDontSee('Última IP')
+            ->assertDontSee('Configurar permisos')
+            ->assertDontSee('class="eq-card"', false)
             ->assertSee('class="sipd-pager"', false)
             ->assertSee('name="cargo"', false)
             ->assertSee('<select name="cargo"', false)
@@ -629,6 +649,8 @@ class CoordinadoraTest extends TestCase
                 'email' => 'kellyactualizada@sipd.co',
                 'cargo' => 'Asesor jurídico',
                 'activo' => '1',
+                'permisos' => ['ver_casos', 'editar_casos', 'ver_reportes'],
+                'duracion' => ['editar_casos' => '3'],
             ])
             ->assertRedirect();
 
@@ -638,6 +660,10 @@ class CoordinadoraTest extends TestCase
             'email' => 'kellyactualizada@sipd.co',
             'cargo' => 'Asesor jurídico',
         ]);
+        $this->assertTrue($rh->fresh()->puede('ver_casos'));
+        $this->assertTrue($rh->fresh()->puede('editar_casos'));
+        $this->assertTrue($rh->fresh()->puede('ver_reportes'));
+        $this->assertFalse($rh->fresh()->puede('registrar_casos'));
         $this->assertSame($hashAntes, $rh->fresh()->password);
 
         $this->actingAs($coord)

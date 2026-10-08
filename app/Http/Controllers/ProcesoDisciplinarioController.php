@@ -1256,6 +1256,7 @@ class ProcesoDisciplinarioController extends Controller
     {
         $abogado = User::where('role', 'equipo')->findOrFail($id);
         $editarUrl = route('coordinadora.abogados.editar', $abogado->id);
+        $permisosValidos = implode(',', \App\Support\RhPermisos::claves());
 
         try {
             $validated = $request->validate([
@@ -1263,6 +1264,12 @@ class ProcesoDisciplinarioController extends Controller
                 'email' => Formatos::reglasEmail(true, $abogado->id),
                 'cargo' => Formatos::reglasCargo(),
                 'nueva_password' => 'nullable|min:8|confirmed',
+                'permisos' => 'sometimes|array',
+                'permisos.*' => 'string|in:' . $permisosValidos,
+                'duracion' => 'sometimes|array',
+                'duracion.*' => 'in:permanente,1,3,5,custom',
+                'horas' => 'sometimes|array',
+                'horas.*' => 'nullable|integer|min:1|max:168',
             ] + Formatos::mensajes());
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()
@@ -1283,7 +1290,15 @@ class ProcesoDisciplinarioController extends Controller
             $data['password'] = Hash::make($validated['nueva_password']);
         }
 
-        $abogado->update($data);
+        DB::transaction(function () use ($abogado, $data, $validated, $request) {
+            $abogado->update($data);
+            $abogado->sincronizarPermisos(
+                $validated['permisos'] ?? [],
+                $validated['duracion'] ?? [],
+                auth()->id(),
+                $validated['horas'] ?? []
+            );
+        });
         $abogado = $abogado->fresh();
 
         if (!$abogado->estaActivo()) {
@@ -1296,7 +1311,7 @@ class ProcesoDisciplinarioController extends Controller
 
         return redirect()
             ->back()
-            ->with('success', $ok);
+            ->with('success', $ok . ' Permisos actualizados.');
     }
 
     public function asignarProceso(Request $request, $id)

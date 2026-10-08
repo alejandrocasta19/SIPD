@@ -107,105 +107,63 @@
         color: #64748b;
         font-size: 14px;
     }
-    .eq-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 18px;
-    }
-    .eq-card {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
+    .team-table-wrap {
+        overflow-x: auto;
         background: #fff;
         border: 1px solid var(--cth-border);
-        border-radius: 22px;
-        padding: 28px 22px 22px;
+        border-radius: 18px;
         box-shadow: var(--cth-shadow);
-        min-height: 320px;
     }
-    .eq-card:hover { border-color: #9cbcab; }
-    .eq-card.is-inactive { opacity: .72; background: #f8fafc; }
-    .eq-card-icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: var(--cth-green-soft);
-        color: var(--cth-green);
-        display: grid;
-        place-items: center;
-        font-size: 22px;
-        margin-bottom: 14px;
+    .team-table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+        text-align: left;
     }
-    .eq-card h3 {
-        margin: 0 0 8px;
-        font-size: 18px;
-        font-weight: 800;
-        color: var(--cth-ink);
-        letter-spacing: -.02em;
+    .team-table th {
+        padding: 14px 18px;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        border-bottom: 1px solid var(--cth-line);
     }
-    .eq-badge {
+    .team-table td {
+        padding: 16px 18px;
+        color: #334155;
+        font-size: 13px;
+        border-bottom: 1px solid var(--cth-line);
+        vertical-align: middle;
+    }
+    .team-table tbody tr:last-child td { border-bottom: 0; }
+    .team-table tr.is-inactive td { color: #94a3b8; }
+    .team-name { color: var(--cth-ink); font-weight: 700; }
+    .team-role {
         display: inline-flex;
         align-items: center;
-        padding: 4px 12px;
+        padding: 5px 10px;
         border-radius: 999px;
-        background: #ecfdf5;
-        color: var(--cth-green-text);
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-    }
-    .eq-badge.off { background: #f1f5f9; color: #64748b; }
-    .eq-card hr {
-        width: 100%;
-        border: 0;
-        border-top: 1px solid var(--cth-line);
-        margin: 18px 0 16px;
-    }
-    .eq-assign {
-        margin: 0 0 6px;
-        color: #334155;
-        font-size: 14px;
-        font-weight: 600;
-        line-height: 1.4;
-    }
-    .eq-assign small {
-        display: block;
-        margin-top: 4px;
-        color: #94a3b8;
+        background: #eff6ff;
+        color: #1d4ed8;
         font-size: 12px;
-        font-weight: 500;
+        font-weight: 700;
     }
-    .eq-lock {
-        margin-top: auto;
-        display: flex;
-        flex-direction: column;
+    .team-permissions {
+        display: inline-flex;
+        min-width: 28px;
+        height: 28px;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        width: 100%;
-        border: 0;
-        background: transparent;
-        color: var(--cth-green);
-        font: inherit;
-        font-size: 13px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #334155;
+        font-size: 12px;
         font-weight: 700;
-        cursor: pointer;
-        padding: 18px 8px 4px;
     }
-    .eq-lock:hover { color: var(--cth-green-dark); }
-    .eq-lock i { font-size: 16px; }
-    .eq-board .sipd-pager { margin-top: 22px; }
-    .eq-card-acts {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        display: flex;
-        gap: 4px;
-    }
-    .eq-card-acts button {
+    .team-actions { display: flex; align-items: center; gap: 6px; }
+    .team-actions button {
         width: 32px;
         height: 32px;
         border: 0;
@@ -214,26 +172,40 @@
         cursor: pointer;
         border-radius: 8px;
     }
-    .eq-card-acts button.edit-rh:hover { background: #ecfdf5; color: var(--cth-green-text); }
-    .eq-card-acts button.danger:hover { background: #fff1f2; color: #e11d48; }
-    .eq-empty {
-        grid-column: 1 / -1;
-        text-align: center;
-        padding: 48px 16px;
-        color: #94a3b8;
-        background: #fff;
-        border: 1px dashed var(--cth-border);
-        border-radius: 22px;
+    .team-actions button.edit-rh,
+    .team-actions button.edit-rh i { color: #94a3b8; }
+    .team-actions button.edit-rh:hover,
+    .team-actions button.edit-rh:hover i,
+    .team-actions button.edit-rh:focus-visible,
+    .team-actions button.edit-rh:focus-visible i {
+        background-color: #fff7ed !important;
+        color: #f97316 !important;
     }
+    .team-actions button.danger:hover { background: #fff1f2; color: #e11d48; }
+    .team-empty { text-align: center; padding: 32px; color: #94a3b8; }
 
     @media (max-width: 900px) {
         .form-grid { grid-template-columns: 1fr; }
-        .eq-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    @media (max-width: 640px) {
-        .eq-grid { grid-template-columns: 1fr; }
     }
     .perm-lead { margin: 0 0 16px; color: #64748b; font-size: 13px; line-height: 1.45; }
+    .team-edit-fields label {
+        display: block;
+        margin: 0 0 6px;
+        color: #64748b;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .team-edit-fields input:not([type="checkbox"]) {
+        width: 100%;
+        height: 42px;
+        margin: 0 0 12px;
+        padding: 0 12px;
+        border: 1px solid var(--cth-border);
+        border-radius: 10px;
+        font: inherit;
+    }
+    .team-edit-divider { border: 0; border-top: 1px solid var(--cth-line); margin: 18px 0; }
+    .team-edit-heading { margin: 0 0 8px; color: var(--cth-ink); font-size: 16px; }
     .perm-back {
         display: none;
         align-items: center;
@@ -377,7 +349,7 @@
         border-color: var(--cth-green-bright);
         color: var(--cth-green);
     }
-    .sipd-dialog.modal-perm { max-width: 760px; max-height: 88vh; overflow: auto; }
+    .sipd-dialog.modal-perm { max-width: 820px; max-height: 88vh; overflow: auto; }
     @media (max-width: 700px) {
         .perm-mod-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -545,121 +517,110 @@
     </div>
 
     <section class="eq-board">
-        <h2 class="eq-board-title">Distribuye cargos y permisos</h2>
-        <p class="eq-board-lead">Asignados por la coordinadora a cada integrante del equipo.</p>
-        <div class="eq-grid">
+        <h2 class="eq-board-title">Equipo y permisos</h2>
+        <p class="eq-board-lead">Administra las cuentas del equipo de RH y sus permisos desde Editar.</p>
+        <div class="team-table-wrap">
+            <table class="team-table">
+                <thead>
+                    <tr>
+                        <th>Nombre completo</th>
+                        <th>Correo electrónico</th>
+                        <th>Rol principal</th>
+                        <th>Permisos</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
             @forelse($abogados as $abogado)
                 @php
                     $vigentes = $abogado->permisos->filter(function ($p) { return $p->estaVigente(); });
-                    $temps = $vigentes->filter(function ($p) { return $p->esTemporal(); })->count();
                 @endphp
-                <article class="eq-card{{ $abogado->estaActivo() ? '' : ' is-inactive' }}">
-                    <div class="eq-card-acts">
-                        <button type="button" class="edit-rh" title="Editar"
+                    <tr class="{{ $abogado->estaActivo() ? '' : 'is-inactive' }}">
+                        <td class="team-name">{{ $abogado->name }}</td>
+                        <td>{{ $abogado->email }}</td>
+                        <td><span class="team-role">{{ $abogado->cargo ?: 'Equipo de RH' }}</span></td>
+                        <td><span class="team-permissions" title="{{ $vigentes->count() }} permisos vigentes">{{ $vigentes->count() }}</span></td>
+                        <td>
+                            @if($abogado->estaActivo())
+                                <span class="estado-chip on"><i class="fas fa-circle"></i> Habilitado</span>
+                            @else
+                                <span class="estado-chip off"><i class="fas fa-circle"></i> Inactivo</span>
+                            @endif
+                        </td>
+                        <td>
+                            <div class="team-actions">
+                                <button type="button" class="edit-rh" title="Editar integrante y permisos"
                             data-name="{{ $abogado->name }}"
                             data-email="{{ $abogado->email }}"
                             data-cargo="{{ $abogado->cargo }}"
                             data-activo="{{ $abogado->estaActivo() ? '1' : '0' }}"
-                            data-action="{{ route('coordinadora.abogados.editar', $abogado->id) }}">
-                            <i class="fas fa-pen"></i>
-                        </button>
-                        <form action="{{ route('coordinadora.abogados.eliminar', $abogado->id) }}" method="POST"
+                            data-action="{{ route('coordinadora.abogados.editar', $abogado->id) }}"
+                            data-permisos='@json($abogado->permisosParaFormulario())'>
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <form action="{{ route('coordinadora.abogados.eliminar', $abogado->id) }}" method="POST"
                               data-confirm="Se eliminará este registro de recursos humanos."
                               data-confirm-title="Eliminar registro"
                               data-confirm-ok="Eliminar"
                               data-confirm-danger="1"
                               data-confirm-icon="warning">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="danger" title="Eliminar">
-                                <i class="far fa-trash-alt"></i>
-                            </button>
-                        </form>
-                    </div>
-                    <div class="eq-card-icon" aria-hidden="true">
-                        <i class="far fa-user"></i>
-                    </div>
-                    <h3 title="{{ $abogado->name }}">{{ $abogado->nombreCorto() }}</h3>
-                    @if($abogado->estaActivo())
-                        <span class="eq-badge">Equipo RH</span>
-                    @else
-                        <span class="eq-badge off">Inactivo</span>
-                    @endif
-                    <hr>
-                    <p class="eq-assign">
-                        {{ $abogado->cargo ?: 'Equipo de RH' }}
-                        <small>
-                            Cargo asignado por la coordinadora
-                            · {{ $vigentes->count() }} permiso{{ $vigentes->count() === 1 ? '' : 's' }}
-                            @if($temps > 0)
-                                · {{ $temps }} temporal{{ $temps === 1 ? '' : 'es' }}
-                            @endif
-                        </small>
-                    </p>
-                    <button type="button" class="eq-lock" title="Permisos"
-                        data-name="{{ $abogado->name }}"
-                        data-action="{{ route('coordinadora.abogados.permisos', $abogado->id) }}"
-                        data-permisos='@json($abogado->permisosParaFormulario())'
-                        onclick="abrirPermisos(this)">
-                        <i class="fas fa-lock"></i>
-                        Configurar permisos
-                    </button>
-                </article>
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="danger" title="Eliminar integrante">
+                                        <i class="far fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
             @empty
-                <div class="eq-empty">No hay personal de RH registrado</div>
+                    <tr><td colspan="6" class="team-empty">No hay personal de RH registrado</td></tr>
             @endforelse
+                </tbody>
+            </table>
         </div>
         @include('partials.paginacion', ['paginador' => $abogados, 'etiqueta' => 'integrantes'])
     </section>
 
     <div class="sipd-dialog-bg" id="modalEditar">
-        <div class="sipd-dialog">
-            <h3>Editar integrante</h3>
+        <div class="sipd-dialog modal-perm">
+            <h3>Editar integrante · <span id="permNombre"></span></h3>
             <form id="formEditar" method="POST">
                 @csrf
                 @method('PUT')
-                <label>Nombre</label>
-                <input type="text" name="name" id="editName" required value="{{ session('abrir_editar_rh') ? old('name') : '' }}">
-                <label>Correo</label>
-                <input type="email" name="email" id="editEmail" required value="{{ session('abrir_editar_rh') ? old('email') : '' }}">
-                <label>Cargo</label>
-                <input type="text" name="cargo" id="editCargo" required value="{{ session('abrir_editar_rh') ? old('cargo') : '' }}">
-                <div class="perfil-toggle">
-                    <input type="hidden" name="activo" value="0">
-                    <label class="toggle-line" for="editActivo">
-                        <input type="checkbox" name="activo" value="1" id="editActivo" {{ (session('abrir_editar_rh') ? (string) old('activo', '1') : '1') === '1' ? 'checked' : '' }}>
-                        <span class="toggle-ui"></span>
-                        <span class="toggle-copy">
-                            <b id="editActivoLabel">Perfil activo</b>
-                            <small>Si lo desactivas, esta persona no podrá iniciar sesión.</small>
-                        </span>
-                    </label>
+                <div class="team-edit-fields">
+                    <label>Nombre completo</label>
+                    <input type="text" name="name" id="editName" required value="{{ session('abrir_editar_rh') ? old('name') : '' }}">
+                    <label>Correo electrónico</label>
+                    <input type="email" name="email" id="editEmail" required value="{{ session('abrir_editar_rh') ? old('email') : '' }}">
+                    <label>Rol principal · cargo</label>
+                    <input type="text" name="cargo" id="editCargo" required value="{{ session('abrir_editar_rh') ? old('cargo') : '' }}">
+                    <div class="perfil-toggle">
+                        <input type="hidden" name="activo" value="0">
+                        <label class="toggle-line" for="editActivo">
+                            <input type="checkbox" name="activo" value="1" id="editActivo" {{ (session('abrir_editar_rh') ? (string) old('activo', '1') : '1') === '1' ? 'checked' : '' }}>
+                            <span class="toggle-ui"></span>
+                            <span class="toggle-copy">
+                                <b id="editActivoLabel">Perfil activo</b>
+                                <small>Si lo desactivas, esta persona no podrá iniciar sesión.</small>
+                            </span>
+                        </label>
+                    </div>
+                    <label>Nueva contraseña</label>
+                    <input type="password" name="nueva_password" id="editPassword" minlength="8" autocomplete="new-password" placeholder="Déjala vacía si no la cambias">
+                    <label>Confirmar contraseña</label>
+                    <input type="password" name="nueva_password_confirmation" id="editPasswordConfirm" minlength="8" autocomplete="new-password">
+                    @error('nueva_password')
+                        <p class="sipd-dialog-lead" style="color:#be123c;">{{ $message }}</p>
+                    @enderror
                 </div>
-                <label>Nueva contraseña</label>
-                <input type="password" name="nueva_password" id="editPassword" minlength="6" autocomplete="new-password" placeholder="Déjala vacía si no la cambias">
-                <label>Confirmar contraseña</label>
-                <input type="password" name="nueva_password_confirmation" id="editPasswordConfirm" minlength="6" autocomplete="new-password">
-                @error('nueva_password')
-                    <p class="sipd-dialog-lead" style="color:#be123c;">{{ $message }}</p>
-                @enderror
-                <div class="sipd-dialog-actions">
-                    <button type="button" class="btn-ghost" onclick="cerrarModal()">Cancelar</button>
-                    <button type="submit" class="btn-ok">Guardar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="sipd-dialog-bg" id="modalPermisos">
-        <div class="sipd-dialog modal-perm">
-            <h3>Permisos · <span id="permNombre"></span></h3>
-            <p class="perm-lead" id="permLead">Elige un módulo para configurar sus opciones. Inicio lo ve todo el equipo, por eso no aparece aquí.</p>
+                <hr class="team-edit-divider">
+                <h4 class="team-edit-heading">Permisos por módulo</h4>
+                <p class="perm-lead" id="permLead">Elige un módulo para configurar sus opciones. Inicio lo ve todo el equipo, por eso no aparece aquí.</p>
             <button type="button" class="perm-back" id="permBack" onclick="mostrarModulos()">
                 <i class="fas fa-arrow-left"></i> Módulos
             </button>
-            <form id="formPermisos" method="POST">
-                @csrf
-                @method('PUT')
                 <div class="perm-mod-grid" id="permModGrid">
                     @foreach($catalogoPermisos as $grupoKey => $grupo)
                         <button type="button" class="perm-mod-card" data-grupo="{{ $grupoKey }}" onclick="abrirModulo('{{ $grupoKey }}')">
@@ -720,8 +681,8 @@
                     </div>
                 @endforeach
                 <div class="sipd-dialog-actions">
-                    <button type="button" class="btn-ghost" onclick="cerrarPermisos()">Cancelar</button>
-                    <button type="submit" class="btn-ok">Guardar permisos</button>
+                    <button type="button" class="btn-ghost" onclick="cerrarModal()">Cancelar</button>
+                    <button type="submit" class="btn-ok">Guardar integrante y permisos</button>
                 </div>
             </form>
         </div>
@@ -748,12 +709,28 @@
     }
 
     function abrirModalEditar(btn) {
+        var data = {};
+        try { data = JSON.parse(btn.getAttribute('data-permisos') || '{}'); } catch (e) { data = {}; }
         document.getElementById('editName').value = btn.getAttribute('data-name') || '';
         document.getElementById('editEmail').value = btn.getAttribute('data-email') || '';
         document.getElementById('editCargo').value = btn.getAttribute('data-cargo') || '';
         document.getElementById('formEditar').action = btn.getAttribute('data-action') || '';
+        document.getElementById('permNombre').textContent = btn.getAttribute('data-name') || '';
         document.getElementById('editActivo').checked = btn.getAttribute('data-activo') === '1';
+        document.querySelectorAll('#formEditar input[type="checkbox"][name="permisos[]"]').forEach(function (cb) {
+            var grant = data[cb.value];
+            cb.checked = !!(grant && grant.on);
+        });
+        document.querySelectorAll('#formEditar .fn-dur').forEach(function (sel) {
+            var grant = data[sel.getAttribute('data-clave')] || {};
+            var hrs = sel.parentNode.querySelector('.fn-hrs');
+            sel.value = grant.duracion || 'permanente';
+            if (hrs) hrs.value = grant.horas || '';
+        });
         actualizarEtiquetaActivo();
+        syncTodasDuraciones();
+        syncChips();
+        mostrarModulos();
         limpiarClaveEditar();
         document.getElementById('modalEditar').style.display = 'flex';
         document.getElementById('editName').focus();
@@ -767,22 +744,35 @@
 
     function cerrarModal() {
         document.getElementById('modalEditar').style.display = 'none';
+        mostrarModulos();
         limpiarClaveEditar();
     }
 
     document.getElementById('editActivo').addEventListener('change', actualizarEtiquetaActivo);
 
     @if(session('abrir_editar_rh'))
-        document.getElementById('formEditar').action = @json(session('abrir_editar_rh'));
-        document.getElementById('editActivo').checked = @json((string) old('activo', '1') === '1');
-        actualizarEtiquetaActivo();
-        document.getElementById('modalEditar').style.display = 'flex';
+        var editarUrlFallido = @json(session('abrir_editar_rh'));
+        var botonEditarFallido = Array.prototype.find.call(document.querySelectorAll('.edit-rh'), function (btn) {
+            return btn.getAttribute('data-action') === editarUrlFallido;
+        });
+        if (botonEditarFallido) {
+            abrirModalEditar(botonEditarFallido);
+            document.getElementById('editName').value = @json(old('name'));
+            document.getElementById('editEmail').value = @json(old('email'));
+            document.getElementById('editCargo').value = @json(old('cargo'));
+            document.getElementById('editActivo').checked = @json((string) old('activo', '1') === '1');
+            aplicarPermisosSeleccionados(@json(old('permisos', [])));
+            aplicarDuraciones(@json(old('duracion', [])), @json(old('horas', [])));
+            actualizarEtiquetaActivo();
+            syncTodasDuraciones();
+            syncChips();
+        }
     @endif
 
     function refrescarResumenModulos() {
         document.querySelectorAll('.perm-mod-card').forEach(function (card) {
             var key = card.getAttribute('data-grupo');
-            var group = document.querySelector('#formPermisos .perm-group[data-grupo="' + key + '"]');
+            var group = document.querySelector('#formEditar .perm-group[data-grupo="' + key + '"]');
             if (!group) return;
             var cbs = group.querySelectorAll('.perm-row input[type="checkbox"]');
             var on = group.querySelectorAll('.perm-row input[type="checkbox"]:checked').length;
@@ -796,7 +786,7 @@
         document.getElementById('permModGrid').classList.remove('is-off');
         document.getElementById('permBack').classList.remove('is-on');
         document.getElementById('permLead').textContent = 'Elige un módulo para configurar sus opciones. Inicio lo ve todo el equipo, por eso no aparece aquí.';
-        document.querySelectorAll('#formPermisos .perm-group').forEach(function (group) {
+        document.querySelectorAll('#formEditar .perm-group').forEach(function (group) {
             group.classList.remove('is-open');
         });
         refrescarResumenModulos();
@@ -806,7 +796,7 @@
         document.getElementById('permModGrid').classList.add('is-off');
         document.getElementById('permBack').classList.add('is-on');
         var lead = 'Ver, registrar, guardar borrador y descargar se activan o se apagan y quedan permanentes. El tiempo solo aplica a editar y eliminar.';
-        document.querySelectorAll('#formPermisos .perm-group').forEach(function (group) {
+        document.querySelectorAll('#formEditar .perm-group').forEach(function (group) {
             var abierto = group.getAttribute('data-grupo') === grupo;
             group.classList.toggle('is-open', abierto);
             if (!abierto) return;
@@ -816,36 +806,32 @@
         document.getElementById('permLead').textContent = lead;
     }
 
-    function abrirPermisos(btn) {
-        var data = {};
-        try { data = JSON.parse(btn.getAttribute('data-permisos') || '{}'); } catch (e) { data = {}; }
-        document.getElementById('permNombre').textContent = btn.getAttribute('data-name') || '';
-        document.getElementById('formPermisos').action = btn.getAttribute('data-action') || '';
-        document.querySelectorAll('#formPermisos input[type="checkbox"]').forEach(function (cb) {
-            var grant = data[cb.value];
-            cb.checked = !!(grant && grant.on);
-        });
-        document.querySelectorAll('#formPermisos .fn-dur').forEach(function (sel) {
-            var grant = data[sel.getAttribute('data-clave')] || {};
-            var hrs = sel.parentNode.querySelector('.fn-hrs');
-            sel.value = grant.duracion || 'permanente';
-            if (hrs) hrs.value = grant.horas || '';
+    function aplicarPermisosSeleccionados(claves) {
+        var seleccionados = Array.isArray(claves) ? claves : [];
+        document.querySelectorAll('#formEditar input[type="checkbox"][name="permisos[]"]').forEach(function (cb) {
+            cb.checked = seleccionados.indexOf(cb.value) !== -1;
         });
         syncTodasDuraciones();
         syncChips();
-        mostrarModulos();
-        document.getElementById('modalPermisos').style.display = 'flex';
+        refrescarResumenModulos();
     }
 
-    function cerrarPermisos() {
-        document.getElementById('modalPermisos').style.display = 'none';
-        mostrarModulos();
+    function aplicarDuraciones(duraciones, horas) {
+        Object.keys(duraciones || {}).forEach(function (clave) {
+            var selector = document.querySelector('#formEditar .fn-dur[data-clave="' + clave + '"]');
+            if (selector) selector.value = duraciones[clave];
+        });
+        Object.keys(horas || {}).forEach(function (clave) {
+            var input = document.querySelector('#formEditar .fn-hrs[name="horas[' + clave + ']"]');
+            if (input) input.value = horas[clave];
+        });
+        syncTodasDuraciones();
     }
 
     var REQUIERE = @json($requierePermisos ?? []);
 
     function permCbs(clave) {
-        return document.querySelectorAll('#formPermisos input[type="checkbox"][value="' + clave + '"]');
+        return document.querySelectorAll('#formEditar input[type="checkbox"][value="' + clave + '"]');
     }
 
     function hijosDe(padre) {
@@ -869,11 +855,11 @@
     }
 
     function syncTodasDuraciones() {
-        document.querySelectorAll('#formPermisos .perm-row.has-time').forEach(syncFilaDuracion);
+        document.querySelectorAll('#formEditar .perm-row.has-time').forEach(syncFilaDuracion);
     }
 
     function syncChips() {
-        document.querySelectorAll('#formPermisos .perm-chip').forEach(function (chip) {
+        document.querySelectorAll('#formEditar .perm-chip').forEach(function (chip) {
             var cb = chip.querySelector('input[type="checkbox"]');
             chip.classList.toggle('is-on', !!(cb && cb.checked));
         });
@@ -908,7 +894,7 @@
     function syncDuracionGemela(origen) {
         var clave = origen.getAttribute('data-clave');
         if (!clave) return;
-        document.querySelectorAll('#formPermisos .fn-dur[data-clave="' + clave + '"]').forEach(function (sel) {
+        document.querySelectorAll('#formEditar .fn-dur[data-clave="' + clave + '"]').forEach(function (sel) {
             if (sel !== origen) sel.value = origen.value;
             var hrs = sel.parentNode.querySelector('.fn-hrs');
             var origenHrs = origen.parentNode.querySelector('.fn-hrs');
@@ -916,7 +902,7 @@
         });
     }
 
-    document.getElementById('formPermisos').addEventListener('change', function (e) {
+    document.getElementById('formEditar').addEventListener('change', function (e) {
         var row = e.target.closest('.perm-row');
         if (row && e.target.type === 'checkbox') {
             syncGemelos(e.target.value, e.target.checked);
@@ -934,13 +920,11 @@
         syncChips();
         refrescarResumenModulos();
     });
-    document.getElementById('formPermisos').addEventListener('submit', function () {
+    document.getElementById('formEditar').addEventListener('submit', function () {
         this.querySelectorAll('select, input').forEach(function (el) { el.disabled = false; });
     });
-    ['modalPermisos', 'modalEditar'].forEach(function (id) {
-        document.getElementById(id).addEventListener('click', function (e) {
-            if (e.target === this) this.style.display = 'none';
-        });
+    document.getElementById('modalEditar').addEventListener('click', function (e) {
+        if (e.target === this) cerrarModal();
     });
 </script>
 @endsection
