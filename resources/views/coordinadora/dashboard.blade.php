@@ -88,10 +88,12 @@
         <div class="dash-col">
             <section class="dash-card">
                 <div class="dash-card-title">
-                    <span>Pendientes de veredicto</span>
-                    @if($enProceso > 0)
-                        <span class="dash-chip blue">{{ $enProceso }}</span>
-                    @endif
+                    <span style="display:inline-flex;align-items:center;gap:6px;">
+                        Pendientes de veredicto
+                        @if($enProceso > 0)
+                            <span class="dash-chip blue">{{ $enProceso }}</span>
+                        @endif
+                    </span>
                     <a href="{{ route('coordinadora.veredictos') }}">Ver cola &rarr;</a>
                 </div>
 
