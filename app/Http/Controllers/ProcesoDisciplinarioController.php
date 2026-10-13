@@ -407,7 +407,7 @@ class ProcesoDisciplinarioController extends Controller
                 ->with('user')
                 ->withCount('anexos')
                 ->latest('updated_at'),
-            10,
+            Paginacion::DEFAULT,
             'historial_page'
         );
         $historialPaginado->getCollection()->transform(function ($p) {
