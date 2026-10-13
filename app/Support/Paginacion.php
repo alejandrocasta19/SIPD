@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 class Paginacion
 {
     public const OPCIONES = [5, 10, 15];
-    public const DEFAULT = 10;
+    public const DEFAULT = 5;
     public const MAX = 100;
 
     public static function porPagina(?Request $request = null, int $default = self::DEFAULT, string $pageName = 'page'): int
