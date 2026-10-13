@@ -65,16 +65,11 @@ class ProcesoDisciplinario extends Model
 
     public static function opcionesDescargosPresentacion(): array
     {
-        $opciones = [
-            'no_presento' => 'Descargos · No presentó',
-            'presencial' => 'Descargos · Presencial',
+        return [
+            'no_presento' => 'No presentó',
+            'presencial'  => 'Presencial',
+            'virtual'     => 'Virtual',
         ];
-
-        foreach (self::DESCARGOS_MEDIOS as $clave => $etiqueta) {
-            $opciones['virtual_' . $clave] = 'Descargos · Virtual · ' . $etiqueta;
-        }
-
-        return $opciones;
     }
 
     public static function parseDescargosPresentacion(?string $value): array
@@ -90,14 +85,10 @@ class ProcesoDisciplinario extends Model
         }
 
         if ($value === 'virtual' || str_starts_with($value, 'virtual_')) {
-            $medio = $value === 'virtual' ? null : substr($value, 8);
-            if ($medio !== null && !array_key_exists($medio, self::DESCARGOS_MEDIOS)) {
-                $medio = null;
-            }
-
-            return ['descargos_forma' => 'virtual', 'descargos_medio' => $medio];
+            return ['descargos_forma' => 'virtual', 'descargos_medio' => null];
         }
 
+        // no_presento u otro
         return ['descargos_forma' => 'no_presento', 'descargos_medio' => null];
     }
 
@@ -106,18 +97,13 @@ class ProcesoDisciplinario extends Model
         if ($this->descargos_forma === 'presencial') {
             return 'presencial';
         }
-
-        if ($this->descargos_forma === 'virtual') {
-            return ($this->descargos_medio && array_key_exists($this->descargos_medio, self::DESCARGOS_MEDIOS))
-                ? 'virtual_' . $this->descargos_medio
-                : 'virtual_whatsapp';
+        if ($this->descargos_forma === 'virtual' || str_starts_with((string) $this->descargos_forma, 'virtual_')) {
+            return 'virtual';
         }
-
         if ($this->descargos_forma === 'no_presento') {
             return 'no_presento';
         }
-
-        return filled($this->descargos) ? 'presentado' : 'no_presento';
+        return filled($this->descargos) ? 'presencial' : 'no_presento';
     }
 
     public function etiquetaTipoDescargos(): string

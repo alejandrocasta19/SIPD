@@ -196,105 +196,132 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                             @endphp
                             @if(!empty($plazo->es_descargos) && !$soloCoordinadora)
                                 @php
-                                    $presentacion         = $plazo->descargos_presentacion ?? 'no_presentado';
-                                    $yaDecidido           = $presentacion !== 'no_presentado';
-                                    $bloqueado            = ($yaDecidido && !$puedeEditar) || $soloCoordinadora;
-                                    $archivos             = $plazo->descargos_archivos ?? collect();
-                                    $tieneArchivos        = $archivos->isNotEmpty();
-                                    $uid                  = 'dc-' . $plazo->proceso_id;
+                                    $presentacion      = $plazo->descargos_presentacion ?? 'no_presento';
+                                    $yaDecidido        = $presentacion !== 'no_presento';
+                                    $esPresencial      = $presentacion === 'presencial';
+                                    $esVirtual         = $presentacion === 'virtual';
+                                    $bloqueado         = ($yaDecidido && !$puedeEditar) || $soloCoordinadora;
+                                    $archivos          = $plazo->descargos_archivos ?? collect();
+                                    $tieneArchivos     = $archivos->isNotEmpty();
+                                    $uid               = 'dc-' . $plazo->proceso_id;
+                                    $fmtUrl            = route('abogado.plazos.descargos', $plazo->proceso_id);
                                 @endphp
 
-                                {{-- SELECT: siempre visible si no está bloqueado --}}
-                                @if(!$bloqueado)
-                                    <form id="form-{{ $uid }}" class="plz-tipo" method="POST"
-                                          action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}"
-                                          enctype="multipart/form-data">
-                                        @csrf
-                                        @if($filtro !== 'todos')
-                                            <input type="hidden" name="estado" value="{{ $filtro }}">
+                                @if($bloqueado)
+                                    {{-- Solo lectura --}}
+                                    @php
+                                        $etqMap = ['presencial' => 'Presencial', 'virtual' => 'Virtual', 'no_presento' => 'No presentó'];
+                                        $etqColor = ['presencial' => '#16a34a', 'virtual' => '#2563eb', 'no_presento' => '#94a3b8'];
+                                    @endphp
+                                    <span style="font-weight:700;color:{{ $etqColor[$presentacion] ?? '#94a3b8' }};font-size:12px;">
+                                        {{ $etqMap[$presentacion] ?? 'No presentó' }}
+                                    </span>
+                                @else
+                                    {{-- Estado actual --}}
+                                    @if(!$yaDecidido && !$tieneArchivos)
+                                        <span style="font-size:11px;color:#94a3b8;font-style:italic;">Sin registrar</span>
+                                    @elseif($esPresencial)
+                                        <span style="font-size:11px;font-weight:700;color:#16a34a;"><i class="fas fa-check-circle"></i> Presencial</span>
+                                    @elseif($esVirtual || $tieneArchivos)
+                                        <span style="font-size:11px;font-weight:700;color:#2563eb;"><i class="fas fa-file-upload"></i> Virtual</span>
+                                    @endif
+
+                                    {{-- Botones Presencial Sí / No --}}
+                                    <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">
+                                        <form method="POST" action="{{ $fmtUrl }}" enctype="multipart/form-data">
+                                            @csrf
+                                            @if($filtro !== 'todos')<input type="hidden" name="estado" value="{{ $filtro }}">@endif
+                                            <input type="hidden" name="descargos_presentacion" value="presencial">
+                                            <button type="submit"
+                                                    style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;border:1.5px solid {{ $esPresencial ? '#16a34a' : '#e2e8f0' }};background:{{ $esPresencial ? '#f0fdf4' : '#fff' }};color:{{ $esPresencial ? '#16a34a' : '#64748b' }};">
+                                                <i class="fas fa-user"></i> Presencial
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ $fmtUrl }}" enctype="multipart/form-data">
+                                            @csrf
+                                            @if($filtro !== 'todos')<input type="hidden" name="estado" value="{{ $filtro }}">@endif
+                                            <input type="hidden" name="descargos_presentacion" value="virtual">
+                                            <button type="submit"
+                                                    style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;border:1.5px solid {{ $esVirtual ? '#2563eb' : '#e2e8f0' }};background:{{ $esVirtual ? '#eff6ff' : '#fff' }};color:{{ $esVirtual ? '#2563eb' : '#64748b' }};">
+                                                <i class="fas fa-laptop"></i> Virtual
+                                            </button>
+                                        </form>
+                                        @if($yaDecidido)
+                                        <form method="POST" action="{{ $fmtUrl }}" enctype="multipart/form-data">
+                                            @csrf
+                                            @if($filtro !== 'todos')<input type="hidden" name="estado" value="{{ $filtro }}">@endif
+                                            <input type="hidden" name="descargos_presentacion" value="no_presento">
+                                            <button type="submit"
+                                                    style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;border:1.5px solid #e2e8f0;background:#fff;color:#94a3b8;"
+                                                    title="Desmarcar">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </form>
                                         @endif
+                                    </div>
 
-                                        {{-- Select para marcar presentación presencial --}}
-                                        <select name="descargos_presentacion"
-                                                onchange="this.form.submit()"
-                                                aria-label="Presentación de descargos">
-                                            @if($presentacion === 'presentado')
-                                                <option value="presentado" selected>Descargos · Presentado</option>
-                                            @endif
-                                            @foreach($opcionesDescargos as $valor => $etiqueta)
-                                                <option value="{{ $valor }}" {{ $presentacion === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
-                                            @endforeach
-                                        </select>
+                                    {{-- Subir evidencia (toggle) --}}
+                                    <form id="form-{{ $uid }}" method="POST" action="{{ $fmtUrl }}" enctype="multipart/form-data">
+                                        @csrf
+                                        @if($filtro !== 'todos')<input type="hidden" name="estado" value="{{ $filtro }}">@endif
+                                        <input type="hidden" name="descargos_presentacion" value="{{ $presentacion === 'no_presento' ? 'virtual' : $presentacion }}">
 
-                                        {{-- Widget de subida: oculto por defecto, se abre con botón --}}
-                                        <div id="upload-{{ $uid }}" style="display:none;margin-top:8px;">
+                                        <div id="upload-{{ $uid }}" style="display:none;margin-top:7px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:8px;">
                                             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                                                <label style="display:inline-flex;align-items:center;gap:5px;background:#f1f5f9;border:1.5px dashed #cbd5e1;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;color:#475569;">
-                                                    <i class="fas fa-paperclip"></i> Elegir archivos
-                                                    <input type="file"
-                                                           name="archivos_descargos[]"
-                                                           multiple
+                                                <label style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:11px;font-weight:600;color:#475569;">
+                                                    <i class="fas fa-paperclip"></i> Elegir
+                                                    <input type="file" name="archivos_descargos[]" multiple
                                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
                                                            style="display:none;"
                                                            onchange="sipdMostrarArchivos(this,'lbl-{{ $uid }}')">
                                                 </label>
                                                 <span id="lbl-{{ $uid }}" style="font-size:11px;color:#94a3b8;">Sin archivos</span>
-                                                <button type="submit"
-                                                        style="background:var(--cth-green-text);color:#fff;border:0;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">
+                                                <button type="submit" style="background:var(--cth-green-text);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">
                                                     <i class="fas fa-upload"></i> Subir
                                                 </button>
                                             </div>
-                                            <p style="margin:4px 0 0;font-size:10px;color:#94a3b8;">PDF · Word · Excel · Imágenes (máx. 20 MB c/u, hasta 10 archivos)</p>
+                                            <p style="margin:4px 0 0;font-size:10px;color:#94a3b8;">PDF · Word · Excel · Imágenes (máx. 20 MB c/u)</p>
                                         </div>
 
-                                        {{-- Botón toggle para abrir/cerrar widget --}}
-                                        <button type="button"
-                                                onclick="sipdToggle('{{ $uid }}')"
-                                                style="margin-top:6px;display:inline-flex;align-items:center;gap:4px;background:none;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer;"
-                                                id="btn-{{ $uid }}">
-                                            <i class="fas fa-paperclip"></i>
-                                            {{ $tieneArchivos ? 'Agregar más' : 'Adjuntar documento' }}
+                                        <button type="button" onclick="sipdToggle('{{ $uid }}')" id="btn-{{ $uid }}"
+                                                style="margin-top:5px;display:inline-flex;align-items:center;gap:4px;background:none;border:1px dashed #cbd5e1;border-radius:6px;padding:3px 8px;font-size:11px;color:#64748b;cursor:pointer;">
+                                            <i class="fas fa-paperclip"></i> {{ $tieneArchivos ? 'Agregar evidence' : 'Subir evidencia' }}
                                         </button>
-
-                                        @if($yaVencido && !$yaDecidido)
-                                            <small style="display:block;color:#dc2626;font-size:10px;font-weight:600;margin-top:4px;">
-                                                <i class="fas fa-exclamation-circle"></i> Plazo vencido — registra si hubo presentación tardía
-                                            </small>
-                                        @endif
                                     </form>
-                                @else
-                                    <span style="font-weight:600;color:#334155;">
-                                        {{ $opcionesDescargos[$presentacion] ?? 'Descargos · No presentó' }}
-                                    </span>
+
+                                    @if($yaVencido && !$yaDecidido && !$tieneArchivos)
+                                        <small style="display:block;color:#dc2626;font-size:10px;font-weight:600;margin-top:4px;">
+                                            <i class="fas fa-exclamation-circle"></i> Plazo vencido
+                                        </small>
+                                    @endif
                                 @endif
 
-                                {{-- Archivos subidos: vista visual de tarjetas --}}
+                                {{-- Archivos subidos --}}
                                 @if($tieneArchivos)
-                                    <div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">
+                                    <div style="margin-top:7px;display:flex;flex-direction:column;gap:3px;">
                                         @foreach($archivos as $af)
                                             @php
                                                 $ext = strtolower($af->extension ?? '');
-                                                $isImg = in_array($ext, ['jpg','jpeg','png','gif','webp']);
                                                 $iconoCls = match(true) {
-                                                    $ext === 'pdf'                  => 'fa-file-pdf',
+                                                    $ext==='pdf'                    => 'fa-file-pdf',
                                                     in_array($ext,['doc','docx'])   => 'fa-file-word',
                                                     in_array($ext,['xls','xlsx'])   => 'fa-file-excel',
-                                                    $isImg                          => 'fa-file-image',
+                                                    in_array($ext,['jpg','jpeg','png','gif','webp']) => 'fa-file-image',
                                                     default                         => 'fa-file',
                                                 };
                                                 $iconoColor = match(true) {
-                                                    $ext === 'pdf'                  => '#dc2626',
+                                                    $ext==='pdf'                    => '#dc2626',
                                                     in_array($ext,['doc','docx'])   => '#2563eb',
                                                     in_array($ext,['xls','xlsx'])   => '#16a34a',
-                                                    $isImg                          => '#9333ea',
+                                                    in_array($ext,['jpg','jpeg','png','gif','webp']) => '#9333ea',
                                                     default                         => '#64748b',
                                                 };
                                             @endphp
                                             <a href="{{ route('abogado.plazos.descargos.download', $af->id) }}"
-                                               style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;text-decoration:none;max-width:240px;"
+                                               style="display:inline-flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:3px 7px;text-decoration:none;max-width:230px;"
                                                title="{{ $af->nombre_original }}">
-                                                <i class="fas {{ $iconoCls }}" style="color:{{ $iconoColor }};font-size:13px;flex-shrink:0;"></i>
-                                                <span style="font-size:11px;color:#334155;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ Str::limit($af->nombre_original, 22) }}</span>
+                                                <i class="fas {{ $iconoCls }}" style="color:{{ $iconoColor }};font-size:12px;flex-shrink:0;"></i>
+                                                <span style="font-size:11px;color:#334155;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ Str::limit($af->nombre_original, 20) }}</span>
                                                 <span style="font-size:10px;color:#94a3b8;flex-shrink:0;">{{ $af->tamanoLegible() }}</span>
                                             </a>
                                         @endforeach
