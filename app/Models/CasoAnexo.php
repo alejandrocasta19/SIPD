@@ -8,12 +8,28 @@ class CasoAnexo extends Model
 {
     protected $table = 'caso_anexos';
 
-    public const TIPO_ARCHIVO_PREVIO = 'archivo_previo';
-    public const TIPO_FIRMA_GERENTE = 'firma_gerente';
+    public const TIPO_ARCHIVO_PREVIO  = 'archivo_previo';
+    public const TIPO_FIRMA_GERENTE   = 'firma_gerente';
+    public const TIPO_DESCARGOS       = 'descargos';
 
-    public const ESTADO_CARGADO = 'cargado';
-    public const ESTADO_PENDIENTE_FIRMA = 'pendiente_firma';
-    public const ESTADO_FIRMADO = 'firmado';
+    public const ESTADO_CARGADO          = 'cargado';
+    public const ESTADO_PENDIENTE_FIRMA  = 'pendiente_firma';
+    public const ESTADO_FIRMADO          = 'firmado';
+
+    /** Tipos imageimage + documentos (sin video) permitidos en descargos */
+    public const DESCARGOS_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
+    public const DESCARGOS_MIMES = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-word.document.macroenabled.12',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+    ];
 
     public const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx'];
     public const ALLOWED_MIMES = [

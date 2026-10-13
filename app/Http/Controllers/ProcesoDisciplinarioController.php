@@ -1110,6 +1110,7 @@ class ProcesoDisciplinarioController extends Controller
         ];
 
         $plazos = $this->visibleProcesses()
+            ->with(['anexos' => fn ($q) => $q->where('tipo', CasoAnexo::TIPO_DESCARGOS)->latest()])
             ->latest()
             ->get()
             ->map(function ($proceso) use ($tipos) {
@@ -1121,19 +1122,20 @@ class ProcesoDisciplinarioController extends Controller
                 }
 
                 return (object) [
-                    'id' => $proceso->id,
-                    'proceso_id' => $proceso->id,
-                    'conductor' => $proceso->nombre,
-                    'estado' => $proceso->estado,
-                    'modalidad' => $proceso->modalidad,
-                    'cargo' => $proceso->cargo,
-                    'tipo' => $tipo,
-                    'es_descargos' => $proceso->estado === 'Pendiente',
+                    'id'                     => $proceso->id,
+                    'proceso_id'             => $proceso->id,
+                    'conductor'              => $proceso->nombre,
+                    'estado'                 => $proceso->estado,
+                    'modalidad'              => $proceso->modalidad,
+                    'cargo'                  => $proceso->cargo,
+                    'tipo'                   => $tipo,
+                    'es_descargos'           => $proceso->estado === 'Pendiente',
                     'descargos_presentacion' => $proceso->descargosPresentacionValue(),
-                    'tiene_forma_seteada' => $proceso->descargos_forma !== null,
-                    'vencimiento' => $proceso->vencimientoPlazo(),
-                    'dias' => $proceso->diasPlazo(),
-                    'semaforo' => $proceso->semaforoPlazo(),
+                    'tiene_forma_seteada'    => $proceso->descargos_forma !== null,
+                    'vencimiento'            => $proceso->vencimientoPlazo(),
+                    'dias'                   => $proceso->diasPlazo(),
+                    'semaforo'               => $proceso->semaforoPlazo(),
+                    'descargos_archivos'     => $proceso->anexos,
                 ];
             });
 
@@ -1173,9 +1175,20 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));
+        $extPermitidas = implode(',', \App\Models\CasoAnexo::DESCARGOS_EXTENSIONS);
 
         $validated = $request->validate([
-            'descargos_presentacion' => 'required|in:' . $permitidas,
+            'descargos_presentacion'    => 'required|in:' . $permitidas,
+            'archivos_descargos'        => 'nullable|array|max:10',
+            'archivos_descargos.*'      => [
+                'file',
+                'max:20480',
+                'mimes:' . $extPermitidas,
+            ],
+        ], [
+            'archivos_descargos.*.mimes'   => 'Solo se permiten imágenes (JPG, PNG, GIF, WEBP), PDF, Word y Excel. No se aceptan videos.',
+            'archivos_descargos.*.max'     => 'Cada archivo no puede superar 20 MB.',
+            'archivos_descargos.max'       => 'Máximo 10 archivos por descargo.',
         ]);
 
         $presentacion = ProcesoDisciplinario::parseDescargosPresentacion(
@@ -1186,9 +1199,47 @@ class ProcesoDisciplinarioController extends Controller
             $proceso->update($presentacion);
         }
 
+        // Guardar archivos adjuntos de descargos
+        if ($request->hasFile('archivos_descargos')) {
+            foreach ($request->file('archivos_descargos') as $archivo) {
+                $extension       = strtolower($archivo->getClientOriginalExtension());
+                $mime            = strtolower((string) $archivo->getMimeType());
+                $nombreAlmacenado = 'dc_' . $proceso->id . '_' . uniqid() . '.' . $extension;
+                $ruta = $archivo->storeAs('anexos/' . $proceso->id, $nombreAlmacenado, 'local');
+
+                \App\Models\CasoAnexo::create([
+                    'caso_id'          => $proceso->id,
+                    'user_id'          => auth()->id(),
+                    'tipo'             => \App\Models\CasoAnexo::TIPO_DESCARGOS,
+                    'estado'           => \App\Models\CasoAnexo::ESTADO_CARGADO,
+                    'titulo'           => 'Descargo',
+                    'nombre_original'  => $archivo->getClientOriginalName(),
+                    'nombre_almacenado'=> $nombreAlmacenado,
+                    'extension'        => $extension,
+                    'mime_type'        => $mime,
+                    'tamano'           => $archivo->getSize(),
+                    'ruta_segura'      => $ruta,
+                ]);
+            }
+        }
+
         return redirect()
             ->route('abogado.plazos', array_filter($request->only('estado')))
             ->with('success', 'Presentación de descargos actualizada.');
+    }
+
+    public function downloadDescargo(int $anexoId)
+    {
+        $anexo = \App\Models\CasoAnexo::where('tipo', \App\Models\CasoAnexo::TIPO_DESCARGOS)
+            ->when(!auth()->user()->esCoordinadora(), function ($q) {
+                $q->whereHas('caso', fn ($c) => $c->where('user_id', auth()->id()));
+            })
+            ->findOrFail($anexoId);
+
+        $ruta = storage_path('app/' . $anexo->ruta_segura);
+        abort_unless(is_file($ruta), 404);
+
+        return response()->download($ruta, $anexo->nombre_original);
     }
 
     /**

@@ -195,24 +195,71 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                                 $soloCoordinadora = in_array($plazo->estado, ['Sancionado', 'Archivado'], true) && !auth()->user()->esCoordinadora();
                             @endphp
                             @if(!empty($plazo->es_descargos) && !$soloCoordinadora)
-                                @if($editable)
-                                    <form class="plz-tipo" method="POST" action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}">
+                                @php
+                                    // Bloquear solo si ya está decidido (no pendiente) Y sin permiso de edición,
+                                    // o si el proceso está cerrado. El vencimiento NO bloquea el select.
+                                    $presentacion = $plazo->descargos_presentacion ?? 'no_presentado';
+                                    $yaDecidido   = $presentacion !== 'no_presentado';
+                                    $bloqueado    = ($yaDecidido && !$puedeEditar) || $soloCoordinadora;
+                                @endphp
+                                @if(!$bloqueado)
+                                    <form class="plz-tipo" method="POST"
+                                          action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}"
+                                          enctype="multipart/form-data">
                                         @csrf
-                                        @method('PUT')
                                         @if($filtro !== 'todos')
                                             <input type="hidden" name="estado" value="{{ $filtro }}">
                                         @endif
                                         <select name="descargos_presentacion" onchange="this.form.submit()" aria-label="Presentación de descargos">
-                                            @if($plazo->descargos_presentacion === 'presentado')
+                                            @if($presentacion === 'presentado')
                                                 <option value="presentado" selected>Descargos · Presentado</option>
                                             @endif
                                             @foreach($opcionesDescargos as $valor => $etiqueta)
-                                                <option value="{{ $valor }}" {{ $plazo->descargos_presentacion === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
+                                                <option value="{{ $valor }}" {{ $presentacion === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
                                             @endforeach
                                         </select>
+                                        {{-- Subir archivos de descargos --}}
+                                        <label style="display:block;margin-top:8px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Adjuntar documentos del descargo</label>
+                                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                            <label style="display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border:1.5px dashed #cbd5e1;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:600;color:#475569;">
+                                                <i class="fas fa-paperclip"></i> Seleccionar archivos
+                                                <input type="file"
+                                                       name="archivos_descargos[]"
+                                                       multiple
+                                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                                                       style="display:none;"
+                                                       onchange="sipdMostrarArchivos(this)">
+                                            </label>
+                                            <span id="archivos-label-{{ $plazo->proceso_id }}" style="font-size:11px;color:#64748b;">Sin archivos</span>
+                                            <button type="submit"
+                                                    style="background:var(--cth-green-text);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">
+                                                <i class="fas fa-upload"></i> Guardar
+                                            </button>
+                                        </div>
+                                        @if($yaVencido && !$yaDecidido)
+                                            <small style="color:#dc2626;font-size:11px;font-weight:600;display:block;margin-top:4px;">
+                                                <i class="fas fa-exclamation-circle"></i> Plazo vencido — registra si hubo presentación tardía
+                                            </small>
+                                        @endif
                                     </form>
                                 @else
-                                    <span style="font-weight: 600; color: #334155;">{{ $opcionesDescargos[$plazo->descargos_presentacion] ?? 'Descargos · No presentó' }}</span>
+                                    <span style="font-weight:600;color:#334155;">
+                                        {{ $opcionesDescargos[$presentacion] ?? 'Descargos · No presentó' }}
+                                    </span>
+                                @endif
+                                {{-- Archivos de descargos ya subidos --}}
+                                @if(($plazo->descargos_archivos ?? collect())->isNotEmpty())
+                                    <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
+                                        @foreach($plazo->descargos_archivos as $af)
+                                            <a href="{{ route('abogado.plazos.descargos.download', $af->id) }}"
+                                               style="font-size:11px;color:var(--cth-green-text);text-decoration:none;display:inline-flex;align-items:center;gap:5px;"
+                                               title="{{ $af->nombre_original }}">
+                                                <i class="fas fa-file-download"></i>
+                                                {{ Str::limit($af->nombre_original, 30) }}
+                                                <span style="color:#94a3b8;">({{ $af->tamanoLegible() }})</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
                                 @endif
                             @else
                                 {{ $plazo->tipo }}
@@ -284,4 +331,29 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
         </table>
         @include('partials.paginacion', ['paginador' => $plazos])
     </div>
+@endsection
+
+@section('scripts')
+<script>
+function sipdMostrarArchivos(input) {
+    var files = input.files;
+    var form  = input.closest('form');
+    var match = form ? form.action.match(/\/plazos\/(\d+)\//) : null;
+    var pid   = match ? match[1] : null;
+    var label = pid ? document.getElementById('archivos-label-' + pid) : null;
+    if (!label) {
+        var wrap = input.closest('div');
+        label = wrap ? wrap.querySelector('span[id^="archivos-label"]') : null;
+    }
+    if (!label) return;
+    if (!files || files.length === 0) {
+        label.textContent = 'Sin archivos';
+    } else if (files.length === 1) {
+        var n = files[0].name;
+        label.textContent = n.length > 28 ? n.substring(0, 25) + '...' : n;
+    } else {
+        label.textContent = files.length + ' archivos seleccionados';
+    }
+}
+</script>
 @endsection

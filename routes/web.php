@@ -139,9 +139,13 @@ Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
         [ProcesoDisciplinarioController::class, 'plazos']
     )->name('abogado.plazos');
 
-    Route::put('/abogado/plazos/{id}/descargos',
+    Route::post('/abogado/plazos/{id}/descargos',
         [ProcesoDisciplinarioController::class, 'actualizarDescargosPresentacion']
     )->name('abogado.plazos.descargos');
+
+    Route::get('/abogado/plazos/descargos/{anexoId}/descargar',
+        [ProcesoDisciplinarioController::class, 'downloadDescargo']
+    )->name('abogado.plazos.descargos.download');
 
     Route::get('/abogado/anexos',
         [AnexoController::class, 'index']
