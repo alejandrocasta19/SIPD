@@ -527,6 +527,7 @@
                         <th>Correo electrónico</th>
                         <th>Rol principal</th>
                         <th>Permisos</th>
+                        <th>Última conexión</th>
                         <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
@@ -541,6 +542,16 @@
                         <td>{{ $abogado->email }}</td>
                         <td><span class="team-role">{{ $abogado->cargo ?: 'Equipo de RH' }}</span></td>
                         <td><span class="team-permissions" title="{{ $vigentes->count() }} permisos vigentes">{{ $vigentes->count() }}</span></td>
+                        <td>
+                            @if($abogado->last_login_at)
+                                <span title="{{ $abogado->last_login_at->format('d/m/Y H:i') }}" style="color:#475569;font-size:13px;">
+                                    <i class="fas fa-clock" style="font-size:11px;color:#94a3b8;margin-right:4px;"></i>
+                                    {{ $abogado->last_login_at->diffForHumans() }}
+                                </span>
+                            @else
+                                <span style="color:#cbd5e1;font-size:12px;">Sin registro</span>
+                            @endif
+                        </td>
                         <td>
                             @if($abogado->estaActivo())
                                 <span class="estado-chip on"><i class="fas fa-circle"></i> Habilitado</span>
@@ -575,7 +586,7 @@
                         </td>
                     </tr>
             @empty
-                    <tr><td colspan="6" class="team-empty">No hay personal de RH registrado</td></tr>
+                    <tr><td colspan="7" class="team-empty">No hay personal de RH registrado</td></tr>
             @endforelse
                 </tbody>
             </table>

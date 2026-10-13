@@ -296,13 +296,23 @@
                                 </div>
                                 <div class="col-md-3" id="placa-field" @unless($placaAplica) hidden @endunless>
                                     <strong>Placa del vehículo:</strong>
-
                                     <input type="text"
                                            name="placa"
                                            id="inp-placa"
                                            value="{{ $proceso->placa }}"
                                            class="form-control campo-editable"
-                                           placeholder="Ej: GRK206"
+                                           placeholder="Ej: GRK-206"
+                                           @unless($placaAplica) disabled @endunless
+                                           readonly>
+                                </div>
+                                <div class="col-md-3" id="interno-field" @unless($placaAplica) hidden @endunless>
+                                    <strong>Número interno:</strong>
+                                    <input type="text"
+                                           name="numero_interno"
+                                           id="inp-interno"
+                                           value="{{ $proceso->numero_interno }}"
+                                           class="form-control campo-editable"
+                                           placeholder="Ej: 042"
                                            @unless($placaAplica) disabled @endunless
                                            readonly>
                                 </div>
@@ -795,12 +805,16 @@
 var MODALIDADES_PLACA = @json(\App\Support\Modalidades::conPlaca());
 
 function syncPlacaDetalle() {
-    var mod = document.getElementById('inp-modalidad');
-    var box = document.getElementById('placa-field');
-    var input = document.getElementById('inp-placa');
+    var mod    = document.getElementById('inp-modalidad');
+    var box    = document.getElementById('placa-field');
+    var input  = document.getElementById('inp-placa');
+    var boxI   = document.getElementById('interno-field');
+    var inputI = document.getElementById('inp-interno');
     var aplica = MODALIDADES_PLACA.indexOf(((mod && mod.value) || '').trim()) !== -1;
-    if (box) box.hidden = !aplica;
-    if (input) input.disabled = !aplica;
+    if (box)    box.hidden    = !aplica;
+    if (input)  { input.disabled  = !aplica; input.required  = aplica; }
+    if (boxI)   boxI.hidden   = !aplica;
+    if (inputI) { inputI.disabled = !aplica; inputI.required = aplica; }
 }
 
 function habilitarEdicion() {

@@ -68,7 +68,7 @@ class ProcesoDisciplinarioController extends Controller
         $resueltos = $sancionados + $archivados;
         $tasaResolucion = $total > 0 ? (int) round(($resueltos / $total) * 100) : 0;
         $abiertos = $pendientes + $enProceso;
-        $veredictos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])->has('documentoEstados')->count();
+        $veredictos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])->conDocumentoDescargado()->count();
 
         $pct = function ($count) use ($total) {
             return $total > 0 ? (int) round(($count / $total) * 100) : 0;
@@ -127,7 +127,7 @@ class ProcesoDisciplinarioController extends Controller
             ->get();
 
         $pendientesVeredicto = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])
-            ->has('documentoEstados')
+            ->conDocumentoDescargado()
             ->with('user')
             ->latest()
             ->take(8)
@@ -225,7 +225,7 @@ class ProcesoDisciplinarioController extends Controller
                 $query->where('nombre', 'like', '%' . $term . '%')
                     ->orWhere('cedula', 'like', '%' . $term . '%');
             })
-            ->select('nombre', 'cedula', 'modalidad', 'placa', 'ruta', 'telefono')
+            ->select('nombre', 'cedula', 'modalidad', 'placa', 'numero_interno', 'ruta', 'telefono')
             ->orderBy('nombre')
             ->limit(10)
             ->get()
@@ -318,6 +318,7 @@ class ProcesoDisciplinarioController extends Controller
                 $sub->where('nombre', 'like', '%' . $q . '%')
                     ->orWhere('cedula', 'like', '%' . $q . '%')
                     ->orWhere('placa', 'like', '%' . $q . '%')
+                    ->orWhere('numero_interno', 'like', '%' . $q . '%')
                     ->orWhere('tipo_falta', 'like', '%' . $q . '%');
 
                 $id = preg_replace('/\D+/', '', $q);
@@ -370,6 +371,7 @@ class ProcesoDisciplinarioController extends Controller
                 $sub->where('nombre', 'like', '%' . $q . '%')
                     ->orWhere('cedula', 'like', '%' . $q . '%')
                     ->orWhere('placa', 'like', '%' . $q . '%')
+                    ->orWhere('numero_interno', 'like', '%' . $q . '%')
                     ->orWhere('tipo_falta', 'like', '%' . $q . '%');
             });
         }
@@ -451,6 +453,7 @@ class ProcesoDisciplinarioController extends Controller
                     $sub->where('nombre', 'like', '%' . $q . '%')
                         ->orWhere('cedula', 'like', '%' . $q . '%')
                         ->orWhere('placa', 'like', '%' . $q . '%')
+                        ->orWhere('numero_interno', 'like', '%' . $q . '%')
                         ->orWhere('tipo_falta', 'like', '%' . $q . '%');
                 });
             }
@@ -512,6 +515,7 @@ class ProcesoDisciplinarioController extends Controller
                     $sub->where('nombre', 'like', '%' . $q . '%')
                         ->orWhere('cedula', 'like', '%' . $q . '%')
                         ->orWhere('placa', 'like', '%' . $q . '%')
+                        ->orWhere('numero_interno', 'like', '%' . $q . '%')
                         ->orWhere('tipo_falta', 'like', '%' . $q . '%');
                 });
             }
@@ -575,15 +579,18 @@ class ProcesoDisciplinarioController extends Controller
 
     private function conteosVisibles($visible): array
     {
+        // "Pendiente" = abierto sin ningún documento descargado aún
+        // "En proceso" = abierto con al menos un documento descargado
+        // Esto refleja exactamente lo que muestra estadoVisible() y el filtro del listado
         $abiertos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado']);
-        $enProceso = (clone $abiertos)->has('documentoEstados')->count();
+        $enProceso = (clone $abiertos)->conDocumentoDescargado()->count();
         $abiertosTotal = (clone $abiertos)->count();
 
         return [
-            'Pendiente' => $abiertosTotal - $enProceso,
+            'Pendiente'  => $abiertosTotal - $enProceso,
             'En proceso' => $enProceso,
             'Sancionado' => (clone $visible)->where('estado', 'Sancionado')->count(),
-            'Archivado' => (clone $visible)->where('estado', 'Archivado')->count(),
+            'Archivado'  => (clone $visible)->where('estado', 'Archivado')->count(),
         ];
     }
 
@@ -696,6 +703,9 @@ class ProcesoDisciplinarioController extends Controller
             'cedula'            => $request->cedula,
             'placa'             => Modalidades::usaPlaca($modalidad)
                 ? (Formatos::placaNormalizada($request->input('placa')) ?: null)
+                : null,
+            'numero_interno'    => Modalidades::usaPlaca($modalidad)
+                ? (trim((string) $request->input('numero_interno')) ?: null)
                 : null,
             'ruta'              => $request->ruta,
             'modalidad'         => $modalidad,
@@ -894,6 +904,9 @@ class ProcesoDisciplinarioController extends Controller
             'telefono' => $request->telefono,
             'placa' => Modalidades::usaPlaca($datosModalidad['modalidad'] ?? null)
                 ? (Formatos::placaNormalizada($request->input('placa')) ?: null)
+                : null,
+            'numero_interno' => Modalidades::usaPlaca($datosModalidad['modalidad'] ?? null)
+                ? (trim((string) $request->input('numero_interno')) ?: null)
                 : null,
             'ruta' => $request->ruta,
             'modalidad' => $datosModalidad['modalidad'] ?? null,
@@ -1351,7 +1364,8 @@ class ProcesoDisciplinarioController extends Controller
             $reglas['cargo'] = Formatos::reglasCargo();
         }
         if (Modalidades::usaPlaca($modalidad)) {
-            $reglas['placa'] = Formatos::reglasPlaca();
+            $reglas['placa']           = Formatos::reglasPlaca();
+            $reglas['numero_interno']  = Formatos::reglasNumeroInterno();
         }
 
         $request->validate($reglas, Formatos::mensajes());

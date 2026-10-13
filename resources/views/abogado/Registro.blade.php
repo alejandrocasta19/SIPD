@@ -476,9 +476,15 @@ label.sub-tab-btn .mod-radio {
                     <input type="text" name="cedula" id="inp-cedula" class="field-input" required inputmode="numeric" pattern="[0-9]+" title="Solo números" placeholder="Solo números" value="{{ old('cedula', request('cedula')) }}">
                 </div>
             </div>
-            <div class="field-block" id="placa-field" style="margin-top:14px;"{{ $placaAplica ? '' : ' hidden' }}>
-                <label class="field-label">Placa del vehículo</label>
-                <input type="text" name="placa" id="inp-placa" class="field-input" placeholder="Ej: GRK206" value="{{ old('placa', request('placa')) }}"{{ $placaAplica ? '' : ' disabled' }}>
+            <div id="placa-fields-row" style="display:flex;gap:14px;margin-top:14px;"{{ $placaAplica ? '' : ' hidden' }}>
+                <div class="field-block" id="placa-field" style="flex:1;margin-bottom:0;">
+                    <label class="field-label">Placa del vehículo *</label>
+                    <input type="text" name="placa" id="inp-placa" class="field-input" placeholder="Ej: GRK-206" value="{{ old('placa', request('placa')) }}"{{ $placaAplica ? '' : ' disabled' }}>
+                </div>
+                <div class="field-block" id="interno-field" style="flex:1;margin-bottom:0;">
+                    <label class="field-label">Número interno del vehículo *</label>
+                    <input type="text" name="numero_interno" id="inp-interno" class="field-input" placeholder="Ej: 042" value="{{ old('numero_interno', request('numero_interno')) }}"{{ $placaAplica ? '' : ' disabled' }}>
+                </div>
             </div>
             <div class="field-block" id="cargo-field" style="margin-top:14px;"{{ $cargoAplica ? '' : ' hidden' }}>
                 <label class="field-label">Cargo</label>
@@ -695,13 +701,16 @@ function syncCargoVista() {
 
 function syncPlacaVista() {
     var aplica = MODALIDADES_PLACA.indexOf(modalidadActual()) !== -1;
-    var box = document.getElementById('placa-field');
-    var input = document.getElementById('inp-placa');
-    if (box) box.hidden = !aplica;
-    if (input) {
-        input.disabled = !aplica;
-        input.required = aplica;
-    }
+    var row    = document.getElementById('placa-fields-row');
+    var boxPlaca = document.getElementById('placa-field');
+    var inpPlaca = document.getElementById('inp-placa');
+    var boxInterno = document.getElementById('interno-field');
+    var inpInterno = document.getElementById('inp-interno');
+    if (row)       row.hidden    = !aplica;
+    if (boxPlaca)  boxPlaca.hidden  = !aplica;
+    if (inpPlaca)  { inpPlaca.disabled  = !aplica; inpPlaca.required  = aplica; }
+    if (boxInterno) boxInterno.hidden = !aplica;
+    if (inpInterno) { inpInterno.disabled = !aplica; inpInterno.required = aplica; }
 }
 
 function marcarModalidad(valor) {
@@ -1087,6 +1096,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                 marcarModalidad(w.modalidad || '');
                                 var placa = document.getElementById('inp-placa');
                                 if (placa && !placa.disabled) { placa.value = w.placa || ''; placa.dispatchEvent(new Event('input')); }
+                                var interno = document.getElementById('inp-interno');
+                                if (interno && !interno.disabled) { interno.value = w.numero_interno || ''; }
                                 var tel = document.querySelector('[name="telefono"]');
                                 if(tel) { tel.value = w.telefono||''; tel.dispatchEvent(new Event('input')); }
                                 updateBar();

@@ -23,25 +23,17 @@
                     </form>
                 @endif
                 @if($avisos->total() > 0)
-                    @if($puedeBorrar)
-                        <form method="POST" action="{{ route('notificaciones.leidas') }}"
-                              data-confirm="Se borrarán las notificaciones que ya leíste."
-                              data-confirm-title="Eliminar leídas"
-                              data-confirm-ok="Eliminar"
-                              data-confirm-danger="1">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn-alt">
-                                <i class="far fa-trash-alt"></i> Eliminar leídas
-                            </button>
-                        </form>
-                    @else
-                        <button type="button" class="btn-alt"
-                                data-need-permiso="eliminar_notificaciones"
-                                data-que="Borrar notificaciones de la bandeja que ya no necesito.">
-                            <i class="far fa-trash-alt"></i> Solicitar borrar
+                    <form method="POST" action="{{ route('notificaciones.leidas') }}"
+                          data-confirm="Se borrarán las notificaciones que ya leíste."
+                          data-confirm-title="Eliminar leídas"
+                          data-confirm-ok="Eliminar"
+                          data-confirm-danger="1">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn-alt">
+                            <i class="far fa-trash-alt"></i> Eliminar leídas
                         </button>
-                    @endif
+                    </form>
                 @endif
             </div>
         @endif
@@ -272,8 +264,13 @@
 
         {{-- ── Avisos de coordinación y equipo ────── --}}
         @forelse($avisos as $aviso)
-            <article class="av-item av-{{ $aviso->tonoIcono() }} {{ $aviso->leida_at ? '' : 'is-unread' }}">
-                <a class="av-main" href="{{ route('notificaciones.leer', $aviso->id) }}">
+            <article class="av-item av-{{ $aviso->tonoIcono() }} {{ $aviso->leida_at ? '' : 'is-unread' }}" id="aviso-{{ $aviso->id }}">
+                <a class="av-main"
+                   href="{{ route('notificaciones.leer', $aviso->id) }}"
+                   data-aviso-id="{{ $aviso->id }}"
+                   data-marcar-url="{{ route('notificaciones.marcar-leida', $aviso->id) }}"
+                   data-leida="{{ $aviso->leida_at ? '1' : '0' }}"
+                   onclick="marcarNotificacionLeida(event, this)">
                     <span class="dot {{ $aviso->tonoIcono() }}">
                         <i class="fas {{ $aviso->icono() }}"></i>
                     </span>
@@ -284,7 +281,7 @@
                                 {{ $aviso->etiquetaTipo() }}
                             </span>
                             @if(!$aviso->leida_at)
-                                <span class="av-new-pulse"></span>
+                                <span class="av-new-pulse" data-pulse="{{ $aviso->id }}"></span>
                             @endif
                         </div>
                         <b>{{ $aviso->titulo }}</b>
@@ -312,29 +309,21 @@
                 </a>
                 <div class="av-side">
                     @if($aviso->leida_at)
-                        <small class="av-state">Leída</small>
+                        <small class="av-state" data-state="{{ $aviso->id }}">Leída</small>
                     @else
-                        <small class="av-state">Nueva</small>
+                        <small class="av-state" data-state="{{ $aviso->id }}">Nueva</small>
                     @endif
-                    @if($puedeBorrar)
-                        <form method="POST" action="{{ route('notificaciones.destroy', $aviso->id) }}"
-                              data-confirm="Esta notificación se quitará de tu bandeja permanentemente."
-                              data-confirm-title="Eliminar notificación"
-                              data-confirm-ok="Eliminar"
-                              data-confirm-danger="1">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="av-del" title="Eliminar">
-                                <i class="far fa-trash-alt"></i>
-                            </button>
-                        </form>
-                    @else
-                        <button type="button" class="av-del" title="Solicitar permiso para borrar"
-                                data-need-permiso="eliminar_notificaciones"
-                                data-que="Borrar notificaciones de la bandeja que ya no necesito.">
+                    <form method="POST" action="{{ route('notificaciones.destroy', $aviso->id) }}"
+                          data-confirm="Esta notificación se quitará de tu bandeja permanentemente."
+                          data-confirm-title="Eliminar notificación"
+                          data-confirm-ok="Eliminar"
+                          data-confirm-danger="1">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="av-del" title="Eliminar">
                             <i class="far fa-trash-alt"></i>
                         </button>
-                    @endif
+                    </form>
                 </div>
             </article>
         @empty
@@ -350,4 +339,62 @@
         @endforelse
     </div>
     @include('partials.paginacion', ['paginador' => $avisos])
+@endsection
+
+@section('scripts')
+<script>
+/**
+ * Marca una notificación como leída vía AJAX cuando el usuario hace click.
+ * Si ya está leída, deja navegar normalmente al destino del link.
+ */
+function marcarNotificacionLeida(event, anchor) {
+    var yaLeida = anchor.getAttribute('data-leida') === '1';
+
+    // Si ya estaba leída, navegación normal (no interceptamos)
+    if (yaLeida) return;
+
+    // Interceptamos el click para marcar primero
+    event.preventDefault();
+
+    var url   = anchor.getAttribute('data-marcar-url');
+    var id    = anchor.getAttribute('data-aviso-id');
+    var destino = anchor.getAttribute('href');
+
+    fetch(url, {
+        method: 'PATCH',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json',
+        },
+    })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function () {
+        // Actualizar estado visual sin mover la página
+        anchor.setAttribute('data-leida', '1');
+
+        var article = document.getElementById('aviso-' + id);
+        if (article) {
+            article.classList.remove('is-unread');
+        }
+
+        // Quitar el punto pulsante
+        var pulse = document.querySelector('[data-pulse="' + id + '"]');
+        if (pulse) pulse.remove();
+
+        // Cambiar la etiqueta de estado
+        var estado = document.querySelector('[data-state="' + id + '"]');
+        if (estado) {
+            estado.textContent = 'Leída';
+            estado.classList.remove('is-unread');
+        }
+
+        // Ahora navegar al destino del link
+        window.location.href = destino;
+    })
+    .catch(function () {
+        // Si falla el AJAX, navegar igualmente
+        window.location.href = destino;
+    });
+}
+</script>
 @endsection

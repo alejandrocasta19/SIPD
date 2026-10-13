@@ -304,7 +304,16 @@
                         </td>
                         <td class="name">{{ $proceso->nombre }}</td>
                         <td>{{ $proceso->cedula ?: '—' }}</td>
-                        <td>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }}</td>
+                        <td>
+                            {{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }}
+                            @if(\App\Support\Modalidades::usaPlaca($proceso->modalidad) && ($proceso->placa || $proceso->numero_interno))
+                                <span style="display:block;color:#64748b;font-size:11px;margin-top:3px;">
+                                    @if($proceso->placa)<i class="fas fa-car" style="font-size:9px;"></i> {{ $proceso->placa }}@endif
+                                    @if($proceso->placa && $proceso->numero_interno) · @endif
+                                    @if($proceso->numero_interno)<i class="fas fa-hashtag" style="font-size:9px;"></i> {{ $proceso->numero_interno }}@endif
+                                </span>
+                            @endif
+                        </td>
                         <td>{{ $proceso->tipo_falta ?: '—' }}</td>
                         <td>{{ $proceso->fecha_falta ? \Carbon\Carbon::parse($proceso->fecha_falta)->format('Y-m-d') : '—' }}</td>
                         @if($esCoordinadora)

@@ -44,6 +44,11 @@ class Formatos
         return ['required', 'regex:' . self::PLACA];
     }
 
+    public static function reglasNumeroInterno(): array
+    {
+        return ['required', 'string', 'max:20'];
+    }
+
     public static function reglasEmail(bool $unica = true, ?int $ignorarId = null): array
     {
         $reglas = ['required', 'regex:' . self::EMAIL, 'max:255'];
@@ -77,8 +82,10 @@ class Formatos
             'telefono.regex' => 'El teléfono solo puede tener números.',
             'cargo.regex' => 'El cargo solo puede tener letras.',
             'cargo.required' => 'El cargo es obligatorio.',
-            'placa.regex' => 'La placa debe ser tres letras, un guion y tres números. Ejemplo: ABC-123.',
+            'placa.regex'    => 'La placa debe ser tres letras, un guion y tres números. Ejemplo: ABC-123.',
             'placa.required' => 'La placa es obligatoria en esta modalidad.',
+            'numero_interno.required' => 'El número interno del vehículo es obligatorio en esta modalidad.',
+            'numero_interno.max'      => 'El número interno no puede superar 20 caracteres.',
             'email.regex' => 'El correo debe ser texto@sipd.co, por ejemplo kellyrodriguez@sipd.co.',
         ];
     }

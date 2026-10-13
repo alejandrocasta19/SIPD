@@ -30,6 +30,7 @@ class User extends Authenticatable
         'cedula',
         'firma_path',
         'fecha_ingreso',
+        'last_login_at',
     ];
 
     /**
@@ -51,6 +52,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'fecha_ingreso' => 'date',
         'activo' => 'boolean',
+        'last_login_at' => 'datetime',
     ];
 
     public function procesos()

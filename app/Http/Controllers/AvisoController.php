@@ -16,6 +16,7 @@ class AvisoController extends Controller
         $avisos = Paginacion::deQuery(
             Aviso::query()
                 ->where('user_id', auth()->id())
+                ->where('tipo', '!=', Aviso::TIPO_SESION)
                 ->with(['remitente', 'proceso', 'solicitud'])
                 ->latest()
         );
@@ -26,7 +27,7 @@ class AvisoController extends Controller
             'pageTitle' => 'Notificaciones',
             'avisos' => $avisos,
             'alertasSistema' => AlertasSistema::visibles($user),
-            'puedeBorrar' => $user->puede(RhPermisos::ELIMINAR_NOTIFICACIONES),
+            'puedeBorrar' => true,
         ]);
     }
 
@@ -85,14 +86,19 @@ class AvisoController extends Controller
         return redirect()->route('notificaciones.index');
     }
 
+    public function marcarLeida(Request $request, $id)
+    {
+        $aviso = Aviso::where('user_id', auth()->id())->findOrFail($id);
+        if ($aviso->leida_at === null) {
+            $aviso->update(['leida_at' => now()]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function destroy($id)
     {
         $aviso = Aviso::where('user_id', auth()->id())->findOrFail($id);
-
-        if (!auth()->user()->puede(RhPermisos::ELIMINAR_NOTIFICACIONES)) {
-            return back()->with('error', 'Pide a la coordinadora permiso para borrar notificaciones.');
-        }
-
         $aviso->delete();
 
         return back()->with('success', 'Notificación eliminada.');
@@ -100,10 +106,6 @@ class AvisoController extends Controller
 
     public function destroyLeidas()
     {
-        if (!auth()->user()->puede(RhPermisos::ELIMINAR_NOTIFICACIONES)) {
-            return back()->with('error', 'Pide a la coordinadora permiso para borrar notificaciones.');
-        }
-
         $borradas = Aviso::where('user_id', auth()->id())
             ->whereNotNull('leida_at')
             ->delete();

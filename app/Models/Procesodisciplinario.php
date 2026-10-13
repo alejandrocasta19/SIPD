@@ -23,6 +23,7 @@ class ProcesoDisciplinario extends Model
         'nombre',
         'cedula',
         'placa',
+        'numero_interno',
         'ruta',
         'modalidad',
         'cargo',

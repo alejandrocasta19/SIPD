@@ -275,6 +275,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/notificaciones/leidas', [AvisoController::class, 'destroyLeidas'])->name('notificaciones.leidas');
     Route::delete('/notificaciones/alertas/{tipo}', [AvisoController::class, 'silenciarAlerta'])->name('notificaciones.alertas.silenciar');
     Route::delete('/notificaciones/alertas', [AvisoController::class, 'silenciarAlertas'])->name('notificaciones.alertas.silenciar-todas');
+    Route::patch('/notificaciones/{id}/leer', [AvisoController::class, 'marcarLeida'])->name('notificaciones.marcar-leida');
     Route::get('/notificaciones/{id}', [AvisoController::class, 'leer'])->name('notificaciones.leer');
     Route::delete('/notificaciones/{id}', [AvisoController::class, 'destroy'])->name('notificaciones.destroy');
     Route::post('/permisos/solicitar', [AvisoController::class, 'solicitar'])->name('permisos.solicitar');
