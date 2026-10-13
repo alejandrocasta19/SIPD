@@ -1,19 +1,21 @@
 @php
     $paginador = $paginador ?? null;
-    $etiqueta = $etiqueta ?? 'registros';
-@endphp
-@if($paginador && $paginador->total() > 0)
-    @php
-        $porPagina = (int) $paginador->perPage();
-        $pageName = $paginador->getPageName();
+    $etiqueta  = $etiqueta  ?? 'registros';
+    if ($paginador) {
+        $porPagina   = (int) $paginador->perPage();
+        $pageName    = $paginador->getPageName();
         $perPageName = $pageName === 'page' ? 'per_page' : 'per_page_' . $pageName;
-        $esPreset = \App\Support\Paginacion::esPreset($porPagina);
-        $pagina = $paginador->currentPage();
-        $ultima = $paginador->lastPage();
-        $desde = max(1, $pagina - 2);
-        $hasta = min($ultima, $pagina + 2);
-    @endphp
+        $esPreset    = \App\Support\Paginacion::esPreset($porPagina);
+        $hayDatos    = $paginador->total() > 0;
+        $pagina      = $paginador->currentPage();
+        $ultima      = $paginador->lastPage();
+        $desde       = max(1, $pagina - 2);
+        $hasta       = min($ultima, $pagina + 2);
+    }
+@endphp
+@if($paginador)
     <div class="sipd-pager">
+        {{-- Selector Mostrar: siempre visible aunque no haya registros --}}
         <form class="sipd-pager-size" method="GET" action="{{ url()->current() }}">
             @foreach(request()->except([$pageName, $perPageName]) as $clave => $valor)
                 @if(is_array($valor))
@@ -31,15 +33,22 @@
                 @endforeach
                 <option value="custom" {{ $esPreset ? '' : 'selected' }}>Personalizado</option>
             </select>
-            <input type="number" name="{{ $perPageName }}" class="sipd-pager-custom {{ $esPreset ? 'is-hidden' : '' }}"
+            <input type="number" name="{{ $perPageName }}"
+                   class="sipd-pager-custom {{ $esPreset ? 'is-hidden' : '' }}"
                    min="1" max="{{ \App\Support\Paginacion::MAX }}" value="{{ $porPagina }}"
                    aria-label="Cantidad personalizada">
             <button type="submit" class="sipd-pager-go {{ $esPreset ? 'is-hidden' : '' }}">Aplicar</button>
-            <span class="sipd-pager-count">
-                {{ $paginador->firstItem() }}-{{ $paginador->lastItem() }} de {{ $paginador->total() }} {{ $etiqueta }}
-            </span>
+            @if($hayDatos)
+                <span class="sipd-pager-count">
+                    {{ $paginador->firstItem() }}-{{ $paginador->lastItem() }} de {{ $paginador->total() }} {{ $etiqueta }}
+                </span>
+            @else
+                <span class="sipd-pager-count">0 {{ $etiqueta }}</span>
+            @endif
         </form>
-        @if($paginador->hasPages())
+
+        {{-- Navegación de páginas: solo cuando hay más de una página --}}
+        @if($hayDatos && $paginador->hasPages())
             <nav class="sipd-pager-pages" aria-label="Paginación">
                 @if($paginador->onFirstPage())
                     <span class="sipd-page is-off">Anterior</span>
