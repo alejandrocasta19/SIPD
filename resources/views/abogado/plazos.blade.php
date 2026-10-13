@@ -196,21 +196,28 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                             @endphp
                             @if(!empty($plazo->es_descargos) && !$soloCoordinadora)
                                 @php
-                                    // Bloquear solo si ya está decidido (no pendiente) Y sin permiso de edición,
-                                    // o si el proceso está cerrado. El vencimiento NO bloquea el select.
-                                    $presentacion = $plazo->descargos_presentacion ?? 'no_presentado';
-                                    $yaDecidido   = $presentacion !== 'no_presentado';
-                                    $bloqueado    = ($yaDecidido && !$puedeEditar) || $soloCoordinadora;
+                                    $presentacion         = $plazo->descargos_presentacion ?? 'no_presentado';
+                                    $yaDecidido           = $presentacion !== 'no_presentado';
+                                    $bloqueado            = ($yaDecidido && !$puedeEditar) || $soloCoordinadora;
+                                    $archivos             = $plazo->descargos_archivos ?? collect();
+                                    $tieneArchivos        = $archivos->isNotEmpty();
+                                    $uid                  = 'dc-' . $plazo->proceso_id;
                                 @endphp
+
+                                {{-- SELECT: siempre visible si no está bloqueado --}}
                                 @if(!$bloqueado)
-                                    <form class="plz-tipo" method="POST"
+                                    <form id="form-{{ $uid }}" class="plz-tipo" method="POST"
                                           action="{{ route('abogado.plazos.descargos', $plazo->proceso_id) }}"
                                           enctype="multipart/form-data">
                                         @csrf
                                         @if($filtro !== 'todos')
                                             <input type="hidden" name="estado" value="{{ $filtro }}">
                                         @endif
-                                        <select name="descargos_presentacion" onchange="this.form.submit()" aria-label="Presentación de descargos">
+
+                                        {{-- Select para marcar presentación presencial --}}
+                                        <select name="descargos_presentacion"
+                                                onchange="this.form.submit()"
+                                                aria-label="Presentación de descargos">
                                             @if($presentacion === 'presentado')
                                                 <option value="presentado" selected>Descargos · Presentado</option>
                                             @endif
@@ -218,26 +225,39 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                                                 <option value="{{ $valor }}" {{ $presentacion === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
                                             @endforeach
                                         </select>
-                                        {{-- Subir archivos de descargos --}}
-                                        <label style="display:block;margin-top:8px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;">Adjuntar documentos del descargo</label>
-                                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                                            <label style="display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border:1.5px dashed #cbd5e1;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:600;color:#475569;">
-                                                <i class="fas fa-paperclip"></i> Seleccionar archivos
-                                                <input type="file"
-                                                       name="archivos_descargos[]"
-                                                       multiple
-                                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
-                                                       style="display:none;"
-                                                       onchange="sipdMostrarArchivos(this)">
-                                            </label>
-                                            <span id="archivos-label-{{ $plazo->proceso_id }}" style="font-size:11px;color:#64748b;">Sin archivos</span>
-                                            <button type="submit"
-                                                    style="background:var(--cth-green-text);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">
-                                                <i class="fas fa-upload"></i> Guardar
-                                            </button>
+
+                                        {{-- Widget de subida: oculto por defecto, se abre con botón --}}
+                                        <div id="upload-{{ $uid }}" style="display:none;margin-top:8px;">
+                                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                                <label style="display:inline-flex;align-items:center;gap:5px;background:#f1f5f9;border:1.5px dashed #cbd5e1;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;color:#475569;">
+                                                    <i class="fas fa-paperclip"></i> Elegir archivos
+                                                    <input type="file"
+                                                           name="archivos_descargos[]"
+                                                           multiple
+                                                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                                                           style="display:none;"
+                                                           onchange="sipdMostrarArchivos(this,'lbl-{{ $uid }}')">
+                                                </label>
+                                                <span id="lbl-{{ $uid }}" style="font-size:11px;color:#94a3b8;">Sin archivos</span>
+                                                <button type="submit"
+                                                        style="background:var(--cth-green-text);color:#fff;border:0;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">
+                                                    <i class="fas fa-upload"></i> Subir
+                                                </button>
+                                            </div>
+                                            <p style="margin:4px 0 0;font-size:10px;color:#94a3b8;">PDF · Word · Excel · Imágenes (máx. 20 MB c/u, hasta 10 archivos)</p>
                                         </div>
+
+                                        {{-- Botón toggle para abrir/cerrar widget --}}
+                                        <button type="button"
+                                                onclick="sipdToggle('{{ $uid }}')"
+                                                style="margin-top:6px;display:inline-flex;align-items:center;gap:4px;background:none;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer;"
+                                                id="btn-{{ $uid }}">
+                                            <i class="fas fa-paperclip"></i>
+                                            {{ $tieneArchivos ? 'Agregar más' : 'Adjuntar documento' }}
+                                        </button>
+
                                         @if($yaVencido && !$yaDecidido)
-                                            <small style="color:#dc2626;font-size:11px;font-weight:600;display:block;margin-top:4px;">
+                                            <small style="display:block;color:#dc2626;font-size:10px;font-weight:600;margin-top:4px;">
                                                 <i class="fas fa-exclamation-circle"></i> Plazo vencido — registra si hubo presentación tardía
                                             </small>
                                         @endif
@@ -247,16 +267,35 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                                         {{ $opcionesDescargos[$presentacion] ?? 'Descargos · No presentó' }}
                                     </span>
                                 @endif
-                                {{-- Archivos de descargos ya subidos --}}
-                                @if(($plazo->descargos_archivos ?? collect())->isNotEmpty())
-                                    <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
-                                        @foreach($plazo->descargos_archivos as $af)
+
+                                {{-- Archivos subidos: vista visual de tarjetas --}}
+                                @if($tieneArchivos)
+                                    <div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">
+                                        @foreach($archivos as $af)
+                                            @php
+                                                $ext = strtolower($af->extension ?? '');
+                                                $isImg = in_array($ext, ['jpg','jpeg','png','gif','webp']);
+                                                $iconoCls = match(true) {
+                                                    $ext === 'pdf'                  => 'fa-file-pdf',
+                                                    in_array($ext,['doc','docx'])   => 'fa-file-word',
+                                                    in_array($ext,['xls','xlsx'])   => 'fa-file-excel',
+                                                    $isImg                          => 'fa-file-image',
+                                                    default                         => 'fa-file',
+                                                };
+                                                $iconoColor = match(true) {
+                                                    $ext === 'pdf'                  => '#dc2626',
+                                                    in_array($ext,['doc','docx'])   => '#2563eb',
+                                                    in_array($ext,['xls','xlsx'])   => '#16a34a',
+                                                    $isImg                          => '#9333ea',
+                                                    default                         => '#64748b',
+                                                };
+                                            @endphp
                                             <a href="{{ route('abogado.plazos.descargos.download', $af->id) }}"
-                                               style="font-size:11px;color:var(--cth-green-text);text-decoration:none;display:inline-flex;align-items:center;gap:5px;"
+                                               style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;text-decoration:none;max-width:240px;"
                                                title="{{ $af->nombre_original }}">
-                                                <i class="fas fa-file-download"></i>
-                                                {{ Str::limit($af->nombre_original, 30) }}
-                                                <span style="color:#94a3b8;">({{ $af->tamanoLegible() }})</span>
+                                                <i class="fas {{ $iconoCls }}" style="color:{{ $iconoColor }};font-size:13px;flex-shrink:0;"></i>
+                                                <span style="font-size:11px;color:#334155;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ Str::limit($af->nombre_original, 22) }}</span>
+                                                <span style="font-size:10px;color:#94a3b8;flex-shrink:0;">{{ $af->tamanoLegible() }}</span>
                                             </a>
                                         @endforeach
                                     </div>
@@ -264,6 +303,7 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                             @else
                                 {{ $plazo->tipo }}
                             @endif
+
                         </td>
                         <td>{{ $plazo->vencimiento->format('Y-m-d') }}</td>
                         <td>
@@ -335,16 +375,9 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 
 @section('scripts')
 <script>
-function sipdMostrarArchivos(input) {
+function sipdMostrarArchivos(input, labelId) {
     var files = input.files;
-    var form  = input.closest('form');
-    var match = form ? form.action.match(/\/plazos\/(\d+)\//) : null;
-    var pid   = match ? match[1] : null;
-    var label = pid ? document.getElementById('archivos-label-' + pid) : null;
-    if (!label) {
-        var wrap = input.closest('div');
-        label = wrap ? wrap.querySelector('span[id^="archivos-label"]') : null;
-    }
+    var label = labelId ? document.getElementById(labelId) : null;
     if (!label) return;
     if (!files || files.length === 0) {
         label.textContent = 'Sin archivos';
@@ -355,5 +388,23 @@ function sipdMostrarArchivos(input) {
         label.textContent = files.length + ' archivos seleccionados';
     }
 }
+
+function sipdToggle(uid) {
+    var widget = document.getElementById('upload-' + uid);
+    var btn    = document.getElementById('btn-' + uid);
+    if (!widget) return;
+    var open = widget.style.display === 'none' || widget.style.display === '';
+    widget.style.display = open ? 'block' : 'none';
+    if (btn) {
+        var iconHtml = '<i class="fas fa-paperclip"></i> ';
+        btn.innerHTML = open
+            ? iconHtml + 'Cancelar'
+            : iconHtml + btn.dataset.originalText;
+        if (!btn.dataset.originalText) {
+            btn.dataset.originalText = btn.textContent.trim();
+        }
+    }
+}
 </script>
 @endsection
+
