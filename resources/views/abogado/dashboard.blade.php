@@ -101,10 +101,12 @@
         <div class="dash-col">
             <section class="dash-card">
                 <div class="dash-card-title">
-                    <span>Requieren atención</span>
-                    @if($atencion->isNotEmpty())
-                        <span class="dash-chip">{{ $atencion->count() }}</span>
-                    @endif
+                    <span style="display:inline-flex;align-items:center;gap:6px;">
+                        Requieren atención
+                        @if($atencion->isNotEmpty())
+                            <span class="dash-chip">{{ $atencion->count() }}</span>
+                        @endif
+                    </span>
                     <a href="{{ route('abogado.plazos') }}">Plazos &rarr;</a>
                 </div>
 
