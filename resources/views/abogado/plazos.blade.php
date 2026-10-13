@@ -289,11 +289,6 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                                         </button>
                                     </form>
 
-                                    @if($yaVencido && !$yaDecidido && !$tieneArchivos)
-                                        <small style="display:block;color:#dc2626;font-size:10px;font-weight:600;margin-top:4px;">
-                                            <i class="fas fa-exclamation-circle"></i> Plazo vencido
-                                        </small>
-                                    @endif
                                 @endif
 
                                 {{-- Archivos subidos --}}
