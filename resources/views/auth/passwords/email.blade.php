@@ -1,4 +1,4 @@
-@extends('layouts.guest')
+@extends('layouts.guest-focus')
 
 @section('title', 'Recuperar contraseña · SIPD Cootranshuila')
 
@@ -35,7 +35,6 @@
     </form>
 
     <a class="guest-back" href="{{ route('login') }}">← Volver al acceso</a>
-    <div class="guest-note">Acceso exclusivo para personal institucional de Cootranshuila.</div>
 @endsection
 
 @section('scripts')

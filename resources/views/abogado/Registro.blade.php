@@ -332,6 +332,7 @@ label.sub-tab-btn .mod-radio {
 #doc-html-host table { width: 100% !important; height: auto !important; }
 #doc-html-host td, #doc-html-host th { height: auto !important; }
 #doc-html-host textarea.doc-interactive-field { max-width: 100%; box-sizing: border-box; }
+#doc-html-host textarea.doc-interactive-field { background-color: #FFF3B0 !important; border-color: #d6c66d !important; }
 #doc-html-host textarea.js-inline { height: 2em !important; min-height: 2em !important; overflow: hidden !important; vertical-align: baseline; white-space: nowrap; }
 #doc-html-host .doc-header-field { font-weight: 700; border-bottom: 1px solid #0f172a; padding: 0 4px; }
 #doc-html-host .doc-optional-clause,
@@ -850,6 +851,7 @@ function hydratePlantilla(tipo) {
     bindYellowPersist(host);
     bindOptionalPersist(host);
     syncDocHeader();
+    renderSelectedSignaturePreviews();
     persistDraft();
 }
 
@@ -1168,7 +1170,39 @@ function mostrarFirmaSeleccionada(input, labelId) {
     if (input.files && input.files[0]) {
         var label = document.getElementById(labelId);
         label.textContent = input.files[0].name;
+        renderSelectedSignaturePreviews();
     }
+}
+
+function renderSelectedSignaturePreviews() {
+    var host = document.getElementById('doc-html-host');
+    if (!host) return;
+
+    var zones = Array.prototype.slice.call(host.querySelectorAll('p.sig-zone'));
+    if (!zones.length) return;
+
+    [
+        { id: 'firma-trabajador-registro', role: 'trabajador' },
+        { id: 'firma-registro', role: 'cuenta' }
+    ].forEach(function (signature) {
+        var input = document.getElementById(signature.id);
+        var file = input && !input.disabled && input.files && input.files[0];
+        if (!file || !/^image\/(png|jpeg)$/.test(file.type)) return;
+
+        var index = signature.role === 'trabajador' ? 0 : (currentTipo === 'acta' ? 1 : 0);
+        var zone = zones[index] || zones[zones.length - 1];
+        var reader = new FileReader();
+        reader.onload = function () {
+            if (!zone.isConnected || !input.files || input.files[0] !== file) return;
+            var image = document.createElement('img');
+            image.src = reader.result;
+            image.alt = signature.role === 'trabajador' ? 'Firma del trabajador' : 'Firma de RH';
+            image.style.cssText = 'display:block;max-width:240px;max-height:70px;margin:0 auto;object-fit:contain;';
+            zone.textContent = '';
+            zone.appendChild(image);
+        };
+        reader.readAsDataURL(file);
+    });
 }
 </script>
 @endsection

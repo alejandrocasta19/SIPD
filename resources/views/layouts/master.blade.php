@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=49">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=55">
     @yield('styles')
     <script>
     (function(){
@@ -171,11 +171,6 @@
                     @if($me->puede('ver_anexos'))
                     <a href="{{ route('abogado.anexos') }}" class="{{ request()->routeIs('abogado.anexos') ? 'active' : '' }}">
                         <i class="fas fa-file-upload"></i> Anexos escaneados
-                    </a>
-                    @endif
-                    @if($me->puede('ver_resoluciones'))
-                    <a href="{{ route('abogado.resoluciones') }}" class="{{ request()->routeIs('abogado.resoluciones') ? 'active' : '' }}">
-                        <i class="far fa-file-alt"></i> Resoluciones
                     </a>
                     @endif
                     @if(!$me->esCoordinadora())

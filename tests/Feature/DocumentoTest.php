@@ -169,7 +169,7 @@ class DocumentoTest extends TestCase
     {
         Storage::fake('local');
         Storage::fake('public');
-        $user = $this->makeUser('abogado');
+        $user = $this->makeUser('coordinadora');
 
         $this->actingAs($user)
             ->post(route('abogado.registro.store'), [
@@ -185,6 +185,67 @@ class DocumentoTest extends TestCase
         $this->assertStringStartsWith('firmas/usuarios/' . $user->id . '/', $ruta);
         Storage::disk('local')->assertExists($ruta);
         Storage::disk('public')->assertMissing($ruta);
+
+        $caso = ProcesoDisciplinario::where('cedula', '1234567890')->firstOrFail();
+        $this->get(route('documentos.edit', [$caso->id, 'disciplinario']))
+            ->assertOk()
+            ->assertDontSee('(Firma digital — usa el botón Subir firma, debajo del documento)')
+            ->assertSee('data:image/png;base64,', false);
+
+        $path = app(\App\Services\OfficialDocumentService::class)->materializeDocx($caso, 'disciplinario');
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $media = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = $zip->getNameIndex($index);
+            if (strpos($name, 'word/media/sipd-signature-') === 0) {
+                $media[] = $name;
+            }
+        }
+        $xml = (string) $zip->getFromName('word/document.xml');
+        $relationships = (string) $zip->getFromName('word/_rels/document.xml.rels');
+        $zip->close();
+        @unlink($path);
+
+        $this->assertCount(1, $media);
+        $this->assertStringContainsString('r:embed=', $xml);
+        $this->assertStringContainsString('media/' . basename($media[0]), $relationships);
+        $this->assertStringNotContainsString('Firma digital', $xml);
+    }
+
+    /** @test */
+    public function la_coordinadora_puede_cargar_y_aplicar_su_firma_virtual_en_la_apertura()
+    {
+        Storage::fake('local');
+        $coordinadora = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($coordinadora);
+
+        $this->actingAs($coordinadora)
+            ->post(route('documentos.firmas.store', [$caso->id, 'disciplinario']), [
+                'firma_cuenta' => UploadedFile::fake()->image('firma-coordinadora.png'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        $this->get(route('documentos.edit', [$caso->id, 'disciplinario']))
+            ->assertOk()
+            ->assertSee('data:image/png;base64,', false);
+
+        $path = app(\App\Services\OfficialDocumentService::class)->materializeDocx($caso, 'disciplinario');
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $media = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = $zip->getNameIndex($index);
+            if (strpos($name, 'word/media/sipd-signature-') === 0) {
+                $media[] = $name;
+            }
+        }
+        $zip->close();
+        @unlink($path);
+
+        $this->assertCount(1, $media);
     }
 
     /** @test */
@@ -442,6 +503,8 @@ class DocumentoTest extends TestCase
         $this->actingAs($user)
             ->get(route('documentos.edit', [$caso->id, 'disciplinario']))
             ->assertOk()
+            ->assertSee('class="sipd-back-button"', false)
+            ->assertSee('Volver a generar documentos')
             ->assertSee('Guarda cambios en un documento ya generado')
             ->assertDontSee('Guarda el avance sin generar el documento');
     }
@@ -787,7 +850,9 @@ class DocumentoTest extends TestCase
             ->assertSee('Usar formato')
             ->assertSee('Las zonas amarillas son editables')
             ->assertSee('no se generan en el documento')
-            ->assertSee('sipd_nuevo_proceso', false);
+            ->assertSee('sipd_nuevo_proceso', false)
+            ->assertSee('function renderSelectedSignaturePreviews()', false)
+            ->assertSee('reader.readAsDataURL(file)', false);
     }
 
     /** @test */
@@ -893,7 +958,9 @@ class DocumentoTest extends TestCase
         $this->actingAs($user)
             ->get(route('documentos.hub'))
             ->assertOk()
-            ->assertDontSee('class="action-btn btn-down hub-open-dl"', false);
+            ->assertDontSee('class="action-btn btn-down hub-open-dl"', false)
+            ->assertSee('class="action-btn btn-download-permission"', false)
+            ->assertSee("SIPD_abrirPermiso('descargar_documentos')", false);
 
         $this->actingAs($user)
             ->get(route('documentos.download', [$caso->id, 'disciplinario']))
@@ -905,7 +972,59 @@ class DocumentoTest extends TestCase
             ->get(route('documentos.hub'))
             ->assertOk()
             ->assertSee('class="action-btn btn-down hub-open-dl"', false)
+            ->assertDontSee('class="action-btn btn-download-permission"', false)
             ->assertSee('Descargar');
+    }
+
+    /** @test */
+    public function hub_muestra_solicitudes_de_permisos_en_acciones_y_acciones_otorgadas()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee("SIPD_abrirPermiso('editar_casos')", false)
+            ->assertSee("SIPD_abrirPermiso('eliminar_casos')", false)
+            ->assertSee('class="action-btn btn-view"', false)
+            ->assertSee('class="action-btn btn-edit"', false)
+            ->assertSee('class="action-btn btn-delete"', false)
+            ->assertSee('.action-btn {', false)
+            ->assertSee('background: #f1f5f9;', false)
+            ->assertSee('.action-btn.btn-view:hover { background: #dcfce7; color: #15803d; }', false)
+            ->assertSee('.action-btn.btn-edit:hover { background: #dbeafe; color: #1d4ed8; }', false)
+            ->assertSee('.action-btn.btn-delete:hover { background: #fee2e2; color: #b91c1c; }', false);
+
+        $user->otorgarPermiso('editar_casos', null);
+        $user->otorgarPermiso('eliminar_casos', null);
+
+        $this->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee('editar=1', false)
+            ->assertSee(route('abogado.eliminarproceso', $caso->id), false)
+            ->assertSee('class="action-btn btn-edit"', false)
+            ->assertSee('class="action-btn btn-delete"', false)
+            ->assertDontSee("SIPD_abrirPermiso('editar_casos')", false)
+            ->assertDontSee("SIPD_abrirPermiso('eliminar_casos')", false);
+    }
+
+    /** @test */
+    public function mis_casos_usa_los_mismos_colores_y_tamano_de_acciones_que_generar_documentos()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('abogado.mis-casos'))
+            ->assertOk()
+            ->assertSee(route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'casos']), false)
+            ->assertSee('class="danger"', false)
+            ->assertSee('background: #f1f5f9;', false)
+            ->assertSee('.acts a.btn-view:hover { background: #dcfce7; color: #15803d; }', false)
+            ->assertSee('.acts button.danger:hover { background: #fee2e2; color: #b91c1c; }', false)
+            ->assertSee('width: 32px;', false)
+            ->assertSee('height: 32px;', false);
     }
 
     /** @test */
@@ -930,14 +1049,18 @@ class DocumentoTest extends TestCase
     {
         $user = $this->makeUser('abogado');
 
-        $this->actingAs($user)
+        $html = $this->actingAs($user)
             ->get(route('abogado.registro.plantilla', ['tipo' => 'llamado']))
             ->assertOk()
             ->assertJsonStructure(['html', 'tipo', 'etiqueta', 'slot'])
             ->assertJson([
                 'tipo' => 'llamado',
                 'slot' => 'resolucion',
-            ]);
+            ])
+            ->json('html');
+
+        $this->assertStringContainsString('background:#FFF3B0', $html);
+        $this->assertStringContainsString('border:1.5px dashed #d6c66d', $html);
     }
 
     /** @test */
@@ -1539,6 +1662,7 @@ class DocumentoTest extends TestCase
             ->from(route('documentos.hub'))
             ->get(route('abogado.detalleproceso', $caso->id))
             ->assertOk()
+            ->assertSee('class="sipd-back-button btn-volver-lista"', false)
             ->assertSee('btn-volver-lista" href="'.route('documentos.hub').'"', false);
     }
 

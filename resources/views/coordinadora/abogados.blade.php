@@ -167,21 +167,15 @@
         width: 32px;
         height: 32px;
         border: 0;
-        background: transparent;
-        color: #94a3b8;
+        background: #f1f5f9;
+        color: #64748b;
         cursor: pointer;
         border-radius: 8px;
     }
-    .team-actions button.edit-rh,
-    .team-actions button.edit-rh i { color: #94a3b8; }
     .team-actions button.edit-rh:hover,
-    .team-actions button.edit-rh:hover i,
-    .team-actions button.edit-rh:focus-visible,
-    .team-actions button.edit-rh:focus-visible i {
-        background-color: #fff7ed !important;
-        color: #f97316 !important;
-    }
-    .team-actions button.danger:hover { background: #fff1f2; color: #e11d48; }
+    .team-actions button.edit-rh:focus-visible { background: #dbeafe; color: #1d4ed8; }
+    .team-actions button.danger:hover,
+    .team-actions button.danger:focus-visible { background: #fee2e2; color: #b91c1c; }
     .team-empty { text-align: center; padding: 32px; color: #94a3b8; }
 
     @media (max-width: 900px) {

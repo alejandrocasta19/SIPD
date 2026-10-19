@@ -175,10 +175,6 @@ Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
         return redirect()->route('abogado.anexos');
     })->name('abogado.partes');
 
-    Route::get('/abogado/resoluciones',
-        [ProcesoDisciplinarioController::class, 'resoluciones']
-    )->name('abogado.resoluciones');
-
 });
 
 /*

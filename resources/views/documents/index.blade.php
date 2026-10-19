@@ -23,7 +23,7 @@
         <p>{{ $caso->nombre }} · C.C. {{ $caso->cedula }} · PRO-{{ str_pad($caso->id, 3, '0', STR_PAD_LEFT) }}</p>
     </div>
     <div class="proc-head-side">
-        <a class="btn-alt" href="{{ route('documentos.hub') }}"><i class="fas fa-arrow-left"></i> Volver a documentos</a>
+        <a class="sipd-back-button" href="{{ route('documentos.hub') }}"><i class="fas fa-arrow-left"></i> Volver a documentos</a>
     </div>
 </div>
 @endsection

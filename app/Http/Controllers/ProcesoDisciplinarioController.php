@@ -32,7 +32,6 @@ class ProcesoDisciplinarioController extends Controller
         $this->middleware('permiso:exportar_reportes')->only(['reportesGlobales', 'exportarCasos']);
         $this->middleware('permiso:ver_reincidencias')->only(['reincidencias']);
         $this->middleware('permiso:ver_plazos')->only(['plazos', 'actualizarDescargosPresentacion']);
-        $this->middleware('permiso:ver_resoluciones')->only(['resoluciones']);
     }
 
     private function visibleProcesses()
@@ -802,7 +801,6 @@ class ProcesoDisciplinarioController extends Controller
             'anexos' => route('abogado.anexos'),
             'plazos' => route('abogado.plazos'),
             'reincidencias' => route('abogado.reincidencias'),
-            'resoluciones' => route('abogado.resoluciones'),
             'veredictos' => route('coordinadora.veredictos'),
         ];
     }
@@ -1026,75 +1024,6 @@ class ProcesoDisciplinarioController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Error al eliminar el proceso: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Archivo de resoluciones
-     */
-    public function resoluciones(Request $request)
-    {
-        $resoluciones = $this->visibleProcesses()->with('user')
-            ->latest()
-            ->get()
-            ->map(function ($proceso) {
-                $decision = mb_strtolower((string) $proceso->decision_final);
-
-                if (str_contains($decision, 'nulid')) {
-                    $tipo = 'nulidad';
-                } elseif (str_contains($decision, 'absol')) {
-                    $tipo = 'absolutoria';
-                } elseif ($proceso->estado === 'Archivado') {
-                    $tipo = 'archivo';
-                } elseif ($proceso->estado === 'Sancionado' || str_contains($decision, 'sancion')) {
-                    $tipo = 'sancionatoria';
-                } elseif ($proceso->estado === 'En Proceso') {
-                    $tipo = 'sancionatoria';
-                } else {
-                    $tipo = 'sancionatoria';
-                }
-
-                $firmada = filled($proceso->decision_final)
-                    || in_array($proceso->estado, ['Sancionado', 'Archivado'], true);
-
-                $fecha = $proceso->updated_at ?: $proceso->created_at;
-                $anio = optional($fecha)->format('Y') ?: date('Y');
-
-                return (object) [
-                    'id' => $proceso->id,
-                    'numero' => $anio . '-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT),
-                    'nombre' => $proceso->nombre,
-                    'modalidad' => $proceso->modalidad,
-                    'cargo' => $proceso->cargo,
-                    'proceso_id' => $proceso->id,
-                    'abogado' => $proceso->user->name ?? 'Sin asignar',
-                    'expediente' => optional($fecha)->format('Y-m-d'),
-                    'tipo' => $tipo,
-                    'firmada' => $firmada,
-                    'solo_coordinadora' => in_array($proceso->estado, ['Sancionado', 'Archivado'], true) && (!auth()->user() || !auth()->user()->esCoordinadora()),
-                ];
-            });
-
-        $conteos = [
-            'todos' => $resoluciones->count(),
-            'sancionatoria' => $resoluciones->where('tipo', 'sancionatoria')->count(),
-            'absolutoria' => $resoluciones->where('tipo', 'absolutoria')->count(),
-            'archivo' => $resoluciones->where('tipo', 'archivo')->count(),
-            'nulidad' => $resoluciones->where('tipo', 'nulidad')->count(),
-        ];
-
-        $filtro = $request->get('tipo', 'todos');
-        if (in_array($filtro, ['sancionatoria', 'absolutoria', 'archivo', 'nulidad'], true)) {
-            $resoluciones = $resoluciones->where('tipo', $filtro)->values();
-        }
-
-        $resolucionesPaginated = Paginacion::deColeccion($resoluciones);
-
-        return view('abogado.resoluciones', [
-            'pageTitle' => 'Resoluciones',
-            'resoluciones' => $resolucionesPaginated,
-            'conteos' => $conteos,
-            'filtro' => $filtro,
-        ]);
     }
 
     /**

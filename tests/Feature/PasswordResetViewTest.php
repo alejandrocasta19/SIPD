@@ -24,9 +24,29 @@ class PasswordResetViewTest extends TestCase
             ->assertSee('Solicitar recuperación')
             ->assertSee('La coordinadora revisará la solicitud')
             ->assertSee('Volver al acceso')
-            ->assertSee('guest-split', false)
+            ->assertSee('guest-focus-page', false)
+            ->assertDontSee('guest-split', false)
+            ->assertDontSee('PLATAFORMA INSTITUCIONAL')
+            ->assertDontSee('Consultar mi caso')
+            ->assertDontSee('Acceso exclusivo para personal institucional')
             ->assertDontSee('Reset Password')
             ->assertDontSee('Send Password Reset Link');
+    }
+
+    /** @test */
+    public function restablecer_contrasena_muestra_solo_el_formulario_de_recuperacion()
+    {
+        $this->get(route('password.reset', [
+            'token' => 'token-de-prueba',
+            'email' => 'usuario@example.test',
+        ]))
+            ->assertOk()
+            ->assertSee('Restablecer contraseña')
+            ->assertSee('Nueva contraseña')
+            ->assertSee('Confirmar contraseña')
+            ->assertSee('guest-focus-page', false)
+            ->assertDontSee('guest-split', false)
+            ->assertDontSee('Consultar mi caso');
     }
 
     /** @test */

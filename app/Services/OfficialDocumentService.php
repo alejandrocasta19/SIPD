@@ -384,9 +384,6 @@ class OfficialDocumentService
                 ? (string) $proceso->nombre
                 : (string) ($header['firmante_nombre'] ?? $firmante->name);
             $target = $this->lastParagraphContaining($xpath, $targetName);
-            if (!$target || !$target->parentNode) {
-                continue;
-            }
 
             $imageInfo = getimagesize($path);
             if (!$imageInfo) {
@@ -400,7 +397,15 @@ class OfficialDocumentService
             $image->setAttribute('src', 'data:' . $imageInfo['mime'] . ';base64,' . base64_encode($bytes));
             $image->setAttribute('alt', 'Firma ' . $role);
             $image->setAttribute('style', 'display:block;max-width:240px;max-height:70px;margin:0 auto;');
-            $paragraph = $this->previousParagraph($target);
+
+            $paragraph = $target && $target->parentNode ? $this->previousParagraph($target) : null;
+            if (!$paragraph) {
+                $paragraph = $this->signaturePlaceholderHtml($xpath, $tipo, $role);
+            }
+            if (!$paragraph && (!$target || !$target->parentNode)) {
+                throw new \RuntimeException('No se encontró el espacio de firma para insertar la firma virtual.');
+            }
+
             $paragraphText = $paragraph ? trim($paragraph->textContent) : '';
             $classNames = $paragraph ? preg_split('/\s+/', $paragraph->getAttribute('class')) : [];
             $isSignatureLine = $paragraph && (
@@ -409,6 +414,9 @@ class OfficialDocumentService
                 || in_array('sig-zone', $classNames, true)
             );
             if (!$isSignatureLine) {
+                if (!$target || !$target->parentNode) {
+                    throw new \RuntimeException('No se encontró el nombre del firmante para insertar la firma virtual.');
+                }
                 $paragraph = $document->createElement('p');
                 $target->parentNode->insertBefore($paragraph, $target);
             } else {
@@ -463,9 +471,6 @@ class OfficialDocumentService
                 ? (string) $proceso->nombre
                 : (string) ($header['firmante_nombre'] ?? $firmante->name);
             $target = $this->lastParagraphContaining($xpath, $targetName);
-            if (!$target || !$target->parentNode) {
-                continue;
-            }
 
             $imageInfo = getimagesize($path);
             if (!$imageInfo || !in_array($imageInfo['mime'] ?? '', ['image/png', 'image/jpeg'], true)) {
@@ -490,7 +495,16 @@ class OfficialDocumentService
                 $mediaName,
                 $drawingId++
             );
-            $signatureParagraph = $this->previousParagraph($target);
+            $signatureParagraph = $target && $target->parentNode
+                ? $this->previousParagraph($target)
+                : null;
+            if (!$signatureParagraph) {
+                $signatureParagraph = $this->signaturePlaceholderXml($xpath, $tipo, $role);
+            }
+            if (!$signatureParagraph && (!$target || !$target->parentNode)) {
+                throw new \RuntimeException('No se encontró el espacio de firma para insertar la firma virtual.');
+            }
+
             $paragraphText = $signatureParagraph
                 ? trim(preg_replace('/\s+/u', ' ', $signatureParagraph->textContent) ?? '')
                 : '';
@@ -499,6 +513,9 @@ class OfficialDocumentService
                 || preg_match('/^_{5,}$/u', $paragraphText)
             );
             if (!$isSignatureLine) {
+                if (!$target || !$target->parentNode) {
+                    throw new \RuntimeException('No se encontró el nombre del firmante para insertar la firma virtual.');
+                }
                 $signatureParagraph = $document->createElementNS(
                     'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
                     'w:p'
@@ -519,6 +536,47 @@ class OfficialDocumentService
             throw new \RuntimeException('No se pudieron guardar los recursos de firma en el DOCX.');
         }
         return $document->saveXML();
+    }
+
+    private function signaturePlaceholderHtml(DOMXPath $xpath, string $tipo, string $role): ?\DOMElement
+    {
+        $zones = $xpath->query('//p[contains(concat(" ", normalize-space(@class), " "), " sig-zone ")]');
+        $index = $this->signaturePlaceholderIndex($tipo, $role);
+
+        return $zones && $zones->length > $index && $zones->item($index) instanceof \DOMElement
+            ? $zones->item($index)
+            : null;
+    }
+
+    private function signaturePlaceholderXml(DOMXPath $xpath, string $tipo, string $role): ?\DOMElement
+    {
+        $paragraphs = $xpath->query('//w:p');
+        if (!$paragraphs) {
+            return null;
+        }
+
+        $zones = [];
+        foreach ($paragraphs as $paragraph) {
+            $text = trim(preg_replace('/\s+/u', ' ', $paragraph->textContent) ?? '');
+            if (preg_match('/^_{5,}$/u', $text)) {
+                $zones[] = $paragraph;
+            }
+        }
+
+        $index = $this->signaturePlaceholderIndex($tipo, $role);
+
+        return isset($zones[$index]) && $zones[$index] instanceof \DOMElement
+            ? $zones[$index]
+            : null;
+    }
+
+    private function signaturePlaceholderIndex(string $tipo, string $role): int
+    {
+        if ($tipo === 'acta' && $role === 'cuenta') {
+            return 1;
+        }
+
+        return 0;
     }
 
     private function lastParagraphContaining(DOMXPath $xpath, string $text): ?\DOMElement
@@ -544,12 +602,26 @@ class OfficialDocumentService
 
     private function previousParagraph(\DOMElement $target): ?\DOMElement
     {
+        $emptyParagraph = null;
         for ($sibling = $target->previousSibling; $sibling; $sibling = $sibling->previousSibling) {
-            if ($sibling instanceof \DOMElement && $sibling->localName === 'p') {
+            if (!($sibling instanceof \DOMElement) || $sibling->localName !== 'p') {
+                continue;
+            }
+
+            $text = trim(preg_replace('/\s+/u', ' ', $sibling->textContent) ?? '');
+            $classes = preg_split('/\s+/', trim($sibling->getAttribute('class'))) ?: [];
+            if (in_array('sig-zone', $classes, true) || preg_match('/^_{5,}$/u', $text)) {
                 return $sibling;
             }
+            if ($text === '') {
+                $emptyParagraph = $emptyParagraph ?: $sibling;
+                continue;
+            }
+
+            return $emptyParagraph;
         }
-        return null;
+
+        return $emptyParagraph;
     }
 
     private function centerSignatureParagraph(\DOMElement $paragraph): void
@@ -1156,11 +1228,11 @@ class OfficialDocumentService
             $ch = max(10, $len + 4);
             $textarea->setAttribute('class', "doc-interactive-field js-block-{$tipo} js-inline");
             $textarea->setAttribute('rows', '1');
-            $textarea->setAttribute('style', "display:inline-block;min-width:{$ch}ch;width:{$ch}ch;max-width:100%;vertical-align:baseline;height:2em;min-height:2em;overflow:hidden;resize:none;font-family:inherit;font-size:inherit;line-height:1.35;padding:2px 8px;border:1.5px dashed #fbbf24;border-radius:4px;box-sizing:content-box;background:#fffbeb;outline:none;margin:0 4px;");
+            $textarea->setAttribute('style', "display:inline-block;min-width:{$ch}ch;width:{$ch}ch;max-width:100%;vertical-align:baseline;height:2em;min-height:2em;overflow:hidden;resize:none;font-family:inherit;font-size:inherit;line-height:1.35;padding:2px 8px;border:1.5px dashed #d6c66d;border-radius:4px;box-sizing:content-box;background:#FFF3B0;outline:none;margin:0 4px;");
         } else {
             $textarea->setAttribute('class', "doc-interactive-field js-block-{$tipo} js-autosize");
             $textarea->setAttribute('rows', $len > 160 ? '4' : ($len > 70 ? '3' : '2'));
-            $textarea->setAttribute('style', 'display:block;width:100%;min-height:2.1em;max-height:none;overflow:auto;resize:vertical;font-family:inherit;font-size:inherit;line-height:1.4;padding:6px 8px;border:1.5px dashed #fbbf24;border-radius:4px;box-sizing:border-box;background:#fffbeb;outline:none;margin:6px 0;');
+            $textarea->setAttribute('style', 'display:block;width:100%;min-height:2.1em;max-height:none;overflow:auto;resize:vertical;font-family:inherit;font-size:inherit;line-height:1.4;padding:6px 8px;border:1.5px dashed #d6c66d;border-radius:4px;box-sizing:border-box;background:#FFF3B0;outline:none;margin:6px 0;');
         }
         return $textarea;
     }

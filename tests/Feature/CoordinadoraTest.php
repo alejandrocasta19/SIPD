@@ -385,6 +385,7 @@ class CoordinadoraTest extends TestCase
             ->get(route('coordinadora.notificar'))
             ->assertOk()
             ->assertSee('Avisar al equipo')
+            ->assertSee('class="sipd-back-button"', false)
             ->assertSee('Destinatarios')
             ->assertDontSee('Así lo verá el equipo')
             ->assertDontSee('Asunto del aviso');
@@ -577,7 +578,7 @@ class CoordinadoraTest extends TestCase
             ->assertSee('Mis Casos')
             ->assertSee('Reincidencias')
             ->assertSee('Plazos y términos')
-            ->assertSee('Resoluciones')
+            ->assertDontSee('Resoluciones')
             ->assertSee('Estadísticas / Reportes')
             ->assertSee('class="perm-mod-card"', false)
             ->assertSee('Descargar Word/PDF')
@@ -605,6 +606,16 @@ class CoordinadoraTest extends TestCase
             ->assertDontSee('Tiempo del módulo')
             ->assertDontSee('Ver autos y actas')
             ->assertDontSee('Generar y editar documentos');
+    }
+
+    /** @test */
+    public function ruta_del_modulo_de_resoluciones_ya_no_existe()
+    {
+        $coord = $this->makeUser('coordinadora');
+
+        $this->actingAs($coord)
+            ->get('/abogado/resoluciones')
+            ->assertNotFound();
     }
 
     /** @test */

@@ -69,8 +69,8 @@
 .btn-dl-word { background: #1d4ed8; }
 .btn-dl-pdf { background: #e24b3a; }
 .doc-interactive-field:focus {
-    background-color: #fff !important;
-    border-color: var(--c-green) !important;
+    background-color: #FFF3B0 !important;
+    border-color: #d6c66d !important;
     box-shadow: 0 0 0 3px rgba(34,197,94,.2) !important;
 }
 .phpword-document-container { overflow-x: auto; }
@@ -79,6 +79,7 @@
 .phpword-document-container img { max-width: 100%; height: auto; max-height: 90px; }
 .phpword-document-container table { width: 100% !important; height: auto !important; }
 .phpword-document-container textarea.doc-interactive-field { max-width: 100%; box-sizing: border-box; }
+.phpword-document-container textarea.doc-interactive-field { background-color: #FFF3B0 !important; border-color: #d6c66d !important; }
 .phpword-document-container textarea.js-inline { height: 2em !important; min-height: 2em !important; overflow: hidden !important; vertical-align: baseline; white-space: nowrap; }
 .phpword-document-container .doc-optional-clause,
 .phpword-document-container .doc-optional-bar,
@@ -95,6 +96,11 @@
         <div>
             <h1>{{ $pageTitle }}</h1>
             <p>Expediente de {{ $caso->nombre }} (CC: {{ $caso->cedula }})</p>
+        </div>
+        <div class="proc-head-side">
+            <a href="{{ route('documentos.hub') }}" class="sipd-back-button">
+                <i class="fas fa-arrow-left"></i> Volver a generar documentos
+            </a>
         </div>
     </div>
 @endsection
@@ -244,9 +250,6 @@
                 </div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <a href="{{ route('documentos.hub') }}" class="btn-toolbar btn-ghost" style="text-decoration:none;">
-                    <i class="fas fa-arrow-left"></i> Generar documentos
-                </a>
                 @if(!$yaGenerado && $puedeEscribir && auth()->user()->puede('editar_documentos'))
                 <button type="submit" class="btn-toolbar btn-ghost" title="Guarda el avance sin generar el documento">
                     <i class="fas fa-save"></i> Guardar borrador

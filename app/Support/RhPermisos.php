@@ -22,7 +22,6 @@ class RhPermisos
     public const ELIMINAR_ANEXOS = 'eliminar_anexos';
 
     public const VER_PLAZOS = 'ver_plazos';
-    public const VER_RESOLUCIONES = 'ver_resoluciones';
     public const VER_REINCIDENCIAS = 'ver_reincidencias';
     public const VER_REPORTES = 'ver_reportes';
     public const EXPORTAR_REPORTES = 'exportar_reportes';
@@ -122,17 +121,6 @@ class RhPermisos
                     self::EDITAR_ANEXOS => 'Cambiar el tipo o reemplazar un archivo ya cargado.',
                     self::DESCARGAR_ANEXOS => 'Bajar el archivo adjunto.',
                     self::ELIMINAR_ANEXOS => 'Quitar un anexo del expediente.',
-                ],
-            ],
-            'resoluciones' => [
-                'label' => 'Resoluciones',
-                'icon' => 'far fa-file-alt',
-                'desc' => 'Consulta de resoluciones del expediente.',
-                'items' => [
-                    self::VER_RESOLUCIONES => 'Ver resoluciones',
-                ],
-                'hints' => [
-                    self::VER_RESOLUCIONES => 'Consulta de resoluciones.',
                 ],
             ],
             'reportes' => [
@@ -279,7 +267,6 @@ class RhPermisos
             self::VER_ANEXOS,
             self::SUBIR_ANEXOS,
             self::VER_PLAZOS,
-            self::VER_RESOLUCIONES,
             self::VER_REINCIDENCIAS,
             self::VER_REPORTES,
         ];

@@ -65,23 +65,21 @@
     .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
     .acts form { margin: 0; }
     .acts .action-btn {
-        background: #f1f5f9; color: #334155; border: 1px solid var(--cth-border);
+        background: #f1f5f9; color: #64748b; border: 1px solid var(--cth-border);
         padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
         text-decoration: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
         white-space: nowrap; line-height: 1;
     }
     .acts .action-btn:hover { background: #e2e8f0; color: #0f172a; }
+    .acts .action-btn.edit:hover { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
     .acts .action-btn.download {
-        background: var(--cth-green);
-        color: #fff;
-        border-color: transparent;
+        border-color: var(--cth-border);
         padding: 8px 16px;
-        box-shadow: 0 1px 2px rgba(0, 104, 55, .22);
     }
     .acts .action-btn.download i { font-size: 12px; }
-    .acts .action-btn.download:hover { filter: brightness(1.08); color: #fff; }
-    .acts .action-btn.danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-    .acts .action-btn.veredicto { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+    .acts .action-btn.download:hover { background: #ddd6fe; color: #5b21b6; }
+    .acts .action-btn.danger:hover { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+    .acts .action-btn.veredicto:hover { background: #dbeafe; color: #1d4ed8; }
     table.proc th:last-child,
     table.proc td:last-child { width: 1%; white-space: nowrap; }
     #modalEditarAnexo .sipd-dialog { max-width: 480px; }
@@ -220,14 +218,14 @@
                     @endphp
                     <div class="acts">
                         @if($puedeEditar)
-                            <button type="button" class="action-btn anexo-editar"
+                            <button type="button" class="action-btn edit anexo-editar"
                                 data-action="{{ route('abogado.anexos.update', $anexo->id) }}"
                                 data-tipo="{{ $anexo->tipoDocumento() }}"
                                 data-titulo="{{ $anexo->nombreVisible() }}">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
                         @else
-                            <button type="button" class="action-btn" onclick="SIPD_abrirPermiso('editar_anexos')">
+                            <button type="button" class="action-btn edit" onclick="SIPD_abrirPermiso('editar_anexos')">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
                         @endif

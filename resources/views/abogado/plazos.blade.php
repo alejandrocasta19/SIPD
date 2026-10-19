@@ -97,11 +97,11 @@ table.plz tr.sem-vencido td:first-child { border-left: 3px solid #ef4444; }
 }
 .acts a:hover,
 .acts button:hover { background: #e2e8f0; color: #0f172a; }
-.acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
+.acts a.btn-view:hover { background: #dcfce7; color: #15803d; }
 .acts button.warning:hover,
-.acts button.lock-edit:hover { background: #fffbeb; color: #d97706; }
+.acts button.lock-edit:hover { background: #dbeafe; color: #1d4ed8; }
 .acts button.lock-del:hover,
-.acts button.danger:hover { background: #fff1f2; color: #e11d48; }
+.acts button.danger:hover { background: #fee2e2; color: #b91c1c; }
 table.plz th.col-acts,
 table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 
@@ -429,4 +429,3 @@ function sipdToggle(uid) {
 }
 </script>
 @endsection
-

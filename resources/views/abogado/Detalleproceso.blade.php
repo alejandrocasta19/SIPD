@@ -6,10 +6,19 @@
             <h1>Detalle del proceso</h1>
             <p>{{ $proceso->nombre }} · CC {{ $proceso->cedula ?: '—' }}</p>
         </div>
+        <div class="proc-head-side">
+            <a class="sipd-back-button btn-volver-lista" href="{{ $volverA }}"><i class="fas fa-arrow-left"></i> Volver a la lista</a>
+        </div>
     </div>
 @endsection
 
 @section('content')
+
+@php
+    $editarDesdeTabla = request()->boolean('editar')
+        && auth()->user()->puede('editar_casos')
+        && !$proceso->soloLoManejaCoordinadora();
+@endphp
 
 @if($errors->any())
     <div class="sipd-alert sipd-alert-warning">
@@ -36,48 +45,17 @@
 
                 <div class="card-header">
                     <div class="card-tools">
-
-                        <a class="btn btn-secondary btn-volver-lista" href="{{ $volverA }}"><i class="fas fa-arrow-left"></i> Volver a la lista</a>
-
                         @if($proceso->soloLoManejaCoordinadora())
                         <span class="btn btn-outline-secondary disabled" style="pointer-events:none;">
                             <i class="fas fa-lock"></i> Solo la coordinadora puede manejarlo
                         </span>
                         @else
-                            @if(auth()->user()->puede('editar_casos'))
-                            <button type="button"
-                                    class="btn btn-primary"
-                                    onclick="habilitarEdicion()">
-                                <i class="fas fa-edit"></i> Editar Proceso
-                            </button>
                             <button type="submit"
                                     id="btnGuardar"
                                     class="btn btn-success"
-                                    style="display:none;">
+                                    style="{{ $editarDesdeTabla ? 'display:inline-block;' : 'display:none;' }}">
                                 <i class="fas fa-save"></i> Guardar Cambios
                             </button>
-                            @else
-                            <button type="button" class="btn btn-outline-secondary" onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('editar_casos')">
-                                <i class="fas fa-key"></i> Pedir permiso para editar
-                            </button>
-                            @endif
-
-                            @if(auth()->user()->puede('eliminar_casos'))
-                            <button type="submit"
-                                    form="form-eliminar-proceso"
-                                    class="btn btn-danger"
-                                    data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente y no se puede deshacer."
-                                    data-confirm-title="Eliminar proceso"
-                                    data-confirm-ok="Eliminar"
-                                    data-confirm-danger="1"
-                                    data-confirm-icon="warning">
-                                <i class="fas fa-trash-alt"></i> Eliminar Proceso
-                            </button>
-                            @else
-                            <button type="button" class="btn btn-outline-danger" onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('eliminar_casos')">
-                                <i class="fas fa-key"></i> Pedir permiso para eliminar
-                            </button>
-                            @endif
                         @endif
 
                     </div>
@@ -575,12 +553,6 @@
     @method('PUT')
 </form>
 @endif
-@if(auth()->user()->puede('eliminar_casos'))
-<form id="form-eliminar-proceso" action="{{ route('abogado.eliminarproceso', $proceso->id) }}" method="POST" class="d-none">
-    @csrf
-    @method('DELETE')
-</form>
-@endif
 <style>
     .flujo-doc-card {
         display: block;
@@ -831,6 +803,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var mod = document.getElementById('inp-modalidad');
     if (mod) mod.addEventListener('input', syncPlacaDetalle);
     syncPlacaDetalle();
+    if (@json($editarDesdeTabla)) habilitarEdicion();
 });
 </script>
 @endsection

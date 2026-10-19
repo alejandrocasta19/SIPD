@@ -162,10 +162,6 @@
                         @if(($plazosVencidos + $plazosPorVencer) > 0)<em class="count">{{ $plazosVencidos + $plazosPorVencer }}</em>@endif
                         <i class="fas fa-chevron-right right"></i>
                     </a>
-                    <a href="{{ route('abogado.resoluciones') }}">
-                        <span><i class="far fa-file-alt left"></i> Resoluciones</span>
-                        <i class="fas fa-chevron-right right"></i>
-                    </a>
                     <a href="{{ route('abogado.reportes') }}">
                         <span><i class="fas fa-chart-bar left"></i> Estadísticas / Reportes</span>
                         <i class="fas fa-chevron-right right"></i>

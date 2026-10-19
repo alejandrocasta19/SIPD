@@ -20,7 +20,9 @@ class ConsultaPublicaTest extends TestCase
         $this->get(route('consulta.publica'))
             ->assertOk()
             ->assertSee('Consultar mi caso')
-            ->assertSee('Número de cédula');
+            ->assertSee('Número de cédula')
+            ->assertDontSee('id="sipd-intro"', false)
+            ->assertDontSee('INTRO%202023%20COOTRANSHUILA%20NO%20AUDIO-vidkit-2026-10-13.webm', false);
     }
 
     /** @test */
@@ -150,6 +152,9 @@ class ConsultaPublicaTest extends TestCase
             ->assertOk()
             ->assertSee('Acceso al sistema')
             ->assertSee('Consultar mi caso')
+            ->assertSee('id="sipd-intro"', false)
+            ->assertSee('data-src=', false)
+            ->assertDontSee('<source src=', false)
             ->assertSee('class="btn-public"', false)
             ->assertSee('ACCESO PÚBLICO')
             ->assertSee('Cootranshuila')

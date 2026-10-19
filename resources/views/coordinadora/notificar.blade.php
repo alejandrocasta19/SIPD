@@ -8,6 +8,9 @@
             <h1>Avisar al equipo</h1>
             <p>Llega como aviso de coordinación, con tu nombre y el motivo. No se mezcla con plazos o permisos.</p>
         </div>
+        <div class="proc-head-side">
+            <a class="sipd-back-button" href="{{ route('abogado.dashboard') }}"><i class="fas fa-arrow-left"></i> Volver al inicio</a>
+        </div>
     </div>
 @endsection
 
@@ -124,7 +127,6 @@
                 <textarea id="av-cuerpo" name="cuerpo" rows="4" maxlength="2000" placeholder="Qué deben hacer o el contexto adicional.">{{ old('cuerpo') }}</textarea>
             </div>
             <div class="span-2 nt-actions">
-                <a class="btn-ghost" href="{{ route('abogado.dashboard') }}">Cancelar</a>
                 <button type="submit" class="btn-ok">Enviar aviso</button>
             </div>
         </div>

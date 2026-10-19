@@ -65,8 +65,8 @@
     }
     .acts a:hover,
     .acts button:hover { background: #e2e8f0; color: #0f172a; }
-    .acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
-    .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
+    .acts a.btn-view:hover { background: #dcfce7; color: #15803d; }
+    .acts button.danger:hover { background: #fee2e2; color: #b91c1c; }
     table.proc th.col-acts,
     table.proc td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 

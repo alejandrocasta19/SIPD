@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=45">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=52">
 </head>
 <body class="consulta-page">
     <div class="consulta-hero">
@@ -87,12 +87,13 @@
                         <div class="consulta-dialog consulta-result is-{{ $caso['estado_clase'] }}" role="dialog" aria-modal="true" aria-labelledby="consulta-caso-title-{{ $idx }}">
                             <div class="consulta-result-top">
                                 <div>
-                                    <div class="consulta-code" id="consulta-caso-title-{{ $idx }}">{{ $caso['codigo'] }}</div>
+                                    <span class="consulta-dialog-kicker">Seguimiento del proceso</span>
+                                    <h2 class="consulta-dialog-title" id="consulta-caso-title-{{ $idx }}">{{ $caso['codigo'] }}</h2>
                                     <div class="consulta-exp">Expediente {{ $caso['expediente'] }}</div>
                                 </div>
                                 <div class="consulta-dialog-head">
                                     <div class="consulta-estado consulta-estado--{{ $caso['estado_clase'] }}">{{ $caso['estado'] }}</div>
-                                    <button type="button" class="consulta-dialog-close" data-close aria-label="Cerrar">×</button>
+                                    <button type="button" class="consulta-dialog-close" data-close aria-label="Cerrar seguimiento"><i class="fas fa-times" aria-hidden="true"></i></button>
                                 </div>
                             </div>
 
@@ -101,7 +102,10 @@
                                 <div>{{ $caso['tipo'] }}@if(!empty($caso['abierto_el'])) · Abierto el {{ $caso['abierto_el']['texto'] }}@endif</div>
                             </div>
 
-                            <p class="consulta-status-msg">{{ $caso['mensaje'] }}</p>
+                            <div class="consulta-status-msg">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                <p>{{ $caso['mensaje'] }}</p>
+                            </div>
 
                             <ol class="consulta-steps" aria-label="Avance del trámite">
                                 @foreach($caso['etapas'] as $etapa)
@@ -114,7 +118,7 @@
                             </ol>
 
                             <div class="consulta-timeline-wrap">
-                                <h2>Línea de tiempo</h2>
+                                <h2><i class="fas fa-history" aria-hidden="true"></i> Línea de tiempo</h2>
                                 <ol class="consulta-timeline">
                                     @foreach($caso['linea_tiempo'] as $evento)
                                         <li class="{{ !empty($evento['actual']) ? 'is-current' : '' }}">

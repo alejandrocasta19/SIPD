@@ -62,6 +62,7 @@
     .hub-actions {
         display: flex;
         flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: center;
         gap: 6px;
@@ -84,14 +85,13 @@
         box-sizing: border-box;
         transition: all 0.15s ease;
     }
-    .action-btn:hover { background: #e2e8f0; color: #0f172a; }
-    .action-btn.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
-    .action-btn.btn-edit:hover { background: #fffbeb; color: #d97706; }
-    .action-btn.btn-down:hover { background: #eff6ff; color: #2563eb; }
-    .action-btn.veredicto {
-        background: #eff6ff; color: #2563eb;
-    }
-    .action-btn.veredicto:hover { background: #dbeafe; color: #1d4ed8; }
+    .action-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+    .action-btn.btn-view:hover { background: #dcfce7; color: #15803d; }
+    .action-btn.btn-edit:hover { background: #dbeafe; color: #1d4ed8; }
+    .action-btn.btn-delete:hover { background: #fee2e2; color: #b91c1c; }
+    .action-btn.btn-down:hover { background: #ddd6fe; color: #5b21b6; }
+    .action-btn.btn-download-permission:hover { background: #ddd6fe; color: #5b21b6; }
+    .action-btn.veredicto:hover { background: #ccfbf1; color: #0f766e; }
 </style>
 @endsection
 
@@ -201,13 +201,45 @@
                                 </button>
                             </form>
                         @endif
-                        <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn {{ $caso->soloLoManejaCoordinadora() ? 'btn-view' : 'btn-edit' }}" title="{{ $caso->soloLoManejaCoordinadora() ? 'Ver proceso' : 'Editar datos del proceso' }}">
-                            <i class="fas {{ $caso->soloLoManejaCoordinadora() ? 'fa-eye' : 'fa-edit' }}"></i>
+                        <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos']) }}" class="action-btn btn-view" title="Ver proceso">
+                            <i class="fas fa-eye"></i>
                         </a>
+                        @if(!$caso->soloLoManejaCoordinadora())
+                            @if(auth()->user()->puede('editar_casos'))
+                                <a href="{{ route('abogado.detalleproceso', ['id' => $caso->id, 'from' => 'documentos', 'editar' => 1]) }}" class="action-btn btn-edit" title="Editar datos del proceso">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            @else
+                                <button type="button" class="action-btn btn-edit" title="Solicitar permiso para editar" aria-label="Solicitar permiso para editar"
+                                        onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('editar_casos')">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                            @endif
+                            @if(auth()->user()->puede('eliminar_casos'))
+                                <form action="{{ route('abogado.eliminarproceso', $caso->id) }}" method="POST"
+                                      data-confirm="Esta acción eliminará el proceso disciplinario de forma permanente y no se puede deshacer."
+                                      data-confirm-title="Eliminar proceso"
+                                      data-confirm-ok="Eliminar"
+                                      data-confirm-danger="1"
+                                      data-confirm-icon="warning">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="action-btn btn-delete" title="Eliminar proceso" aria-label="Eliminar proceso">
+                                        <i class="far fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                            @else
+                                <button type="button" class="action-btn btn-delete" title="Solicitar permiso para eliminar" aria-label="Solicitar permiso para eliminar"
+                                        onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('eliminar_casos')">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                            @endif
+                        @endif
                         @php
                             $puedeGral = auth()->user()->puede('descargar_documentos');
                             $descargas = [];
                             $tieneAlMenosUno = false;
+                            $requierePermisoDescarga = false;
                             foreach (\App\Models\CasoDocumentoEstado::SLOTS as $slot => $variantes) {
                                 $tipoSlot = $caso->varianteDelSlot($slot);
                                 $estSlot = $caso->estadoDocumento($tipoSlot);
@@ -223,6 +255,7 @@
                                     $tieneAlMenosUno = true;
                                 } else {
                                     $actionState = 'bloqueado';
+                                    $requierePermisoDescarga = true;
                                 }
 
                                 $descargas[] = [
@@ -241,6 +274,14 @@
                                 data-items='@json($descargas)'
                                 title="Descargar documentos">
                                 <i class="fas fa-download"></i>
+                            </button>
+                        @endif
+                        @if($requierePermisoDescarga)
+                            <button type="button" class="action-btn btn-download-permission"
+                                title="Solicitar permiso para volver a descargar"
+                                aria-label="Solicitar permiso para volver a descargar"
+                                onclick="window.SIPD_abrirPermiso && SIPD_abrirPermiso('descargar_documentos')">
+                                <i class="fas fa-key"></i>
                             </button>
                         @endif
                     </div>
@@ -294,7 +335,7 @@
             if (item.actionState === 'listo') {
                 actions = '<a class="hub-dl-word" href="' + esc(item.word) + '" title="Descargar Word"><i class="fas fa-file-word"></i> Word</a><a class="hub-dl-pdf" href="' + esc(item.pdf) + '" title="Descargar PDF"><i class="fas fa-file-pdf"></i> PDF</a>';
             } else if (item.actionState === 'bloqueado') {
-                actions = '<span style="color:var(--cth-gray-text);font-size:12px;cursor:not-allowed;" title="Ya fue descargado. No tienes permisos para volver a descargarlo."><i class="fas fa-lock"></i> Requiere permiso</span>';
+                actions = '<span style="color:var(--cth-gray-text);font-size:12px;cursor:not-allowed;" title="Ya fue descargado. Usa la llave de la fila para solicitar permiso y volver a descargarlo."><i class="fas fa-lock"></i> Requiere permiso</span>';
             } else {
                 actions = '<span style="color:var(--cth-gray-text);font-size:12px;" title="Primero debes diligenciar y generar el documento."><i class="fas fa-file-signature"></i> Falta generar</span>';
             }

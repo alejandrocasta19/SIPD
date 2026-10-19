@@ -172,23 +172,27 @@
 
     table.proc th.col-acts,
     table.proc td.col-acts { text-align: center; }
-    .acts { display: flex; gap: 8px; justify-content: center; }
+    .acts { display: flex; gap: 6px; justify-content: center; }
     .acts a, .acts button {
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border: 0;
-        background: #f8fafc;
+        background: #f1f5f9;
         color: #64748b;
         border-radius: 8px;
         display: grid;
         place-items: center;
         text-decoration: none;
         cursor: pointer;
+        font-size: 13px;
+        padding: 0;
+        flex-shrink: 0;
+        transition: all .15s ease;
     }
-
-    .acts a:hover, .acts button:hover { background: #e2e8f0; color: #0f172a; }
-    .acts a.btn-view:hover { background: #ecfdf5; color: var(--cth-green-text); }
-    .acts button.danger:hover { background: #fff1f2; color: #e11d48; }
+    .acts a:focus-visible, .acts button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+    .acts a.btn-view:hover { background: #dcfce7; color: #15803d; }
+    .acts button.danger:hover { background: #fee2e2; color: #b91c1c; }
+    .acts form { margin: 0; }
 
     .empty {
         text-align: center;
