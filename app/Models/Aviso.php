@@ -14,6 +14,7 @@ class Aviso extends Model
     public const TIPO_FIRMA = 'firma_pendiente';
     public const TIPO_SESION = 'actividad_sesion';
     public const TIPO_RECUPERACION = 'recuperacion_contrasena';
+    public const TIPO_RESULTADO_VEREDICTO = 'resultado_veredicto';
 
     protected $table = 'sipd_avisos';
 
@@ -74,6 +75,7 @@ class Aviso extends Model
             self::TIPO_FIRMA     => 'Firma pendiente',
             self::TIPO_SESION    => 'Actividad de sesión',
             self::TIPO_RECUPERACION => 'Recuperación de contraseña',
+            self::TIPO_RESULTADO_VEREDICTO => 'Veredicto registrado',
         ];
 
         return $etiquetas[$this->tipo] ?? 'Notificación';
@@ -89,6 +91,7 @@ class Aviso extends Model
             self::TIPO_FIRMA     => 'fa-file-signature',
             self::TIPO_SESION    => 'fa-sign-in-alt',
             self::TIPO_RECUPERACION => 'fa-key',
+            self::TIPO_RESULTADO_VEREDICTO => 'fa-gavel',
         ];
 
         return $iconos[$this->tipo] ?? 'fa-bell';
@@ -104,6 +107,7 @@ class Aviso extends Model
             self::TIPO_FIRMA     => 'warn',
             self::TIPO_SESION    => 'info',
             self::TIPO_RECUPERACION => 'warn',
+            self::TIPO_RESULTADO_VEREDICTO => 'coord',
         ];
 
         return $tonos[$this->tipo] ?? 'info';

@@ -7,6 +7,7 @@ use App\Models\CasoAnexo;
 use App\Models\CasoDocumentoEstado;
 use App\Models\ProcesoDisciplinario;
 use App\Models\User;
+use App\Models\Aviso;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -950,14 +951,54 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         $validated = $request->validate([
-            'estado' => 'required|in:Sancionado,Archivado',
+            'veredicto_tipo' => 'required|in:sancion,archivo,terminacion_justa_causa',
+            'dias_sancion' => 'nullable|required_if:veredicto_tipo,sancion|integer|min:1',
+            'decision_final' => 'nullable|string|max:5000',
+        ], [
+            'dias_sancion.required_if' => 'Indica la cantidad de días de la sanción.',
+            'dias_sancion.integer' => 'Los días de sanción deben ser un número entero.',
+            'dias_sancion.min' => 'La sanción debe ser de al menos un día.',
         ]);
 
-        $proceso->update(['estado' => $validated['estado']]);
+        $estado = $validated['veredicto_tipo'] === 'archivo' ? 'Archivado' : 'Sancionado';
+        $diasSancion = $validated['veredicto_tipo'] === 'sancion'
+            ? (int) $validated['dias_sancion']
+            : null;
+        $etiqueta = match ($validated['veredicto_tipo']) {
+            'sancion' => 'Sanción',
+            'archivo' => 'Archivo del proceso',
+            'terminacion_justa_causa' => 'Cancelación de contrato por justa causa',
+        };
+        $codigo = 'PRO-' . str_pad((string) $proceso->id, 3, '0', STR_PAD_LEFT);
+        $detalleDias = $diasSancion ? ' Días de sanción: ' . $diasSancion . '.' : '';
 
-        $mensaje = $validated['estado'] === 'Sancionado'
-            ? 'Veredicto registrado. El proceso quedó Sancionado.'
-            : 'Veredicto registrado. El proceso quedó Archivado.';
+        DB::transaction(function () use ($proceso, $validated, $estado, $diasSancion, $etiqueta, $codigo, $detalleDias) {
+            $decisionFinal = isset($validated['decision_final']) ? trim($validated['decision_final']) : null;
+
+            $proceso->update([
+                'estado' => $estado,
+                'veredicto_tipo' => $validated['veredicto_tipo'],
+                'dias_sancion' => $diasSancion,
+                'decision_final' => $decisionFinal ?: null,
+            ]);
+
+            $justificacionTexto = $decisionFinal
+                ? ' Justificación: ' . $decisionFinal
+                : '';
+
+            Aviso::enviar($proceso->user, [
+                'remitente_id' => auth()->id(),
+                'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
+                'titulo' => 'Comunicar resultado del caso ' . $codigo,
+                'cuerpo' => 'La coordinadora registró el veredicto: ' . $etiqueta . '.'
+                    . $detalleDias
+                    . $justificacionTexto
+                    . ' Comunica formalmente esta decisión al trabajador.',
+                'proceso_id' => $proceso->id,
+            ]);
+        });
+
+        $mensaje = 'Veredicto registrado. Se notificó al responsable del expediente para comunicar el resultado al trabajador.';
 
         return redirect()->back()->with('success', $mensaje);
     }

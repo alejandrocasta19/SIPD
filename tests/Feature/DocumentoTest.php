@@ -1622,21 +1622,132 @@ class DocumentoTest extends TestCase
         $caso = $this->makeCaso($rh, ['estado' => 'En Proceso']);
 
         $this->actingAs($rh)
-            ->put(route('abogado.actualizarestado', $caso->id), ['estado' => 'Sancionado'])
+            ->put(route('abogado.actualizarestado', $caso->id), [
+                'veredicto_tipo' => 'sancion',
+                'dias_sancion' => 5,
+                'decision_final' => 'Se comprobó el incumplimiento.',
+            ])
             ->assertForbidden();
 
         $this->actingAs($coord)
-            ->put(route('abogado.actualizarestado', $caso->id), ['estado' => 'Sancionado'])
+            ->put(route('abogado.actualizarestado', $caso->id), [
+                'veredicto_tipo' => 'sancion',
+                'dias_sancion' => 5,
+                'decision_final' => 'Se comprobó el incumplimiento.',
+            ])
             ->assertRedirect();
 
         $this->assertSame('Sancionado', $caso->fresh()->estado);
+        $this->assertSame('sancion', $caso->fresh()->veredicto_tipo);
+        $this->assertSame(5, $caso->fresh()->dias_sancion);
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $rh->id,
+            'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
+            'proceso_id' => $caso->id,
+        ]);
+        $avisoSancion = Aviso::where('user_id', $rh->id)
+            ->where('proceso_id', $caso->id)
+            ->where('tipo', Aviso::TIPO_RESULTADO_VEREDICTO)
+            ->firstOrFail();
+        $this->assertStringContainsString('Días de sanción: 5', $avisoSancion->cuerpo);
+        $this->assertStringContainsString('Se comprobó el incumplimiento.', $avisoSancion->cuerpo);
 
         $otro = $this->makeCaso($rh, ['estado' => 'En Proceso']);
         $this->actingAs($coord)
-            ->put(route('abogado.actualizarestado', $otro->id), ['estado' => 'Archivado'])
+            ->put(route('abogado.actualizarestado', $otro->id), [
+                'veredicto_tipo' => 'archivo',
+                'decision_final' => 'No se reunieron elementos suficientes.',
+            ])
             ->assertRedirect();
 
         $this->assertSame('Archivado', $otro->fresh()->estado);
+        $this->assertNull($otro->fresh()->dias_sancion);
+    }
+
+    /** @test */
+    public function el_veredicto_exige_dias_para_sancion_y_justificacion()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+        $caso = $this->makeCaso($rh, ['estado' => 'En Proceso']);
+
+        $this->actingAs($coord)
+            ->put(route('abogado.actualizarestado', $caso->id), [
+                'veredicto_tipo' => 'sancion',
+                'decision_final' => '   ',
+            ])
+            ->assertSessionHasErrors(['dias_sancion', 'decision_final']);
+
+        $this->assertSame('En Proceso', $caso->fresh()->estado);
+        $this->assertDatabaseMissing('sipd_avisos', [
+            'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
+            'proceso_id' => $caso->id,
+        ]);
+    }
+
+    /** @test */
+    public function terminacion_por_justa_causa_es_un_veredicto_y_notifica_al_responsable()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $responsable = $this->makeUser('abogado');
+        $otroRh = $this->makeUser('abogado');
+        $caso = $this->makeCaso($responsable, ['estado' => 'En Proceso']);
+
+        $this->actingAs($coord)
+            ->put(route('abogado.actualizarestado', $caso->id), [
+                'veredicto_tipo' => 'terminacion_justa_causa',
+                'decision_final' => 'Reiteración documentada de faltas graves.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $caso->refresh();
+        $this->assertSame('Sancionado', $caso->estado);
+        $this->assertSame('terminacion_justa_causa', $caso->veredicto_tipo);
+        $this->assertNull($caso->dias_sancion);
+        $this->assertSame('Cancelación de contrato por justa causa', $caso->etiquetaVeredicto());
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $responsable->id,
+            'remitente_id' => $coord->id,
+            'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
+            'proceso_id' => $caso->id,
+        ]);
+        $aviso = Aviso::where('user_id', $responsable->id)
+            ->where('proceso_id', $caso->id)
+            ->where('tipo', Aviso::TIPO_RESULTADO_VEREDICTO)
+            ->firstOrFail();
+        $this->assertStringContainsString('Cancelación de contrato por justa causa', $aviso->cuerpo);
+        $this->assertStringContainsString('Reiteración documentada de faltas graves.', $aviso->cuerpo);
+        $this->assertStringContainsString('Comunica formalmente', $aviso->cuerpo);
+        $this->actingAs($responsable)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertSee('Veredicto registrado')
+            ->assertSee('Comunicar resultado del caso')
+            ->assertSee('Reiteración documentada de faltas graves.');
+        $this->assertDatabaseMissing('sipd_avisos', [
+            'user_id' => $otroRh->id,
+            'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
+            'proceso_id' => $caso->id,
+        ]);
+    }
+
+    /** @test */
+    public function veredictos_muestra_opciones_dias_y_justificacion()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('abogado');
+        $caso = $this->makeCaso($rh, ['estado' => 'En Proceso']);
+
+        $this->actingAs($coord)
+            ->get(route('coordinadora.veredictos'))
+            ->assertOk()
+            ->assertSee('name="veredicto_tipo"', false)
+            ->assertSee('name="dias_sancion"', false)
+            ->assertSee('name="decision_final"', false)
+            ->assertSee('Sanción')
+            ->assertSee('Archivar el caso')
+            ->assertSee('Cancelación de contrato por justa causa');
     }
 
     /** @test */
@@ -1646,7 +1757,11 @@ class DocumentoTest extends TestCase
         $caso = $this->makeCaso($coord, ['estado' => 'Pendiente']);
 
         $this->actingAs($coord)
-            ->put(route('abogado.actualizarestado', $caso->id), ['estado' => 'Sancionado'])
+            ->put(route('abogado.actualizarestado', $caso->id), [
+                'veredicto_tipo' => 'sancion',
+                'dias_sancion' => 2,
+                'decision_final' => 'Justificación de prueba.',
+            ])
             ->assertRedirect();
 
         $this->assertSame('Pendiente', $caso->fresh()->estado);

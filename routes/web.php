@@ -246,6 +246,8 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
     Route::get('/coordinadora/veredictos', [CoordinadoraController::class, 'veredictos'])
         ->name('coordinadora.veredictos');
+    Route::post('/coordinadora/veredictos/preparar-pruebas', [CoordinadoraController::class, 'prepararCasosDemoVeredictos'])
+        ->name('coordinadora.veredictos.preparar-demo');
     Route::put('/coordinadora/abogados/{id}/permisos', [CoordinadoraController::class, 'guardarPermisos'])
         ->name('coordinadora.abogados.permisos');
     Route::get('/coordinadora/solicitudes', [CoordinadoraController::class, 'solicitudes'])

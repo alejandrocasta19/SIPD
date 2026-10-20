@@ -2,72 +2,64 @@
     $paginador = $paginador ?? null;
     $etiqueta  = $etiqueta  ?? 'registros';
     if ($paginador) {
-        $porPagina   = (int) $paginador->perPage();
-        $pageName    = $paginador->getPageName();
-        $perPageName = $pageName === 'page' ? 'per_page' : 'per_page_' . $pageName;
-        $esPreset    = \App\Support\Paginacion::esPreset($porPagina);
-        $hayDatos    = $paginador->total() > 0;
-        $pagina      = $paginador->currentPage();
-        $ultima      = $paginador->lastPage();
-        $desde       = max(1, $pagina - 2);
-        $hasta       = min($ultima, $pagina + 2);
+        $hayDatos = $paginador->total() > 0;
+        $pagina   = $paginador->currentPage();
+        $ultima   = $paginador->lastPage();
+        $desde    = max(1, $pagina - 2);
+        $hasta    = min($ultima, $pagina + 2);
     }
 @endphp
 @if($paginador)
     <div class="sipd-pager">
-        {{-- Selector Mostrar: siempre visible aunque no haya registros --}}
-        <form class="sipd-pager-size" method="GET" action="{{ url()->current() }}">
-            @foreach(request()->except([$pageName, $perPageName]) as $clave => $valor)
-                @if(is_array($valor))
-                    @foreach($valor as $item)
-                        <input type="hidden" name="{{ $clave }}[]" value="{{ $item }}">
-                    @endforeach
-                @else
-                    <input type="hidden" name="{{ $clave }}" value="{{ $valor }}">
-                @endif
-            @endforeach
-            <label>Mostrar</label>
-            <select class="sipd-pager-choice" aria-label="Registros por página">
-                @foreach(\App\Support\Paginacion::OPCIONES as $opcion)
-                    <option value="{{ $opcion }}" {{ $porPagina === $opcion ? 'selected' : '' }}>{{ $opcion }}</option>
-                @endforeach
-                <option value="custom" {{ $esPreset ? '' : 'selected' }}>Personalizado</option>
-            </select>
-            <input type="number" name="{{ $perPageName }}"
-                   class="sipd-pager-custom {{ $esPreset ? 'is-hidden' : '' }}"
-                   min="1" max="{{ \App\Support\Paginacion::MAX }}" value="{{ $porPagina }}"
-                   aria-label="Cantidad personalizada">
-            <button type="submit" class="sipd-pager-go {{ $esPreset ? 'is-hidden' : '' }}">Aplicar</button>
-            @if($hayDatos)
-                <span class="sipd-pager-count">
-                    {{ $paginador->firstItem() }}-{{ $paginador->lastItem() }} de {{ $paginador->total() }} {{ $etiqueta }}
-                </span>
-            @else
-                <span class="sipd-pager-count">0 {{ $etiqueta }}</span>
-            @endif
-        </form>
+        @if($hayDatos)
+            <span class="sipd-pager-count">
+                {{ $paginador->firstItem() }}-{{ $paginador->lastItem() }} de {{ $paginador->total() }} {{ $etiqueta }}
+            </span>
+        @else
+            <span class="sipd-pager-count">0 {{ $etiqueta }}</span>
+        @endif
 
-        {{-- Navegación de páginas: solo cuando hay más de una página --}}
         @if($hayDatos && $paginador->hasPages())
             <nav class="sipd-pager-pages" aria-label="Paginación">
                 @if($paginador->onFirstPage())
                     <span class="sipd-page is-off">Anterior</span>
                 @else
-                    <a class="sipd-page" href="{{ $paginador->previousPageUrl() }}">Anterior</a>
+                    <a class="sipd-page sipd-page-nav" href="{{ $paginador->previousPageUrl() }}">Anterior</a>
                 @endif
                 @for($n = $desde; $n <= $hasta; $n++)
                     @if($n === $pagina)
                         <span class="sipd-page is-current">{{ $n }}</span>
                     @else
-                        <a class="sipd-page" href="{{ $paginador->url($n) }}">{{ $n }}</a>
+                        <a class="sipd-page sipd-page-nav" href="{{ $paginador->url($n) }}">{{ $n }}</a>
                     @endif
                 @endfor
                 @if($paginador->hasMorePages())
-                    <a class="sipd-page" href="{{ $paginador->nextPageUrl() }}">Siguiente</a>
+                    <a class="sipd-page sipd-page-nav" href="{{ $paginador->nextPageUrl() }}">Siguiente</a>
                 @else
                     <span class="sipd-page is-off">Siguiente</span>
                 @endif
             </nav>
         @endif
     </div>
+
+    <script>
+    // Fase bubble (capture=false) → corre DESPUÉS de los listeners capture del master
+    // El master guarda la posición actual en click+capture. Nosotros la sobreescribimos
+    // con top:0 en click+bubble, siendo la última escritura antes de navegar.
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest('a.sipd-page-nav');
+        if (!a) return;
+        if (document.documentElement.scrollHeight <= window.innerHeight * 1.6) return;
+        try {
+            var dest = new URL(a.href, window.location.href);
+            sessionStorage.setItem('sipd_scroll_restore', JSON.stringify({
+                path: dest.pathname,
+                top: 0,
+                anchorTop: null,
+                pagerIndex: null,
+                sidebarTop: null
+            }));
+        } catch (e) {}
+    }); // sin capture — fase bubble, última en ejecutarse
+    </script>
 @endif

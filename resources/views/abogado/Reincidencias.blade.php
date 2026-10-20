@@ -79,17 +79,40 @@
     
     .global-pager-card { background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 24px; }
     .casos-pager {
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         padding: 10px 16px;
         border-top: 1px solid var(--cth-line);
         color: #94a3b8;
         font-size: 12px;
     }
-    .casos-pager-nav { display: flex; gap: 6px; }
-    .casos-pager .sipd-page[disabled] { opacity: .45; cursor: default; }
+    .casos-pager-nav {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        justify-self: center;
+    }
+    .casos-page {
+        min-width: 30px;
+        height: 30px;
+        padding: 0 8px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid var(--cth-border);
+        background: #fff;
+        color: #64748b;
+        transition: background .12s, color .12s;
+    }
+    .casos-page:hover:not(:disabled) { background: #ecfdf5; color: var(--cth-green-text); border-color: #bbf7d0; }
+    .casos-page.is-current { background: var(--cth-green); border-color: var(--cth-green); color: #fff; cursor: default; }
+    .casos-page:disabled { opacity: .4; cursor: default; pointer-events: none; }
 
     @media (max-width: 900px) { .toolbar { grid-template-columns: 1fr; } .proc-head { flex-direction: column; } .table-card { overflow-x: auto; } }
 </style>
@@ -100,8 +123,8 @@
 (function () {
     document.querySelectorAll('.js-casos-card').forEach(function (card) {
         var rows = Array.prototype.slice.call(card.querySelectorAll('tbody tr'));
-        var nav = card.querySelector('.js-casos-pager');
-        var perPage = Math.max(1, parseInt(card.getAttribute('data-per-page'), 10) || 10);
+        var nav  = card.querySelector('.js-casos-pager');
+        var perPage = Math.max(1, parseInt(card.getAttribute('data-per-page'), 10) || 5);
         var page = 1;
         var total = rows.length;
         if (!nav || total === 0) return;
@@ -111,16 +134,41 @@
             if (page < 1) page = 1;
             if (page > pages) page = pages;
             var from = (page - 1) * perPage;
-            var to = Math.min(from + perPage, total);
-            rows.forEach(function (row, index) {
-                row.hidden = index < from || index >= to;
-            });
+            var to   = Math.min(from + perPage, total);
+
+            // Mostrar/ocultar filas
+            rows.forEach(function (row, i) { row.hidden = i < from || i >= to; });
+
+            // Paginador: solo si hay más de una página
             var needsPager = total > perPage;
             nav.hidden = !needsPager;
+            if (!needsPager) return;
+
+            // Conteo
             var count = nav.querySelector('.js-casos-count');
-            if (count) {
-                count.textContent = (from + 1) + '-' + to + ' de ' + total + ' casos';
+            if (count) count.textContent = (from + 1) + '–' + to + ' de ' + total + ' casos';
+
+            // Botones de número de página
+            var numbersWrap = nav.querySelector('.js-casos-numbers');
+            if (numbersWrap) {
+                numbersWrap.innerHTML = '';
+                var desde = Math.max(1, page - 2);
+                var hasta = Math.min(pages, page + 2);
+                for (var n = desde; n <= hasta; n++) {
+                    (function (num) {
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'casos-page' + (num === page ? ' is-current' : '');
+                        btn.textContent = num;
+                        if (num !== page) {
+                            btn.addEventListener('click', function () { page = num; render(); });
+                        }
+                        numbersWrap.appendChild(btn);
+                    })(n);
+                }
             }
+
+            // Prev / Next
             var prev = nav.querySelector('.js-casos-prev');
             var next = nav.querySelector('.js-casos-next');
             if (prev) prev.disabled = page <= 1;
@@ -134,6 +182,7 @@
         render();
     });
 })();
+
 </script>
 @endsection
 
@@ -257,8 +306,9 @@
                 <div class="casos-pager js-casos-pager" hidden>
                     <span class="js-casos-count"></span>
                     <div class="casos-pager-nav">
-                        <button type="button" class="sipd-page js-casos-prev">Anterior</button>
-                        <button type="button" class="sipd-page js-casos-next">Siguiente</button>
+                        <button type="button" class="casos-page js-casos-prev">Anterior</button>
+                        <span class="js-casos-numbers" style="display:contents"></span>
+                        <button type="button" class="casos-page js-casos-next">Siguiente</button>
                     </div>
                 </div>
             </div>

@@ -420,7 +420,13 @@
 
                             <div class="row">
                                 <div class="col-md-6">
-                                    <strong>Decisión Final:</strong>
+                                    @if($proceso->veredicto_tipo)
+                                        <strong>Resultado del veredicto:</strong>
+                                        <p class="mb-1 font-weight-bold">{{ $proceso->etiquetaVeredicto() }}@if($proceso->veredicto_tipo === 'sancion' && $proceso->dias_sancion) · {{ $proceso->dias_sancion }} días @endif</p>
+                                        <strong>Justificación:</strong>
+                                    @else
+                                        <strong>Decisión Final:</strong>
+                                    @endif
                                     <textarea name="decision_final"
                                               class="form-control campo-editable decision-text" rows="4"
                                               readonly>{{ $proceso->decision_final }}</textarea>
@@ -448,29 +454,9 @@
                                                 </button>
                                             @endif
                                             @if($proceso->estado === 'En Proceso' && auth()->user()->esCoordinadora())
-                                                <button type="submit"
-                                                        form="form-estado-veredicto"
-                                                        name="estado"
-                                                        value="Sancionado"
-                                                        class="sipd-estado sipd-estado--sancionado"
-                                                        data-confirm="Esto cerrará el proceso de forma permanente y ya no se podrá editar."
-                                                        data-confirm-title="Sancionar proceso"
-                                                        data-confirm-ok="Sancionar"
-                                                        data-confirm-danger="1"
-                                                        data-confirm-icon="warning">
-                                                    Sancionado
-                                                </button>
-                                                <button type="submit"
-                                                        form="form-estado-veredicto"
-                                                        name="estado"
-                                                        value="Archivado"
-                                                        class="sipd-estado sipd-estado--archivado"
-                                                        data-confirm="El expediente quedará archivado."
-                                                        data-confirm-title="Archivar proceso"
-                                                        data-confirm-ok="Archivar"
-                                                        data-confirm-icon="question">
-                                                    Archivado
-                                                </button>
+                                                <a href="{{ route('coordinadora.veredictos') }}" class="btn btn-sm btn-outline-success">
+                                                    <i class="fas fa-gavel"></i> Registrar veredicto
+                                                </a>
                                             @else
                                                 <span class="sipd-estado sipd-estado--sancionado {{ $proceso->estado == 'Sancionado' ? 'is-on' : '' }}">
                                                     Sancionado
@@ -537,12 +523,6 @@
 </form>
 @if($proceso->puedeEnviarAProceso() && !auth()->user()->esCoordinadora())
 <form id="form-enviar-proceso" action="{{ route('abogado.solicitar_veredicto', $proceso->id) }}" method="POST" class="d-none">
-    @csrf
-    @method('PUT')
-</form>
-@endif
-@if($proceso->estado === 'En Proceso' && auth()->user()->esCoordinadora())
-<form id="form-estado-veredicto" action="{{ route('abogado.actualizarestado', $proceso->id) }}" method="POST" class="d-none">
     @csrf
     @method('PUT')
 </form>

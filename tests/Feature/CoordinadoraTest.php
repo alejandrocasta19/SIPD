@@ -6,6 +6,7 @@ use App\Models\PermisoSolicitud;
 use App\Models\ProcesoDisciplinario;
 use App\Models\Aviso;
 use App\Models\User;
+use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,6 +22,89 @@ class CoordinadoraTest extends TestCase
             'role' => $role,
             'cargo' => $role === User::ROLE_ADMIN ? 'Coordinadora de RH' : 'Equipo de RH',
         ], $attrs));
+    }
+
+    /** @test */
+    public function casos_de_prueba_recorren_el_flujo_real_y_notifican_al_responsable()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $kelly = $this->makeUser('equipo', ['name' => 'Kelly Johanna Rodríguez']);
+        $marshall = $this->makeUser('equipo', ['name' => 'Marshall Stephen Rincón Peña']);
+        $jorge = $this->makeUser('equipo', ['name' => 'Jorge Rosado']);
+        app()->detectEnvironment(function () {
+            return 'local';
+        });
+        $this->withoutMiddleware(VerifyCsrfToken::class);
+
+        $this->actingAs($coord)
+            ->post(route('coordinadora.veredictos.preparar-demo'))
+            ->assertRedirect(route('coordinadora.veredictos'))
+            ->assertSessionHas('success');
+
+        $casoMarshall = ProcesoDisciplinario::where('user_id', $marshall->id)
+            ->where('observacion', '[SIPD-PRUEBA-VEREDICTO]')
+            ->firstOrFail();
+        $this->assertSame('En Proceso', $casoMarshall->estado);
+        $this->assertSame(3, ProcesoDisciplinario::where('observacion', '[SIPD-PRUEBA-VEREDICTO]')->count());
+        $this->assertDatabaseHas('disciplinario', [
+            'user_id' => $kelly->id,
+            'observacion' => '[SIPD-PRUEBA-VEREDICTO]',
+            'nombre' => 'Camila Caso de Prueba',
+        ]);
+        $this->assertDatabaseHas('disciplinario', [
+            'user_id' => $jorge->id,
+            'observacion' => '[SIPD-PRUEBA-VEREDICTO]',
+            'nombre' => 'Valentina Caso de Prueba',
+        ]);
+
+        $this->get(route('coordinadora.veredictos'))
+            ->assertOk()
+            ->assertSee('Preparar casos de prueba reales')
+            ->assertSee('Camila Caso de Prueba')
+            ->assertSee('Andrés Caso de Prueba')
+            ->assertSee('Valentina Caso de Prueba')
+            ->assertSee('Marshall Stephen Rincón Peña');
+
+        $this->put(route('abogado.actualizarestado', $casoMarshall->id), [
+            'veredicto_tipo' => 'sancion',
+            'dias_sancion' => 4,
+            'decision_final' => 'Prueba local de notificación real.',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->assertSame('Sancionado', $casoMarshall->fresh()->estado);
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $marshall->id,
+            'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
+            'proceso_id' => $casoMarshall->id,
+        ]);
+        $this->actingAs($marshall)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertSee('Veredicto registrado')
+            ->assertSee('Prueba local de notificación real.');
+
+        $this->actingAs($coord)
+            ->post(route('coordinadora.veredictos.preparar-demo'))
+            ->assertRedirect(route('coordinadora.veredictos'));
+        $this->assertSame(3, ProcesoDisciplinario::where('observacion', '[SIPD-PRUEBA-VEREDICTO]')->count());
+        $this->assertSame(1, Aviso::where('tipo', Aviso::TIPO_RESULTADO_VEREDICTO)
+            ->where('proceso_id', $casoMarshall->id)
+            ->count());
+    }
+
+    /** @test */
+    public function no_se_pueden_preparar_casos_de_prueba_fuera_de_entorno_local()
+    {
+        $coord = $this->makeUser('coordinadora');
+
+        $this->actingAs($coord)
+            ->post(route('coordinadora.veredictos.preparar-demo'))
+            ->assertNotFound();
+
+        $this->get(route('coordinadora.veredictos'))
+            ->assertOk()
+            ->assertDontSee('Preparar casos de prueba reales');
+        $this->assertDatabaseCount('disciplinario', 0);
     }
 
     /** @test */

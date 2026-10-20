@@ -42,6 +42,8 @@ class ProcesoDisciplinario extends Model
         'descargos_forma',
         'descargos_medio',
         'decision_final',
+        'veredicto_tipo',
+        'dias_sancion',
 
         // ESTADO DEL PROCESO
         'estado',
@@ -53,6 +55,7 @@ class ProcesoDisciplinario extends Model
     protected $casts = [
         'fecha_falta' => 'date',
         'datos_oficiales' => 'array',
+        'dias_sancion' => 'integer',
     ];
 
     public const DESCARGOS_MEDIOS = [
@@ -115,6 +118,16 @@ class ProcesoDisciplinario extends Model
         $opciones = self::opcionesDescargosPresentacion();
 
         return $opciones[$this->descargosPresentacionValue()] ?? 'Descargos · No presentó';
+    }
+
+    public function etiquetaVeredicto(): ?string
+    {
+        return match ($this->veredicto_tipo) {
+            'sancion' => 'Sanción',
+            'archivo' => 'Archivo del proceso',
+            'terminacion_justa_causa' => 'Cancelación de contrato por justa causa',
+            default => null,
+        };
     }
 
     /**

@@ -30,6 +30,51 @@ class CoordinadoraController extends Controller
         ]);
     }
 
+    public function prepararCasosDemoVeredictos()
+    {
+        abort_unless(app()->environment('local'), 404);
+        abort_unless(auth()->user()->esCoordinadora(), 403);
+
+        $responsables = collect(['Kelly', 'Marshall', 'Jorge'])->map(function ($nombre) {
+            return User::where('role', User::ROLE_EQUIPO)
+                ->where('name', 'like', '%' . $nombre . '%')
+                ->first();
+        });
+
+        if ($responsables->contains(null)) {
+            return redirect()->route('coordinadora.veredictos')
+                ->with('error', 'No se encontraron las cuentas Kelly, Marshall y Jorge con rol de abogado/RH para preparar los casos de prueba.');
+        }
+
+        $marcador = '[SIPD-PRUEBA-VEREDICTO]';
+        $nombres = ['Camila Caso de Prueba', 'Andrés Caso de Prueba', 'Valentina Caso de Prueba'];
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($responsables, $marcador, $nombres) {
+            foreach ($responsables as $index => $responsable) {
+                ProcesoDisciplinario::firstOrCreate(
+                    [
+                        'user_id' => $responsable->id,
+                        'observacion' => $marcador,
+                    ],
+                    [
+                        'nombre' => $nombres[$index],
+                        'cedula' => 'DEMO-' . $responsable->id,
+                        'cargo' => 'Caso ficticio para validar veredictos',
+                        'modalidad' => 'Administrativos',
+                        'tipo_proceso' => 'disciplinario',
+                        'tipo_falta' => 'Caso de prueba de veredicto',
+                        'descripcion_falta' => 'Registro ficticio local para comprobar el cambio de estado y el aviso real al responsable.',
+                        'fecha_falta' => now()->toDateString(),
+                        'estado' => 'En Proceso',
+                    ]
+                );
+            }
+        });
+
+        return redirect()->route('coordinadora.veredictos')
+            ->with('success', 'Casos de prueba creados en la cola real. Al registrar cada veredicto se guardará el resultado y se enviará un aviso a la cuenta RH asignada.');
+    }
+
     public function solicitudes()
     {
         abort_unless(auth()->user()->esCoordinadora(), 403);
