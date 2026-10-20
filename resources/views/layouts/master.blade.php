@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" href="{{ asset('images/logo-sipd.png') }}" type="image/png">
+    <link rel="icon" href="/images/logo-sipd.png?v=colibri" type="image/png">
     <title>SIPD · {{ $pageTitle ?? 'Inicio' }}</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/plugins/fontawesome-free/css/all.min.css">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="/AdminLTE-3.2.0/plugins/fontawesome-free/css/all.min.css">
+    <link rel="stylesheet" href="/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=46">
+    <link rel="stylesheet" href="/css/sipd-theme.css?v=51">
+    <link rel="stylesheet" href="/css/sipd-halloween.css?v=2">
     @yield('styles')
     {{-- Pre-scroll: page starts hidden, scroll restored before first paint --}}
     <style>html{opacity:0;transition:opacity .12s ease}</style>
@@ -33,6 +34,7 @@
     </script>
 </head>
 <body class="theme-cootranshuila">
+    @include('partials.halloween', ['hwMode' => 'app'])
     @php
         $me = auth()->user();
         $me->loadMissing('permisos');
@@ -62,7 +64,7 @@
     <div class="sipd-app">
         <aside class="sipd-sidebar">
             <a class="sipd-brand" href="{{ route('abogado.dashboard') }}">
-                <img class="sipd-brand-logo" src="{{ asset('images/logo-sipd.png') }}" alt="SIPD">
+                <img class="sipd-brand-logo" src="/images/logo-sipd.png?v=colibri" alt="SIPD">
                 <div>
                     <strong>SIPD</strong>
                     <small>COOTRANSHUILA</small>
@@ -509,7 +511,7 @@
         })();
     </script>
     @endif
-    <script src="{{ rtrim(request()->root(), '/') }}/js/sipd-feedback.js?v=8"></script>
+    <script src="/js/sipd-feedback.js?v=8"></script>
     <script>
         (function () {
             var form = document.getElementById('inactividad-form');
@@ -566,8 +568,8 @@
         })();
     </script>
 
-    <script src="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/plugins/jquery/jquery.min.js"></script>
-    <script src="{{ rtrim(request()->root(), '/') }}/AdminLTE-3.2.0/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/AdminLTE-3.2.0/plugins/jquery/jquery.min.js"></script>
+    <script src="/AdminLTE-3.2.0/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script>
         (function () {
             var app = document.querySelector('.sipd-app');

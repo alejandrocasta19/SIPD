@@ -3,22 +3,24 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" href="{{ asset('images/logo-sipd.png') }}" type="image/png">
+    <link rel="icon" href="/images/logo-sipd.png?v=colibri" type="image/png">
     <title>Consultar mi caso · SIPD Cootranshuila</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=45">
+    <link rel="stylesheet" href="/css/sipd-theme.css?v=51">
+    <link rel="stylesheet" href="/css/sipd-halloween.css?v=2">
 </head>
 <body class="consulta-page">
+    @include('partials.halloween', ['hwMode' => 'full'])
     <div class="consulta-hero">
         <div class="consulta-inner">
             <div class="consulta-top">
                 <a class="consulta-brand" href="{{ route('login') }}">
-                    <img src="{{ rtrim(request()->root(), '/') }}/images/logo-cootranshuila-claro.png" alt="Cootranshuila">
+                    <img src="/images/logo-cootranshuila.png?v=marca2" alt="Cootranshuila">
                     <span>
                         <span class="guest-sipd-row">
-                            <img class="guest-sipd-mark" src="{{ rtrim(request()->root(), '/') }}/images/logo-sipd.png" alt="">
+                            <img class="guest-sipd-mark" src="/images/logo-sipd.png?v=colibri" alt="">
                             <strong>SIPD</strong>
                         </span>
                         <small>Sistema de procesos disciplinarios</small>
@@ -26,7 +28,10 @@
                 </a>
                 <a class="consulta-back" href="{{ route('login') }}">← Volver al acceso</a>
             </div>
-            <div class="guest-badge">ACCESO PÚBLICO</div>
+            <div class="guest-pills">
+                <div class="guest-badge">ACCESO PÚBLICO</div>
+                <span class="hw-season">HALLOWEEN</span>
+            </div>
             <h1>Consultar mi caso</h1>
             <p>Ingresa tu cédula para ver el avance del trámite. Esta consulta no muestra documentos, pruebas ni detalles reservados del expediente.</p>
         </div>
