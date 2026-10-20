@@ -4,24 +4,26 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" href="{{ asset('images/logo-sipd.png') }}" type="image/png">
+    <link rel="icon" href="/images/logo-sipd.png?v=colibri" type="image/png">
     <title>Acceso al sistema · SIPD Cootranshuila</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=50">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=55">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-halloween.css?v=2">
 </head>
 <body>
+    @include('partials.halloween', ['hwMode' => 'full'])
     @include('partials.intro')
     <div class="guest-split">
         <aside class="guest-hero">
             <a class="guest-brand" href="{{ route('login') }}">
                 <span class="guest-logo">
-                    <img src="{{ rtrim(request()->root(), '/') }}/images/logo-cootranshuila-claro.png" alt="Cootranshuila">
+                    <img src="/images/logo-cootranshuila.png?v=marca2" alt="Cootranshuila">
                 </span>
                 <span class="guest-brand-text">
                     <span class="guest-sipd-row">
-                        <img class="guest-sipd-mark" src="{{ rtrim(request()->root(), '/') }}/images/logo-sipd.png" alt="">
+                        <img class="guest-sipd-mark" src="/images/logo-sipd.png?v=colibri" alt="">
                         <strong>SIPD</strong>
                     </span>
                     <small>Sistema de procesos disciplinarios</small>
@@ -29,7 +31,10 @@
             </a>
 
             <div class="guest-copy">
-                <div class="guest-badge">PLATAFORMA INSTITUCIONAL</div>
+                <div class="guest-pills">
+                    <div class="guest-badge">PLATAFORMA INSTITUCIONAL</div>
+                    <span class="hw-season">HALLOWEEN</span>
+                </div>
                 <h1>Gestión disciplinaria de Cootranshuila</h1>
                 <p>Sistema de Recursos Humanos para la administración y seguimiento de procesos disciplinarios.</p>
                 <ul class="guest-points">

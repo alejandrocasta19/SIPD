@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'SIPD') }} · Cootranshuila</title>
-    <script src="{{ asset('js/app.js') }}" defer></script>
+    <script src="/js/app.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="{{ rtrim(request()->root(), '/') }}/css/app.css" rel="stylesheet">
-    <link href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=38" rel="stylesheet">
+    <link href="/css/app.css" rel="stylesheet">
+    <link href="/css/sipd-theme.css?v=51" rel="stylesheet">
+    <link href="/css/sipd-halloween.css?v=2" rel="stylesheet">
 </head>
 <body>
+    @include('partials.halloween', ['hwMode' => 'full'])
     <div id="app" class="guest-auth-wrap">
         <header class="guest-auth-top">
             <a href="{{ route('login') }}">SIPD · Cootranshuila</a>
