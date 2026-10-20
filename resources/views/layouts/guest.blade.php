@@ -9,12 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<<<<<<< HEAD
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=50">
-=======
-    <link rel="stylesheet" href="/css/sipd-theme.css?v=51">
-    <link rel="stylesheet" href="/css/sipd-halloween.css?v=2">
->>>>>>> origin/main
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=55">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-halloween.css?v=2">
 </head>
 <body>
     @include('partials.halloween', ['hwMode' => 'full'])

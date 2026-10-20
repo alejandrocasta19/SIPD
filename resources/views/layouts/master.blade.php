@@ -21,12 +21,8 @@
     <link rel="stylesheet" href="/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-<<<<<<< HEAD
     <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=55">
-=======
-    <link rel="stylesheet" href="/css/sipd-theme.css?v=51">
-    <link rel="stylesheet" href="/css/sipd-halloween.css?v=2">
->>>>>>> origin/main
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-halloween.css?v=2">
     @yield('styles')
     <script>
     (function(){
