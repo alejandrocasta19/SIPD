@@ -27,7 +27,7 @@ class AvisoController extends Controller
             'pageTitle' => 'Notificaciones',
             'avisos' => $avisos,
             'alertasSistema' => AlertasSistema::visibles($user),
-            'puedeBorrar' => true,
+            'puedeBorrar' => $user->puede('eliminar_notificaciones'),
         ]);
     }
 
@@ -98,6 +98,10 @@ class AvisoController extends Controller
 
     public function destroy($id)
     {
+        if (!auth()->user()->puede('eliminar_notificaciones')) {
+            return back()->with('error', 'No tienes permiso para eliminar notificaciones.');
+        }
+
         $aviso = Aviso::where('user_id', auth()->id())->findOrFail($id);
         $aviso->delete();
 
@@ -106,6 +110,10 @@ class AvisoController extends Controller
 
     public function destroyLeidas()
     {
+        if (!auth()->user()->puede('eliminar_notificaciones')) {
+            return back()->with('error', 'No tienes permiso para eliminar notificaciones.');
+        }
+
         $borradas = Aviso::where('user_id', auth()->id())
             ->whereNotNull('leida_at')
             ->delete();

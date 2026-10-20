@@ -18,8 +18,8 @@
             <h1>Coordinación de RH</h1>
             <p>
                 {{ $saludo }}, {{ $user->primerNombre() }}.
-                @if($enProceso > 0)
-                    {{ $enProceso }} pendiente{{ $enProceso === 1 ? '' : 's' }} de veredicto.
+                @if($veredictos > 0)
+                    {{ $veredictos }} pendiente{{ $veredictos === 1 ? '' : 's' }} de veredicto.
                 @else
                     Supervisión de expedientes, equipo y veredictos.
                 @endif
@@ -28,7 +28,7 @@
         <div class="proc-head-side">
             <span class="stat-chip">{{ $total }} total</span>
             <span class="stat-chip green">{{ $tasaResolucion }}% resolución</span>
-            @if($enProceso > 0)<span class="stat-chip">{{ $enProceso }} veredicto</span>@endif
+            @if($veredictos > 0)<span class="stat-chip">{{ $veredictos }} veredicto</span>@endif
             @if($plazosVencidos > 0)<span class="stat-chip red">{{ $plazosVencidos }} vencidos</span>@endif
         </div>
     </div>
@@ -55,14 +55,14 @@
             <div class="dash-bar yellow"><span style="width: {{ $pctPendiente }}%"></span></div>
             <small>{{ $pctPendiente }}% del total</small>
         </a>
-        <a class="dash-pipe" href="{{ route('abogado.consultarproceso', ['estado' => 'En Proceso']) }}">
+        <a class="dash-pipe" href="{{ route('coordinadora.veredictos') }}">
             <div class="dash-pipe-top">
                 <div class="dash-pipe-ico b"><i class="fas fa-gavel"></i></div>
-                <div class="dash-pipe-num">{{ $enProceso }}</div>
+                <div class="dash-pipe-num">{{ $veredictos }}</div>
             </div>
             <div class="dash-pipe-title">Pendiente de veredicto</div>
-            <div class="dash-bar blue"><span style="width: {{ $pctProceso }}%"></span></div>
-            <small>{{ $pctProceso }}% del total</small>
+            <div class="dash-bar blue"><span style="width: {{ $pctVeredictos }}%"></span></div>
+            <small>{{ $pctVeredictos }}% del total</small>
         </a>
         <a class="dash-pipe" href="{{ route('abogado.consultarproceso', ['estado' => 'Sancionado']) }}">
             <div class="dash-pipe-top">
@@ -90,8 +90,8 @@
                 <div class="dash-card-title">
                     <span style="display:inline-flex;align-items:center;gap:6px;">
                         Pendientes de veredicto
-                        @if($enProceso > 0)
-                            <span class="dash-chip blue">{{ $enProceso }}</span>
+                        @if($veredictos > 0)
+                            <span class="dash-chip blue">{{ $veredictos }}</span>
                         @endif
                     </span>
                     <a href="{{ route('coordinadora.veredictos') }}">Ver cola &rarr;</a>
@@ -102,7 +102,7 @@
                         <span class="dash-dot blue">{{ str_pad($proceso->id, 3, '0', STR_PAD_LEFT) }}</span>
                         <div class="dash-main">
                             <b>{{ $proceso->nombre }}</b>
-                            <small>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }} · {{ $proceso->tipo_falta ?: 'Sin tipificar' }} · {{ $proceso->user->name ?? 'Sin RH' }}</small>
+                            <small>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }} · {{ $proceso->tipo_falta ?: 'Sin tipificar' }} · {{ $proceso->user->name ?? $proceso->user_name_snapshot ?? 'Sin RH' }}</small>
                         </div>
                         <span class="dash-status proc">
                             <i class="fas fa-circle" style="font-size:6px;"></i> En Proceso
@@ -128,7 +128,7 @@
                     </a>
                     <a href="{{ route('coordinadora.veredictos') }}">
                         <span>Veredictos</span>
-                        <b>{{ $enProceso }}</b>
+                        <b>{{ $veredictos }}</b>
                     </a>
                     <a href="{{ route('abogado.anexos') }}">
                         <span>Anexos</span>

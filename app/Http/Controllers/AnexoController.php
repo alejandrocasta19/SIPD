@@ -6,6 +6,7 @@ use App\Models\CasoAnexo;
 use App\Models\CasoDocumentoEstado;
 use App\Models\ProcesoDisciplinario;
 use App\Support\Paginacion;
+use App\Support\CaseFilePath;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -158,8 +159,12 @@ class AnexoController extends Controller
         $relativa = $anexo->rutaDescarga();
         abort_unless($relativa, 404);
 
-        $ruta = storage_path('app/' . $relativa);
-        abort_unless(is_file($ruta), 404);
+        $ruta = CaseFilePath::resolve(
+            $relativa,
+            ['anexos/' . $anexo->caso_id],
+            'local'
+        );
+        abort_unless($ruta, 404);
 
         return response()->download($ruta, $anexo->nombreDescarga());
     }

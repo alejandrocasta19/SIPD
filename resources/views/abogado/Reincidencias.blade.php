@@ -79,8 +79,8 @@
     
     .global-pager-card { background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 24px; }
     .casos-pager {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
+        display: flex;
+        justify-content: center;
         align-items: center;
         gap: 8px;
         padding: 10px 16px;
@@ -88,6 +88,7 @@
         color: #94a3b8;
         font-size: 12px;
     }
+    .casos-pager[hidden] { display: none; }
     .casos-pager-nav {
         display: flex;
         gap: 5px;
@@ -144,10 +145,6 @@
             nav.hidden = !needsPager;
             if (!needsPager) return;
 
-            // Conteo
-            var count = nav.querySelector('.js-casos-count');
-            if (count) count.textContent = (from + 1) + '–' + to + ' de ' + total + ' casos';
-
             // Botones de número de página
             var numbersWrap = nav.querySelector('.js-casos-numbers');
             if (numbersWrap) {
@@ -188,7 +185,6 @@
 
 @section('content')
     <form class="toolbar" method="GET" action="{{ route('abogado.reincidencias') }}">
-        <input type="hidden" name="per_page" value="{{ $workersGrouped->perPage() }}">
         <div class="search">
             <i class="fas fa-search"></i>
             <input type="text" name="q" value="{{ $search }}" placeholder="Buscar por nombre del trabajador o cédula...">
@@ -304,7 +300,6 @@
                     </tbody>
                 </table>
                 <div class="casos-pager js-casos-pager" hidden>
-                    <span class="js-casos-count"></span>
                     <div class="casos-pager-nav">
                         <button type="button" class="casos-page js-casos-prev">Anterior</button>
                         <span class="js-casos-numbers" style="display:contents"></span>

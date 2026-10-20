@@ -51,4 +51,38 @@ class ArchivarCasosCerradosTest extends TestCase
             ->assertOk()
             ->assertDontSee('Caso cerrado conservado');
     }
+
+    /** @test */
+    public function reincidencias_pagina_cinco_personas_y_cinco_casos_por_persona()
+    {
+        $coordinator = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        for ($i = 1; $i <= 6; $i++) {
+            ProcesoDisciplinario::factory()->create([
+                'user_id' => $coordinator->id,
+                'nombre' => 'Trabajador Reincidente',
+                'cedula' => '12345678',
+                'estado' => 'Pendiente',
+            ]);
+        }
+
+        for ($i = 1; $i <= 5; $i++) {
+            ProcesoDisciplinario::factory()->create([
+                'user_id' => $coordinator->id,
+                'nombre' => 'Trabajador ' . $i,
+                'cedula' => '8765432' . $i,
+                'estado' => 'Pendiente',
+            ]);
+        }
+
+        $response = $this->actingAs($coordinator)
+            ->get(route('abogado.reincidencias', ['per_page' => 20]))
+            ->assertOk()
+            ->assertSee('Reincidente (6 Casos)')
+            ->assertSee('data-per-page="5"', false)
+            ->assertSee('js-casos-pager', false)
+            ->assertDontSee('sipd-pager-size');
+
+        $this->assertSame(5, substr_count($response->getContent(), 'class="worker-header"'));
+    }
 }

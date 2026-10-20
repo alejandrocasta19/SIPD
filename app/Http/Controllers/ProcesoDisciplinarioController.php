@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Aviso;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ReportService;
 use App\Services\OfficialDocumentService;
@@ -18,16 +19,18 @@ use Illuminate\Validation\ValidationException;
 use App\Support\Formatos;
 use App\Support\Modalidades;
 use App\Support\Paginacion;
+use App\Support\CaseFilePath;
 use Illuminate\Support\Str;
 use Throwable;
 
 class ProcesoDisciplinarioController extends Controller
 {
+    private const USER_HISTORY_MIGRATION = '2026_10_20_120000_preserve_case_history_when_deleting_users';
+
     public function __construct()
     {
         $this->middleware('permiso:registrar_casos')->only(['create', 'plantillaRegistro', 'store']);
         $this->middleware('permiso:ver_casos')->only(['index', 'misCasos', 'show', 'workerSearch', 'downloadSourceDocument']);
-        $this->middleware('permiso:editar_casos')->only(['update']);
         $this->middleware('permiso:eliminar_casos')->only(['destroy']);
         $this->middleware('permiso:ver_reportes')->only(['reportes', 'reportesData']);
         $this->middleware('permiso:exportar_reportes')->only(['reportesGlobales', 'exportarCasos']);
@@ -68,7 +71,8 @@ class ProcesoDisciplinarioController extends Controller
         $resueltos = $sancionados + $archivados;
         $tasaResolucion = $total > 0 ? (int) round(($resueltos / $total) * 100) : 0;
         $abiertos = $pendientes + $enProceso;
-        $veredictos = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])->conDocumentoDescargado()->count();
+        $pendientesVeredictoQuery = (clone $visible)->whereIn('estado', ['En Proceso', 'En proceso']);
+        $veredictos = (clone $pendientesVeredictoQuery)->count();
 
         $pct = function ($count) use ($total) {
             return $total > 0 ? (int) round(($count / $total) * 100) : 0;
@@ -126,9 +130,7 @@ class ProcesoDisciplinarioController extends Controller
             ->take($user->esCoordinadora() ? 12 : 4)
             ->get();
 
-        $pendientesVeredicto = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])
-            ->conDocumentoDescargado()
-            ->with('user')
+        $pendientesVeredicto = (clone $pendientesVeredictoQuery)->with('user')
             ->latest()
             ->take(8)
             ->get();
@@ -152,6 +154,7 @@ class ProcesoDisciplinarioController extends Controller
             'tasaResolucion' => $tasaResolucion,
             'pctPendiente' => $pct($pendientes),
             'pctProceso' => $pct($enProceso),
+            'pctVeredictos' => $pct($veredictos),
             'pctSancionado' => $pct($sancionados),
             'pctArchivado' => $pct($archivados),
             'plazosVencidos' => $plazosVencidos,
@@ -280,7 +283,7 @@ class ProcesoDisciplinarioController extends Controller
         })->sortByDesc('total_casos')->values();
 
         $reincidentes = $workersGrouped->where('es_reincidente', true)->count();
-        $workersGroupedPaginated = Paginacion::deColeccion($workersGrouped, 5);
+        $workersGroupedPaginated = Paginacion::deColeccion($workersGrouped);
 
         return view('abogado.Reincidencias', [
             'pageTitle'      => 'Reincidencias',
@@ -616,6 +619,10 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function store(Request $request, FirmaDocumentoService $firmas)
     {
+        if ($request->hasFile('documento_falta')) {
+            $request->user()->exigir('subir_anexos');
+        }
+
         $seleccion = trim((string) $request->input('modalidad', ''));
         $interpretada = Modalidades::interpretar($seleccion, $request->input('cargo'));
         if ($seleccion !== '' && ($interpretada === null || !Modalidades::permiteSeleccion($request->user(), $seleccion))) {
@@ -659,7 +666,7 @@ class ProcesoDisciplinarioController extends Controller
                 $ext = strtolower($archivo->getClientOriginalExtension());
                 abort_unless(in_array($ext, ['pdf', 'jpg', 'jpeg', 'png'], true), 422, 'Formato de archivo no permitido. Solo se aceptan PDF, JPG, JPEG o PNG.');
                 
-                $ruta = $archivo->store('documentos', 'public');
+                $ruta = $archivo->store('documentos', 'local');
                 if (!$rutaDocumento) $rutaDocumento = $ruta;
                 
                 $evidenciasToSave[] = [
@@ -670,7 +677,7 @@ class ProcesoDisciplinarioController extends Controller
                     'mime_type'         => $archivo->getMimeType(),
                     'tamano'            => $archivo->getSize(),
                     'descripcion'       => null,
-                    'ruta_segura'       => 'public/' . $ruta,
+                    'ruta_segura'       => $ruta,
                 ];
             }
         }
@@ -697,35 +704,50 @@ class ProcesoDisciplinarioController extends Controller
             ];
         }
 
-        $proceso = ProcesoDisciplinario::create([
-            'tipo_proceso'      => $validated['tipo_proceso'],
-            'nombre'            => $request->nombre,
-            'cedula'            => $request->cedula,
-            'placa'             => Modalidades::usaPlaca($modalidad)
-                ? (Formatos::placaNormalizada($request->input('placa')) ?: null)
-                : null,
-            'numero_interno'    => Modalidades::usaPlaca($modalidad)
-                ? (trim((string) $request->input('numero_interno')) ?: null)
-                : null,
-            'ruta'              => $request->ruta,
-            'modalidad'         => $modalidad,
-            'cargo'             => $cargo,
-            'telefono'          => $request->telefono,
-            'tipo_falta'        => $request->tipo_falta,
-            'descripcion_falta' => $request->descripcion_falta,
-            'datos_oficiales'   => [
-                'yellow_blocks' => $yellowBlocksData,
-                'slots' => $slots,
-                'optional_clauses' => $optionalClauses,
-            ],
-            'fecha_falta'       => $request->fecha_falta,
-            'documento_falta'   => $rutaDocumento,
-            'observacion'       => $request->observacion,
-            'descargos'         => $request->descargos,
-            'decision_final'    => $request->decision_final,
-            'estado'            => 'Pendiente',
-            'user_id'           => auth()->id(),
-        ]);
+        $proceso = DB::transaction(function () use (
+            $validated,
+            $request,
+            $yellowBlocksData,
+            $slots,
+            $optionalClauses,
+            $modalidad,
+            $cargo,
+            $rutaDocumento
+        ) {
+            $proceso = ProcesoDisciplinario::create([
+                'tipo_proceso'      => $validated['tipo_proceso'],
+                'nombre'            => $request->nombre,
+                'cedula'            => $request->cedula,
+                'placa'             => Modalidades::usaPlaca($modalidad)
+                    ? (Formatos::placaNormalizada($request->input('placa')) ?: null)
+                    : null,
+                'numero_interno'    => Modalidades::usaPlaca($modalidad)
+                    ? (trim((string) $request->input('numero_interno')) ?: null)
+                    : null,
+                'ruta'              => $request->ruta,
+                'modalidad'         => $modalidad,
+                'cargo'             => $cargo,
+                'telefono'          => $request->telefono,
+                'tipo_falta'        => $request->tipo_falta,
+                'descripcion_falta' => $request->descripcion_falta,
+                'datos_oficiales'   => [
+                    'yellow_blocks' => $yellowBlocksData,
+                    'slots' => $slots,
+                    'optional_clauses' => $optionalClauses,
+                ],
+                'fecha_falta'       => $request->fecha_falta,
+                'documento_falta'   => $rutaDocumento,
+                'observacion'       => $request->observacion,
+                'descargos'         => $request->descargos,
+                'decision_final'    => $request->decision_final,
+                'estado'            => 'Pendiente',
+                'user_id'           => auth()->id(),
+            ]);
+
+            $this->recordInitialAssignment($proceso, $request->user());
+
+            return $proceso;
+        });
 
         if ($request->hasFile('firma_cuenta')) {
             $firmas->guardarFirmaCuenta($request->file('firma_cuenta'), $request->user());
@@ -839,12 +861,17 @@ class ProcesoDisciplinarioController extends Controller
 
     public function downloadSourceDocument($id)
     {
+        auth()->user()->exigir('descargar_anexos');
+
         $proceso = $this->accessibleProcess($id);
         abort_unless($proceso->documento_falta, 404);
 
-        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
-        $disk = Storage::disk('public');
-        return $disk->download($proceso->documento_falta);
+        $ruta = CaseFilePath::resolve($proceso->documento_falta, ['documentos'], 'local')
+            ?? CaseFilePath::resolve($proceso->documento_falta, ['documentos'], 'public');
+
+        abort_unless($ruta, 404);
+
+        return response()->download($ruta);
     }
 
     /**
@@ -852,10 +879,117 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $usuario = $request->user();
+
+        if (!$usuario->puede('editar_casos')) {
+            return DB::transaction(function () use ($request, $id) {
+                $proceso = $this->visibleProcesses()
+                    ->whereKey($id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($respuesta = $proceso->redireccionSiBloqueado()) {
+                    return $respuesta;
+                }
+
+                $incluyePresentacion = $request->exists('descargos')
+                    || $request->exists('descargos_presentacion');
+                abort_unless(
+                    $this->esPrimeraInteraccionDescargos($proceso)
+                    && $incluyePresentacion
+                    && !$this->tieneCambiosFueraDeDescargos($request, $proceso),
+                    403
+                );
+                auth()->user()->exigir('registrar_casos');
+
+                $reglas = [];
+                if ($request->exists('descargos')) {
+                    $reglas['descargos'] = 'nullable|string';
+                }
+                if ($request->exists('descargos_presentacion')) {
+                    $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));
+                    $reglas['descargos_presentacion'] = 'required|in:' . $permitidas;
+                }
+                $validated = $request->validate($reglas);
+
+                $descargos = isset($validated['descargos'])
+                    ? trim($validated['descargos'])
+                    : '';
+                $presentacion = isset($validated['descargos_presentacion'])
+                    ? ProcesoDisciplinario::parseDescargosPresentacion(
+                        $validated['descargos_presentacion']
+                    )
+                    : [];
+
+                if ($descargos === '' && $presentacion === []) {
+                    throw ValidationException::withMessages([
+                        'descargos' => 'Escribe los descargos o selecciona una presentación válida.',
+                    ]);
+                }
+
+                $datos = [];
+                if ($descargos !== '') {
+                    $datos['descargos'] = $descargos;
+                }
+                $datos = array_merge($datos, $presentacion);
+                abort_if($datos === [], 403);
+
+                $proceso->update($datos);
+
+                return redirect()
+                    ->back()
+                    ->with('success', 'Presentación de descargos actualizada.');
+            });
+        }
+
+        $usuario->exigir('editar_casos');
         $proceso = $this->accessibleProcess($id);
 
         if ($respuesta = $proceso->redireccionSiBloqueado()) {
             return $respuesta;
+        }
+
+        if ($request->hasFile('documento_falta')) {
+            $usuario->exigir('subir_anexos');
+        }
+
+        $primeraInteraccion = $this->esPrimeraInteraccionDescargos($proceso);
+        $actualizaDescargos = $request->exists('descargos');
+        $actualizaPresentacion = $request->has('descargos_presentacion');
+        if ($primeraInteraccion && (
+            $actualizaDescargos
+            || $request->exists('descargos_presentacion')
+        )) {
+            $reglasDescargos = [];
+            if ($actualizaDescargos) {
+                $reglasDescargos['descargos'] = 'nullable|string';
+            }
+            if ($request->exists('descargos_presentacion')) {
+                $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));
+                $reglasDescargos['descargos_presentacion'] = 'required|in:' . $permitidas;
+            }
+            $validatedDescargos = $request->validate($reglasDescargos);
+            $textoDescargos = isset($validatedDescargos['descargos'])
+                ? trim($validatedDescargos['descargos'])
+                : '';
+            $modalidadPresentacion = $validatedDescargos['descargos_presentacion'] ?? null;
+            $cambiaPresentacion = $modalidadPresentacion !== null
+                && $modalidadPresentacion !== $proceso->descargosPresentacionValue();
+            $intentaPresentar = $textoDescargos !== ''
+                || $cambiaPresentacion
+                || !$this->tieneCambiosFueraDeDescargos($request, $proceso);
+
+            if ($intentaPresentar) {
+                $usuario->exigir('registrar_casos');
+                if ($textoDescargos === '' && !$cambiaPresentacion) {
+                    throw ValidationException::withMessages([
+                        'descargos' => 'Escribe los descargos o selecciona una presentación válida.',
+                    ]);
+                }
+            } else {
+                $actualizaDescargos = false;
+                $actualizaPresentacion = false;
+            }
         }
 
         $rutaDocumento = $proceso->documento_falta;
@@ -869,7 +1003,7 @@ class ProcesoDisciplinarioController extends Controller
                 $ext = strtolower($archivo->getClientOriginalExtension());
                 abort_unless(in_array($ext, ['pdf', 'jpg', 'jpeg', 'png'], true), 422, 'Formato de archivo no permitido. Solo se aceptan PDF, JPG, JPEG o PNG.');
                 
-                $ruta = $archivo->store('documentos', 'public');
+                $ruta = $archivo->store('documentos', 'local');
                 $rutaDocumento = $ruta;
                 
                 \App\Models\CasoEvidencia::create([
@@ -881,7 +1015,7 @@ class ProcesoDisciplinarioController extends Controller
                     'mime_type'         => $archivo->getMimeType(),
                     'tamano'            => $archivo->getSize(),
                     'descripcion'       => null,
-                    'ruta_segura'       => 'public/' . $ruta,
+                    'ruta_segura'       => $ruta,
                 ]);
             }
         }
@@ -918,11 +1052,14 @@ class ProcesoDisciplinarioController extends Controller
             'documento_falta' => $rutaDocumento,
 
             'observacion' => $request->observacion,
-            'descargos' => $request->descargos,
             'decision_final' => $request->decision_final,
         ]);
 
-        if ($request->has('descargos_presentacion')) {
+        if ($actualizaDescargos) {
+            $proceso->update(['descargos' => $request->input('descargos')]);
+        }
+
+        if ($actualizaPresentacion) {
             $presentacion = ProcesoDisciplinario::parseDescargosPresentacion(
                 $request->input('descargos_presentacion')
             );
@@ -953,11 +1090,12 @@ class ProcesoDisciplinarioController extends Controller
         $validated = $request->validate([
             'veredicto_tipo' => 'required|in:sancion,archivo,terminacion_justa_causa',
             'dias_sancion' => 'nullable|required_if:veredicto_tipo,sancion|integer|min:1',
-            'decision_final' => 'nullable|string|max:5000',
+            'decision_final' => 'nullable|required_if:veredicto_tipo,sancion|string|max:5000',
         ], [
             'dias_sancion.required_if' => 'Indica la cantidad de días de la sanción.',
             'dias_sancion.integer' => 'Los días de sanción deben ser un número entero.',
             'dias_sancion.min' => 'La sanción debe ser de al menos un día.',
+            'decision_final.required_if' => 'Escribe la justificación de la sanción.',
         ]);
 
         $estado = $validated['veredicto_tipo'] === 'archivo' ? 'Archivado' : 'Sancionado';
@@ -1016,7 +1154,7 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         if (!$proceso->puedeEnviarAProceso()) {
-            return redirect()->back()->with('error', 'Genera los 4 documentos oficiales antes de enviar el caso.');
+            return redirect()->back()->with('error', 'Genera y descarga los 4 documentos oficiales antes de enviar el caso.');
         }
 
         $proceso->update(['estado' => 'En Proceso']);
@@ -1040,6 +1178,7 @@ class ProcesoDisciplinarioController extends Controller
 
             // Cleanup associated files on disk to prevent phantom files
             if ($proceso->documento_falta) {
+                Storage::disk('local')->delete($proceso->documento_falta);
                 Storage::disk('public')->delete($proceso->documento_falta);
             }
             
@@ -1134,80 +1273,120 @@ class ProcesoDisciplinarioController extends Controller
 
     public function actualizarDescargosPresentacion(Request $request, $id)
     {
-        $proceso = $this->accessibleProcess($id);
+        $rutasGuardadas = [];
 
-        if ($respuesta = $proceso->redireccionSiBloqueado()) {
-            return $respuesta;
-        }
+        try {
+            return DB::transaction(function () use ($request, $id, &$rutasGuardadas) {
+                $proceso = $this->visibleProcesses()
+                    ->whereKey($id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-        if ($proceso->descargos_forma !== null) {
-            auth()->user()->exigir('editar_casos');
-        }
+                if ($respuesta = $proceso->redireccionSiBloqueado()) {
+                    return $respuesta;
+                }
 
-        $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));
-        $extPermitidas = implode(',', \App\Models\CasoAnexo::DESCARGOS_EXTENSIONS);
+                $primeraInteraccion = $this->esPrimeraInteraccionDescargos($proceso);
+                $incluyeArchivos = $request->hasFile('archivos_descargos');
+                $usuario = auth()->user();
 
-        $validated = $request->validate([
-            'descargos_presentacion'    => 'required|in:' . $permitidas,
-            'archivos_descargos'        => 'nullable|array|max:10',
-            'archivos_descargos.*'      => [
-                'file',
-                'max:20480',
-                'mimes:' . $extPermitidas,
-            ],
-        ], [
-            'archivos_descargos.*.mimes'   => 'Solo se permiten imágenes (JPG, PNG, GIF, WEBP), PDF, Word y Excel. No se aceptan videos.',
-            'archivos_descargos.*.max'     => 'Cada archivo no puede superar 20 MB.',
-            'archivos_descargos.max'       => 'Máximo 10 archivos por descargo.',
-        ]);
+                if ($primeraInteraccion) {
+                    $usuario->exigir('registrar_casos');
+                } else {
+                    $usuario->exigir('editar_casos');
+                }
+                if ($incluyeArchivos) {
+                    $usuario->exigir('subir_anexos');
+                }
 
-        $presentacion = ProcesoDisciplinario::parseDescargosPresentacion(
-            $validated['descargos_presentacion']
-        );
+                $permitidas = implode(',', array_keys(ProcesoDisciplinario::opcionesDescargosPresentacion()));
+                $extPermitidas = implode(',', CasoAnexo::DESCARGOS_EXTENSIONS);
 
-        if ($presentacion !== []) {
-            $proceso->update($presentacion);
-        }
-
-        // Guardar archivos adjuntos de descargos
-        if ($request->hasFile('archivos_descargos')) {
-            foreach ($request->file('archivos_descargos') as $archivo) {
-                $extension       = strtolower($archivo->getClientOriginalExtension());
-                $mime            = strtolower((string) $archivo->getMimeType());
-                $nombreAlmacenado = 'dc_' . $proceso->id . '_' . uniqid() . '.' . $extension;
-                $ruta = $archivo->storeAs('anexos/' . $proceso->id, $nombreAlmacenado, 'local');
-
-                \App\Models\CasoAnexo::create([
-                    'caso_id'          => $proceso->id,
-                    'user_id'          => auth()->id(),
-                    'tipo'             => \App\Models\CasoAnexo::TIPO_DESCARGOS,
-                    'estado'           => \App\Models\CasoAnexo::ESTADO_CARGADO,
-                    'titulo'           => 'Descargo',
-                    'nombre_original'  => $archivo->getClientOriginalName(),
-                    'nombre_almacenado'=> $nombreAlmacenado,
-                    'extension'        => $extension,
-                    'mime_type'        => $mime,
-                    'tamano'           => $archivo->getSize(),
-                    'ruta_segura'      => $ruta,
+                $validated = $request->validate([
+                    'descargos_presentacion'    => 'required|in:' . $permitidas,
+                    'archivos_descargos'        => 'nullable|array|max:10',
+                    'archivos_descargos.*'      => [
+                        'file',
+                        'max:20480',
+                        'mimes:' . $extPermitidas,
+                    ],
+                ], [
+                    'archivos_descargos.*.mimes'   => 'Solo se permiten imágenes (JPG, PNG, GIF, WEBP), PDF, Word y Excel. No se aceptan videos.',
+                    'archivos_descargos.*.max'     => 'Cada archivo no puede superar 20 MB.',
+                    'archivos_descargos.max'       => 'Máximo 10 archivos por descargo.',
                 ]);
-            }
-        }
 
-        return redirect()
-            ->route('abogado.plazos', array_filter($request->only('estado')))
-            ->with('success', 'Presentación de descargos actualizada.');
+                $presentacion = ProcesoDisciplinario::parseDescargosPresentacion(
+                    $validated['descargos_presentacion']
+                );
+                $proceso->update($presentacion);
+
+                if ($incluyeArchivos) {
+                    foreach ($request->file('archivos_descargos') as $archivo) {
+                        $extension = strtolower($archivo->getClientOriginalExtension());
+                        $mime = strtolower((string) $archivo->getMimeType());
+                        $nombreAlmacenado = 'dc_' . $proceso->id . '_' . Str::random(40) . '.' . $extension;
+                        $ruta = $archivo->storeAs('anexos/' . $proceso->id, $nombreAlmacenado, 'local');
+
+                        if (!is_string($ruta) || $ruta === '') {
+                            throw new \RuntimeException('No se pudo guardar un anexo de descargos.');
+                        }
+
+                        $rutasGuardadas[] = $ruta;
+
+                        CasoAnexo::create([
+                            'caso_id'           => $proceso->id,
+                            'user_id'           => $usuario->id,
+                            'tipo'              => CasoAnexo::TIPO_DESCARGOS,
+                            'estado'            => CasoAnexo::ESTADO_CARGADO,
+                            'titulo'            => 'Descargo',
+                            'nombre_original'   => $archivo->getClientOriginalName(),
+                            'nombre_almacenado' => $nombreAlmacenado,
+                            'extension'         => $extension,
+                            'mime_type'         => $mime,
+                            'tamano'            => $archivo->getSize(),
+                            'ruta_segura'       => $ruta,
+                        ]);
+                    }
+                }
+
+                return redirect()
+                    ->route('abogado.plazos', array_filter($request->only('estado')))
+                    ->with('success', 'Presentación de descargos actualizada.');
+            });
+        } catch (Throwable $exception) {
+            foreach ($rutasGuardadas as $ruta) {
+                try {
+                    if (!Storage::disk('local')->delete($ruta)) {
+                        logger()->error('No se pudo retirar un archivo de descargos tras revertir la operación.', [
+                            'ruta' => $ruta,
+                        ]);
+                    }
+                } catch (Throwable $cleanupException) {
+                    report($cleanupException);
+                }
+            }
+
+            throw $exception;
+        }
     }
 
     public function downloadDescargo(int $anexoId)
     {
+        auth()->user()->exigir('descargar_anexos');
+
         $anexo = \App\Models\CasoAnexo::where('tipo', \App\Models\CasoAnexo::TIPO_DESCARGOS)
             ->when(!auth()->user()->esCoordinadora(), function ($q) {
                 $q->whereHas('caso', fn ($c) => $c->where('user_id', auth()->id()));
             })
             ->findOrFail($anexoId);
 
-        $ruta = storage_path('app/' . $anexo->ruta_segura);
-        abort_unless(is_file($ruta), 404);
+        $ruta = CaseFilePath::resolve(
+            (string) $anexo->ruta_segura,
+            ['anexos/' . $anexo->caso_id],
+            'local'
+        );
+        abort_unless($ruta, 404);
 
         return response()->download($ruta, $anexo->nombre_original);
     }
@@ -1247,13 +1426,104 @@ class ProcesoDisciplinarioController extends Controller
      */
     public function eliminarAbogado($id)
     {
-        $abogado = User::findOrFail($id);
+        DB::transaction(function () use ($id) {
+            $user = User::query()
+                ->where('role', User::ROLE_EQUIPO)
+                ->lockForUpdate()
+                ->findOrFail($id);
 
-        $abogado->delete();
+            $historialPreparado = Schema::hasTable('migrations')
+                && DB::table('migrations')
+                    ->where('migration', self::USER_HISTORY_MIGRATION)
+                    ->exists();
 
-        return redirect()
-            ->back()
-            ->with('success', 'Registro de RH eliminado correctamente');
+            abort_unless(
+                $historialPreparado,
+                409,
+                'La eliminación está bloqueada hasta aplicar la migración de preservación del historial.'
+            );
+
+            $this->preserveDeletedUserAttribution($user);
+
+            DB::table('personal_access_tokens')
+                ->where('tokenable_type', $user->getMorphClass())
+                ->where('tokenable_id', $user->id)
+                ->delete();
+
+            if (Schema::hasTable('password_resets')) {
+                DB::table('password_resets')->where('email', $user->email)->delete();
+            }
+
+            if (Schema::hasTable('sessions')) {
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+            }
+
+            $user->delete();
+        });
+
+        return redirect()->back()->with('success', 'Integrante eliminado. Los expedientes y su historial se conservaron.');
+    }
+
+    private function preserveDeletedUserAttribution(User $user): void
+    {
+        if (Schema::hasTable('disciplinario_asignaciones')) {
+            abort_unless(
+                Schema::hasColumn('disciplinario_asignaciones', 'active_case_id'),
+                409,
+                'El historial de asignaciones no está preparado para registrar cambios.'
+            );
+
+            $now = now();
+            DB::table('disciplinario_asignaciones')
+                ->where('user_id', $user->id)
+                ->whereNotNull('active_case_id')
+                ->update([
+                    'unassigned_at' => $now,
+                    'active_case_id' => null,
+                    'updated_at' => $now,
+                ]);
+        }
+
+        $ownerTables = [
+            'disciplinario',
+            'caso_evidencias',
+            'caso_anexos',
+            'user_permisos',
+            'permiso_solicitudes',
+            'sipd_avisos',
+            'sipd_alerta_silencios',
+            'sipd_recuperaciones_contrasena',
+        ];
+
+        foreach ($ownerTables as $table) {
+            $query = DB::table($table)
+                ->where('user_id', $user->id)
+                ->whereNull('user_id_snapshot')
+                ->whereNull('user_name_snapshot');
+
+            $query->update([
+                'user_id_snapshot' => $user->id,
+                'user_name_snapshot' => $user->name,
+            ]);
+        }
+
+        $actorReferences = [
+            ['user_permisos', 'granted_by', 'granted_by_id_snapshot', 'granted_by_name_snapshot'],
+            ['permiso_solicitudes', 'responded_by', 'responded_by_id_snapshot', 'responded_by_name_snapshot'],
+            ['sipd_avisos', 'remitente_id', 'remitente_id_snapshot', 'remitente_name_snapshot'],
+            ['sipd_recuperaciones_contrasena', 'responded_by', 'responded_by_id_snapshot', 'responded_by_name_snapshot'],
+        ];
+
+        foreach ($actorReferences as [$table, $foreignColumn, $snapshotIdColumn, $snapshotNameColumn]) {
+            DB::table($table)
+                ->where($foreignColumn, $user->id)
+                ->whereNull($snapshotIdColumn)
+                ->whereNull($snapshotNameColumn)
+                ->update([
+                    $snapshotIdColumn => $user->id,
+                    $snapshotNameColumn => $user->name,
+                ]);
+        }
     }
 
     /**
@@ -1352,7 +1622,6 @@ class ProcesoDisciplinarioController extends Controller
     {
         abort_unless(auth()->user()->esCoordinadora(), 403);
 
-        $proceso = $this->accessibleProcess($id);
         $validated = $request->validate([
             'user_id' => 'required|integer',
         ]);
@@ -1361,9 +1630,135 @@ class ProcesoDisciplinarioController extends Controller
             ->where('role', 'equipo')
             ->activos()
             ->firstOrFail();
-        $proceso->update(['user_id' => $responsable->id]);
+
+        DB::transaction(function () use ($id, $responsable) {
+            $proceso = $this->visibleProcesses()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                Schema::hasTable('disciplinario_asignaciones'),
+                409,
+                'La asignación no está disponible hasta completar la preparación del esquema histórico.'
+            );
+
+            if ((int) $proceso->user_id === (int) $responsable->id) {
+                return;
+            }
+
+            abort_unless(
+                Schema::hasColumn('disciplinario_asignaciones', 'active_case_id'),
+                409,
+                'El historial de asignaciones no está preparado para registrar cambios.'
+            );
+
+            $now = now();
+            $hasCurrentAssignment = DB::table('disciplinario_asignaciones')
+                ->where('caso_id', $proceso->id)
+                ->where('active_case_id', $proceso->id)
+                ->exists();
+
+            if (!$hasCurrentAssignment && $proceso->user_id) {
+                $responsableAnterior = User::find($proceso->user_id);
+                if ($responsableAnterior) {
+                    $this->recordInitialAssignment($proceso, $responsableAnterior);
+                }
+            }
+
+            DB::table('disciplinario_asignaciones')
+                ->where('caso_id', $proceso->id)
+                ->where('active_case_id', $proceso->id)
+                ->update([
+                    'unassigned_at' => $now,
+                    'active_case_id' => null,
+                    'updated_at' => $now,
+                ]);
+
+            $this->recordInitialAssignment($proceso, $responsable, $now);
+
+            $proceso->update(['user_id' => $responsable->id]);
+        });
 
         return redirect()->back()->with('success', 'Proceso asignado a ' . $responsable->name . '.');
+    }
+
+    private function esPrimeraInteraccionDescargos(ProcesoDisciplinario $proceso): bool
+    {
+        return !filled($proceso->descargos_forma)
+            && !filled($proceso->descargos)
+            && !filled($proceso->descargos_medio)
+            && !$proceso->anexos()
+                ->where('tipo', CasoAnexo::TIPO_DESCARGOS)
+                ->exists();
+    }
+
+    private function tieneCambiosFueraDeDescargos(Request $request, ProcesoDisciplinario $proceso): bool
+    {
+        if ($request->hasFile('documento_falta')) {
+            return true;
+        }
+
+        $campos = [
+            'nombre',
+            'cedula',
+            'telefono',
+            'modalidad',
+            'cargo',
+            'placa',
+            'numero_interno',
+            'ruta',
+            'tipo_falta',
+            'fecha_falta',
+            'descripcion_falta',
+            'observacion',
+            'decision_final',
+        ];
+
+        foreach ($campos as $campo) {
+            if (!$request->exists($campo)) {
+                continue;
+            }
+
+            $enviado = $request->input($campo);
+            if (is_array($enviado) || is_object($enviado)) {
+                return true;
+            }
+
+            $actual = $campo === 'fecha_falta' && $proceso->fecha_falta
+                ? $proceso->fecha_falta->format('Y-m-d')
+                : $proceso->getAttribute($campo);
+            $enviado = $enviado === '' ? null : $enviado;
+            $actual = $actual === '' ? null : $actual;
+
+            if ((string) $enviado !== (string) $actual) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function recordInitialAssignment(
+        ProcesoDisciplinario $proceso,
+        User $responsable,
+        $assignedAt = null
+    ): void {
+        if (!Schema::hasTable('disciplinario_asignaciones')) {
+            return;
+        }
+
+        DB::table('disciplinario_asignaciones')->insert([
+            'caso_id' => $proceso->id,
+            'user_id' => $responsable->id,
+            'active_case_id' => $proceso->id,
+            'user_id_snapshot' => $responsable->id,
+            'user_name_snapshot' => $responsable->name,
+            'assigned_at' => $assignedAt,
+            'unassigned_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function validarDatosTrabajador(Request $request, string $seleccion, ?string $modalidad): void

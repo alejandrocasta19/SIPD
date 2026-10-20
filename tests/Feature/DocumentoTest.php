@@ -306,6 +306,10 @@ class DocumentoTest extends TestCase
         $this->actingAs($abog1)
             ->get(route('documentos.download', [$caso->id, 'disciplinario']))
             ->assertStatus(404);
+
+        $this->actingAs($abog1)
+            ->get(route('documentos.preview', [$caso->id, 'disciplinario']))
+            ->assertStatus(404);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -563,7 +567,7 @@ class DocumentoTest extends TestCase
     public function primera_descarga_de_documento_que_requiere_firma_avisa_a_la_coordinadora()
     {
         $coord = $this->makeUser('coordinadora');
-        $user = $this->makeUser('abogado');
+        $user = $this->makeUser('abogado', ['descargar_documentos']);
         $caso = $this->makeCaso($user, [
             'datos_oficiales' => [
                 'yellow_blocks' => ['llamado' => $this->filledBlocks('llamado')],
@@ -580,6 +584,163 @@ class DocumentoTest extends TestCase
             'proceso_id' => $caso->id,
             'tipo_documento' => 'llamado',
         ]);
+    }
+
+    /** @test */
+    public function primera_descarga_de_documento_oficial_no_requiere_permiso_adicional()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertOk()
+            ->assertHeader('X-SIPD-Download-Registered', '1');
+
+        $this->assertNotNull($caso->estadoDocumento('disciplinario')->fresh()->descargado_en);
+    }
+
+    /** @test */
+    public function usuario_con_acceso_al_expediente_puede_previsualizar_sin_permisos_documentales()
+    {
+        $user = $this->makeUser('abogado');
+        $user->permisos()->whereIn('permiso', ['ver_documentos', 'descargar_documentos'])->delete();
+        $user->unsetRelation('permisos');
+        $caso = $this->makeCaso($user);
+
+        $this->mock(\App\Services\OfficialDocumentService::class, function ($mock) use ($caso) {
+            $mock->shouldReceive('previewPdf')
+                ->once()
+                ->withArgs(fn ($receivedCase, $tipo) => $receivedCase->is($caso) && $tipo === 'disciplinario')
+                ->andReturn(response('previsualizacion autorizada'));
+        });
+
+        $this->actingAs($user)
+            ->get(route('documentos.preview', [$caso->id, 'disciplinario']))
+            ->assertOk()
+            ->assertSeeText('previsualizacion autorizada');
+    }
+
+    /** @test */
+    public function previsualizacion_no_exige_el_permiso_ver_documentos()
+    {
+        $user = $this->makeUser('abogado');
+        $user->permisos()->where('permiso', 'ver_documentos')->delete();
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('documentos.preview', [$caso->id, 'disciplinario']))
+            ->assertOk();
+    }
+
+    /** @test */
+    public function descarga_repetida_sin_permiso_es_rechazada_y_no_modifica_su_registro()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+        $estado = $caso->estadoDocumento('disciplinario');
+        $primeraDescarga = now()->subMinute();
+        $estado->update([
+            'estado' => 'generado',
+            'generado_en' => $primeraDescarga,
+            'descargado_en' => $primeraDescarga,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']) . '?descargar_documentos=1')
+            ->assertForbidden();
+
+        $this->assertSame(
+            $primeraDescarga->toDateTimeString(),
+            $estado->fresh()->descargado_en->toDateTimeString()
+        );
+    }
+
+    /** @test */
+    public function primera_descarga_de_otro_tipo_de_documento_tambien_es_libre()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertOk();
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'comprobacion']))
+            ->assertOk();
+
+        $this->assertNotNull($caso->estadoDocumento('disciplinario')->fresh()->descargado_en);
+        $this->assertNotNull($caso->estadoDocumento('comprobacion')->fresh()->descargado_en);
+    }
+
+    /** @test */
+    public function una_descarga_repetida_autorizada_se_permite()
+    {
+        $user = $this->makeUser('abogado', ['descargar_documentos']);
+        $caso = $this->makeCaso($user);
+        $caso->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now()->subMinute(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertOk();
+    }
+
+    /** @test */
+    public function un_archivo_generado_inexistente_no_se_registra_como_descargado()
+    {
+        $user = $this->makeUser('abogado');
+        $caso = $this->makeCaso($user);
+        $rutaTemporal = tempnam(sys_get_temp_dir(), 'sipd-missing-download-');
+        $this->assertNotFalse($rutaTemporal);
+        $respuesta = response()->download($rutaTemporal, 'documento.docx');
+        unlink($rutaTemporal);
+
+        $this->mock(\App\Services\OfficialDocumentService::class, function ($mock) use ($respuesta) {
+            $mock->shouldReceive('downloadOfficial')
+                ->once()
+                ->andReturn($respuesta);
+        });
+
+        $this->actingAs($user)
+            ->get(route('documentos.download', [$caso->id, 'disciplinario']))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertNull($caso->estadoDocumento('disciplinario')->fresh()->descargado_en);
+    }
+
+    /** @test */
+    public function expediente_cerrado_sigue_reservado_a_la_coordinadora_para_editar_documentos()
+    {
+        $user = $this->makeUser('abogado');
+        $coordinadora = $this->makeUser('coordinadora');
+        $caso = $this->makeCaso($user, ['estado' => 'Sancionado']);
+        $datos = ['yellow_blocks' => $this->filledBlocks('disciplinario')];
+        $bloquesOriginales = $caso->datos_oficiales['yellow_blocks']['disciplinario'] ?? null;
+
+        $this->actingAs($user)
+            ->from(route('documentos.edit', [$caso->id, 'disciplinario']))
+            ->put(route('documentos.save', [$caso->id, 'disciplinario']), $datos)
+            ->assertRedirect(route('documentos.edit', [$caso->id, 'disciplinario']))
+            ->assertSessionHas('error');
+
+        $this->assertSame(
+            $bloquesOriginales,
+            $caso->fresh()->datos_oficiales['yellow_blocks']['disciplinario'] ?? null
+        );
+
+        $this->actingAs($coordinadora)
+            ->put(route('documentos.save', [$caso->id, 'disciplinario']), $datos)
+            ->assertRedirect(route('documentos.edit', [$caso->id, 'disciplinario']));
+
+        $this->assertSame(
+            $datos['yellow_blocks'],
+            data_get($caso->fresh()->datos_oficiales, 'yellow_blocks.disciplinario')
+        );
     }
 
     /** @test */
@@ -897,7 +1058,7 @@ class DocumentoTest extends TestCase
             ->assertDontSee('En proceso')
             ->assertSee('Borrador')
             ->assertSee('Generada, no descargada')
-            ->assertDontSee('Generada y descargada')
+            ->assertSee('"estado":"Generada, no descargada"', false)
             ->assertSee('class="action-btn btn-down hub-open-dl"', false);
     }
 
@@ -958,9 +1119,12 @@ class DocumentoTest extends TestCase
         $this->actingAs($user)
             ->get(route('documentos.hub'))
             ->assertOk()
-            ->assertDontSee('class="action-btn btn-down hub-open-dl"', false)
-            ->assertSee('class="action-btn btn-download-permission"', false)
-            ->assertSee("SIPD_abrirPermiso('descargar_documentos')", false);
+            ->assertSee('class="action-btn btn-down hub-open-dl"', false)
+            ->assertDontSee('class="action-btn btn-download-permission"', false)
+            ->assertSee('"actionState":"bloqueado"', false)
+            ->assertSee('Solicito autorizaci\u00f3n para volver a descargar 1. Apertura del proceso PRO-', false)
+            ->assertSee('hub-request-download-permission', false)
+            ->assertSee("SIPD_abrirPermiso('descargar_documentos',", false);
 
         $this->actingAs($user)
             ->get(route('documentos.download', [$caso->id, 'disciplinario']))
@@ -972,6 +1136,7 @@ class DocumentoTest extends TestCase
             ->get(route('documentos.hub'))
             ->assertOk()
             ->assertSee('class="action-btn btn-down hub-open-dl"', false)
+            ->assertSee('"actionState":"listo"', false)
             ->assertDontSee('class="action-btn btn-download-permission"', false)
             ->assertSee('Descargar');
     }
@@ -1028,7 +1193,7 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
-    public function hub_permite_cambiar_registros_por_pagina()
+    public function la_paginacion_global_mantiene_cinco_registros_y_no_muestra_selector()
     {
         $user = $this->makeUser('abogado');
         for ($i = 1; $i <= 6; $i++) {
@@ -1036,12 +1201,29 @@ class DocumentoTest extends TestCase
         }
 
         $this->actingAs($user)
-            ->get(route('documentos.hub', ['per_page' => 5]))
+            ->get(route('documentos.hub', ['per_page' => 20]))
             ->assertOk()
-            ->assertSee('Personalizado')
-            ->assertSee('Mostrar')
-            ->assertSee('value="5"', false)
-            ->assertSee('selected', false);
+            ->assertSee('Conductor Pagina 1')
+            ->assertSee('Conductor Pagina 5')
+            ->assertDontSee('Conductor Pagina 6')
+            ->assertDontSee('Mostrar')
+            ->assertSee('Anterior')
+            ->assertSee('Siguiente')
+            ->assertSee('aria-label="Paginación"', false);
+    }
+
+    /** @test */
+    public function la_paginacion_global_se_muestra_tambien_cuando_no_hay_registros()
+    {
+        $user = $this->makeUser('abogado');
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee('aria-label="Paginación"', false)
+            ->assertSee('Anterior')
+            ->assertSee('Siguiente')
+            ->assertDontSee('sipd-page is-current');
     }
 
     /** @test */
@@ -1328,9 +1510,11 @@ class DocumentoTest extends TestCase
     {
         Storage::fake('local');
 
-        $abog1 = $this->makeUser('abogado');
+        $abog1 = $this->makeUser('abogado', ['descargar_anexos']);
         $abog2 = $this->makeUser('abogado');
         $caso  = $this->makeCaso($abog2);
+        $ruta = 'evidencias/' . $caso->id . '/doc.pdf';
+        Storage::disk('local')->put($ruta, 'contenido de prueba');
 
         $ev = CasoEvidencia::create([
             'caso_id'           => $caso->id,
@@ -1340,12 +1524,143 @@ class DocumentoTest extends TestCase
             'extension'         => 'pdf',
             'mime_type'         => 'application/pdf',
             'tamano'            => 1024,
-            'ruta_segura'       => 'evidencias/' . $caso->id . '/doc.pdf',
+            'ruta_segura'       => $ruta,
         ]);
 
         $this->actingAs($abog1)
             ->get(route('documentos.evidencias.download', [$caso->id, $ev->id]))
             ->assertStatus(404);
+    }
+
+    /** @test */
+    public function evidencia_legacy_de_documento_falta_se_descarga_solo_por_ruta_autorizada()
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $user = $this->makeUser('abogado', ['ver_casos', 'descargar_anexos']);
+        $caso = $this->makeCaso($user);
+        $rutaPublicaLegacy = 'documentos/legacy.pdf';
+        Storage::disk('public')->put($rutaPublicaLegacy, 'evidencia legacy');
+        $evidencia = CasoEvidencia::create([
+            'caso_id' => $caso->id,
+            'user_id' => $user->id,
+            'nombre_original' => 'legacy.pdf',
+            'nombre_almacenado' => 'legacy.pdf',
+            'extension' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'tamano' => 16,
+            'ruta_segura' => 'public/' . $rutaPublicaLegacy,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.evidencias.download', [$caso->id, $evidencia->id]))
+            ->assertOk()
+            ->assertHeader('content-disposition');
+    }
+
+    /** @test */
+    public function evidencia_no_se_descarga_solo_con_ver_casos()
+    {
+        Storage::fake('local');
+        $user = $this->makeUser('abogado', ['ver_casos']);
+        $caso = $this->makeCaso($user);
+        $ruta = 'evidencias/' . $caso->id . '/evidencia.pdf';
+        Storage::disk('local')->put($ruta, 'evidencia existente');
+        $evidencia = CasoEvidencia::create([
+            'caso_id' => $caso->id,
+            'user_id' => $user->id,
+            'nombre_original' => 'evidencia.pdf',
+            'nombre_almacenado' => 'evidencia.pdf',
+            'extension' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'tamano' => 20,
+            'ruta_segura' => $ruta,
+        ]);
+
+        $this->assertTrue($user->puede('ver_casos'));
+        $this->assertFalse($user->puede('descargar_anexos'));
+
+        $this->actingAs($user)
+            ->get(route('documentos.evidencias.download', [$caso->id, $evidencia->id]))
+            ->assertForbidden();
+    }
+
+    /** @test */
+    public function usuario_autorizado_descarga_evidencia_de_su_expediente()
+    {
+        Storage::fake('local');
+        $user = $this->makeUser('abogado', ['ver_casos', 'descargar_anexos']);
+        $caso = $this->makeCaso($user);
+        $ruta = 'evidencias/' . $caso->id . '/evidencia.pdf';
+        Storage::disk('local')->put($ruta, 'evidencia existente');
+        $evidencia = CasoEvidencia::create([
+            'caso_id' => $caso->id,
+            'user_id' => $user->id,
+            'nombre_original' => 'evidencia.pdf',
+            'nombre_almacenado' => 'evidencia.pdf',
+            'extension' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'tamano' => 20,
+            'ruta_segura' => $ruta,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.evidencias.download', [$caso->id, $evidencia->id]))
+            ->assertOk()
+            ->assertHeader('content-disposition');
+    }
+
+    /** @test */
+    public function descarga_de_evidencia_rechaza_rutas_no_canonicas_o_fuera_de_su_carpeta()
+    {
+        Storage::fake('local');
+        $user = $this->makeUser('abogado', ['ver_casos', 'descargar_anexos']);
+        $caso = $this->makeCaso($user);
+        Storage::disk('local')->put('outside.pdf', 'archivo fuera de carpeta');
+        Storage::disk('local')->put('otra-carpeta/evidencia.pdf', 'archivo fuera de carpeta');
+
+        foreach ([
+            'evidencias/' . $caso->id . '/../outside.pdf',
+            Storage::disk('local')->path('outside.pdf'),
+            'otra-carpeta/evidencia.pdf',
+        ] as $rutaInvalida) {
+            $evidencia = CasoEvidencia::create([
+                'caso_id' => $caso->id,
+                'user_id' => $user->id,
+                'nombre_original' => 'evidencia.pdf',
+                'nombre_almacenado' => 'evidencia.pdf',
+                'extension' => 'pdf',
+                'mime_type' => 'application/pdf',
+                'tamano' => 20,
+                'ruta_segura' => $rutaInvalida,
+            ]);
+
+            $this->actingAs($user)
+                ->get(route('documentos.evidencias.download', [$caso->id, $evidencia->id]))
+                ->assertNotFound();
+        }
+    }
+
+    /** @test */
+    public function evidencia_con_ruta_valida_pero_archivo_ausente_devuelve_404()
+    {
+        Storage::fake('local');
+        $user = $this->makeUser('abogado', ['ver_casos', 'descargar_anexos']);
+        $caso = $this->makeCaso($user);
+        $evidencia = CasoEvidencia::create([
+            'caso_id' => $caso->id,
+            'user_id' => $user->id,
+            'nombre_original' => 'ausente.pdf',
+            'nombre_almacenado' => 'ausente.pdf',
+            'extension' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'tamano' => 20,
+            'ruta_segura' => 'evidencias/' . $caso->id . '/ausente.pdf',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('documentos.evidencias.download', [$caso->id, $evidencia->id]))
+            ->assertNotFound();
     }
 
     /** @test */
@@ -1543,24 +1858,26 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
-    public function enviar_no_aparece_hasta_tener_los_cuatro_documentos_generados()
+    public function enviar_no_aparece_hasta_que_los_cuatro_documentos_estan_generados_y_descargados()
     {
         $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
-        $caso->estadoDocumento('disciplinario')->update([
-            'estado' => 'generado',
-            'generado_en' => now(),
-        ]);
+        foreach (['disciplinario', 'acta', 'sancion', 'archivo'] as $tipo) {
+            $caso->estadoDocumento($tipo)->update([
+                'estado' => 'generado',
+                'generado_en' => now(),
+            ]);
+        }
 
         $this->actingAs($user)
             ->get(route('abogado.detalleproceso', $caso->id))
             ->assertOk()
-            ->assertDontSee('form-enviar-proceso', false);
+            ->assertDontSee('Enviar a revisión', false);
 
         $this->actingAs($user)
             ->get(route('documentos.hub'))
             ->assertOk()
-            ->assertDontSee('Enviar a En Proceso', false);
+            ->assertSee('class="hub-send-form d-none"', false);
 
         $this->actingAs($user)
             ->put(route('abogado.solicitar_veredicto', $caso->id))
@@ -1570,7 +1887,7 @@ class DocumentoTest extends TestCase
     }
 
     /** @test */
-    public function enviar_aparece_cuando_los_cuatro_documentos_estan_generados()
+    public function enviar_aparece_cuando_los_cuatro_documentos_estan_generados_y_descargados()
     {
         $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user, ['estado' => 'Pendiente']);
@@ -1578,6 +1895,7 @@ class DocumentoTest extends TestCase
             $caso->estadoDocumento($tipo)->update([
                 'estado' => 'generado',
                 'generado_en' => now(),
+                'descargado_en' => now(),
             ]);
         }
 
@@ -1601,7 +1919,7 @@ class DocumentoTest extends TestCase
     /** @test */
     public function descargar_documento_marca_generada_y_descargada()
     {
-        $user = $this->makeUser('abogado', ['descargar_documentos']);
+        $user = $this->makeUser('abogado');
         $caso = $this->makeCaso($user);
 
         $this->actingAs($user)
@@ -1612,6 +1930,12 @@ class DocumentoTest extends TestCase
         $this->assertSame('generado', $estado->estado);
         $this->assertNotNull($estado->generado_en);
         $this->assertNotNull($estado->descargado_en);
+
+        $this->actingAs($user)
+            ->get(route('documentos.hub'))
+            ->assertOk()
+            ->assertSee('"actionState":"bloqueado"', false)
+            ->assertSee('hub-request-download-permission', false);
     }
 
     /** @test */

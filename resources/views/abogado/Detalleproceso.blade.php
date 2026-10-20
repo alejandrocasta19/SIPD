@@ -360,18 +360,24 @@
                                         <div class="detalle-docs">
                                             @foreach($proceso->evidencias as $evidencia)
                                             <p class="detalle-doc-line">
-                                                <a href="{{ route('documentos.evidencias.download', [$proceso->id, $evidencia->id]) }}">
-                                                    <i class="fas fa-paperclip"></i> {{ $evidencia->nombre_original }}
-                                                </a>
+                                                @if(auth()->user()->puede('descargar_anexos'))
+                                                    <a href="{{ route('documentos.evidencias.download', [$proceso->id, $evidencia->id]) }}">
+                                                        <i class="fas fa-paperclip"></i> {{ $evidencia->nombre_original }}
+                                                    </a>
+                                                @else
+                                                    <span><i class="fas fa-paperclip"></i> {{ $evidencia->nombre_original }}</span>
+                                                @endif
                                             </p>
                                             @endforeach
                                         </div>
-                                    @elseif($proceso->documento_falta)
+                                    @elseif($proceso->documento_falta && auth()->user()->puede('descargar_anexos'))
                                         <p class="detalle-doc-line">
                                             <a href="{{ route('abogado.documento-falta', $proceso->id) }}" class="btn btn-sm btn-info">
                                                 <i class="fas fa-file-pdf"></i> Ver Documento Principal
                                             </a>
                                         </p>
+                                    @elseif($proceso->documento_falta)
+                                        <p class="detalle-empty">Documento adjunto.</p>
                                     @else
                                         <p class="detalle-empty">No hay documento adjunto</p>
                                     @endif

@@ -2,11 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\CasoDocumentoEstado;
-use App\Models\CasoEvidencia;
-use App\Models\CasoAnexo;
 use App\Models\ProcesoDisciplinario;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,123 +22,109 @@ class ConsultaPublicaTest extends TestCase
     }
 
     /** @test */
-    public function consulta_por_cedula_muestra_avance_sin_datos_reservados()
+    public function la_consulta_por_cedula_no_confirma_ni_muestra_detalles_del_expediente()
     {
-        $secreto = 'El conductor golpeó el vehículo de placas ABC123 y amenazó al pasajero.';
-        $descargos = 'Niego los hechos y pido copias de las pruebas internas.';
-        $decision = 'Sanción de 15 días y descuento de $2.500.000';
-
         $proceso = ProcesoDisciplinario::factory()->create([
-            'nombre' => 'Carlos Pérez',
-            'cedula' => '1075123456',
-            'placa' => 'XYZ987',
-            'telefono' => '3001112233',
-            'tipo_falta' => 'Falta grave por agresión',
-            'descripcion_falta' => $secreto,
-            'observacion' => 'Anotación reservada de RH',
-            'descargos' => $descargos,
-            'decision_final' => $decision,
+            'nombre' => 'Caso de prueba sin identidad real',
+            'cedula' => '9876543210',
+            'descripcion_falta' => 'DETALLE_PRIVADO_DE_PRUEBA',
             'estado' => 'En Proceso',
             'tipo_proceso' => 'disciplinario',
         ]);
 
-        CasoDocumentoEstado::create([
-            'caso_id' => $proceso->id,
-            'tipo_documento' => 'disciplinario',
-            'estado' => 'generado',
-            'generado_en' => now()->subDays(2),
-        ]);
-
-        CasoEvidencia::create([
-            'caso_id' => $proceso->id,
-            'user_id' => User::factory()->create()->id,
-            'nombre_original' => 'video-interno-camara.mp4',
-            'nombre_almacenado' => 'oculto.bin',
-            'extension' => 'jpg',
-            'mime_type' => 'image/jpeg',
-            'tamano' => 1024,
-            'descripcion' => 'Grabación confidencial',
-            'ruta_segura' => 'evidencias/oculto.bin',
-        ]);
-
-        CasoAnexo::create([
-            'caso_id' => $proceso->id,
-            'user_id' => User::factory()->create()->id,
-            'tipo' => CasoAnexo::TIPO_ARCHIVO_PREVIO,
-            'estado' => CasoAnexo::ESTADO_CARGADO,
-            'titulo' => 'carta-despido-reservada.docx',
-            'nombre_original' => 'carta-despido-reservada.docx',
-            'nombre_almacenado' => 'ax_oculto.docx',
-            'extension' => 'docx',
-            'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'tamano' => 2048,
-            'ruta_segura' => 'anexos/oculto.docx',
-        ]);
-
         $this->from(route('consulta.publica'))
-            ->post(route('consulta.publica.buscar'), ['cedula' => '1075123456'])
+            ->post(route('consulta.publica.buscar'), ['cedula' => '9876543210'])
             ->assertRedirect(route('consulta.publica'));
 
         $this->get(route('consulta.publica'))
             ->assertOk()
-            ->assertSee('PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT))
-            ->assertSee('Carlos Pérez')
-            ->assertSee('Proceso disciplinario')
-            ->assertSee('En Proceso')
-            ->assertSee('Ver trámite')
-            ->assertSee('Línea de tiempo')
-            ->assertSee('Apertura')
-            ->assertSee('Descargos')
-            ->assertSee('Se incorporó un elemento de prueba al expediente.')
-            ->assertSee('Se incorporó un documento al expediente.')
-            ->assertSee('1.075.123.456')
-            ->assertDontSee($secreto)
-            ->assertDontSee($descargos)
-            ->assertDontSee($decision)
-            ->assertDontSee('Anotación reservada de RH')
-            ->assertDontSee('Falta grave por agresión')
-            ->assertDontSee('XYZ987')
-            ->assertDontSee('3001112233')
-            ->assertDontSee('video-interno-camara.mp4')
-            ->assertDontSee('Grabación confidencial')
-            ->assertDontSee('carta-despido-reservada.docx');
+            ->assertSee('no podemos confirmar si existe un expediente')
+            ->assertDontSee('DETALLE_PRIVADO_DE_PRUEBA')
+            ->assertDontSee('Caso de prueba sin identidad real')
+            ->assertDontSee('PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT))
+            ->assertDontSee('En Proceso')
+            ->assertDontSee('9876543210')
+            ->assertDontSee('Ver trámite')
+            ->assertDontSee('Línea de tiempo');
     }
 
     /** @test */
-    public function consulta_sin_resultados_no_expone_casos_ajenos()
+    public function la_respuesta_es_igual_para_coincidencias_y_sin_coincidencias()
     {
         ProcesoDisciplinario::factory()->create([
             'cedula' => '1111111111',
-            'nombre' => 'Conductor Ajeno',
-            'descripcion_falta' => 'Hecho reservado de otra persona',
+            'nombre' => 'Otro caso de prueba',
         ]);
 
-        $this->post(route('consulta.publica.buscar'), ['cedula' => '9999999999'])
+        $this->post(route('consulta.publica.buscar'), ['cedula' => '1111111111'])
             ->assertRedirect(route('consulta.publica'));
+        $respuestaConCoincidencia = $this->get(route('consulta.publica'))->assertOk();
+
+        $this->post(route('consulta.publica.buscar'), ['cedula' => '2222222222'])
+            ->assertRedirect(route('consulta.publica'));
+        $respuestaSinCoincidencia = $this->get(route('consulta.publica'))->assertOk();
+
+        $respuestaConCoincidencia->assertSee('no podemos confirmar si existe un expediente');
+        $respuestaSinCoincidencia->assertSee('no podemos confirmar si existe un expediente');
+        $respuestaConCoincidencia->assertDontSee('Otro caso de prueba');
+        $respuestaSinCoincidencia->assertDontSee('Otro caso de prueba');
+    }
+
+    /** @test */
+    public function la_cedula_no_se_conserva_en_la_sesion_ni_se_devuelve_en_la_pagina()
+    {
+        $cedula = '9876543210';
+
+        $this->from(route('consulta.publica'))
+            ->post(route('consulta.publica.buscar'), ['cedula' => $cedula])
+            ->assertRedirect(route('consulta.publica'))
+            ->assertSessionMissing('consulta_publica_cedula');
 
         $this->get(route('consulta.publica'))
             ->assertOk()
-            ->assertSee('No se encontraron procesos con esa cédula.')
-            ->assertDontSee('Conductor Ajeno')
-            ->assertDontSee('Hecho reservado de otra persona');
+            ->assertDontSee($cedula)
+            ->assertDontSee('value="' . $cedula . '"', false);
     }
 
     /** @test */
     public function consulta_acepta_cedula_con_puntos()
     {
-        $proceso = ProcesoDisciplinario::factory()->create([
-            'nombre' => 'Ana Consulta',
-            'cedula' => '1075123456',
-        ]);
-
         $this->from(route('consulta.publica'))
-            ->post(route('consulta.publica.buscar'), ['cedula' => '1.075.123.456'])
+            ->post(route('consulta.publica.buscar'), ['cedula' => '987.654.3210'])
             ->assertRedirect(route('consulta.publica'));
 
         $this->get(route('consulta.publica'))
             ->assertOk()
-            ->assertSee('Ana Consulta')
-            ->assertSee('PRO-' . str_pad($proceso->id, 3, '0', STR_PAD_LEFT));
+            ->assertSee('no podemos confirmar si existe un expediente')
+            ->assertDontSee('987.654.3210');
+    }
+
+    /** @test */
+    public function las_entradas_malformadas_no_se_reflejan_en_la_respuesta()
+    {
+        $malformed = '<script>invalid-input</script>';
+
+        $this->from(route('consulta.publica'))
+            ->post(route('consulta.publica.buscar'), ['cedula' => $malformed])
+            ->assertRedirect(route('consulta.publica'))
+            ->assertSessionHasErrors('cedula')
+            ->assertSessionMissing('_old_input');
+
+        $this->get(route('consulta.publica'))
+            ->assertOk()
+            ->assertDontSee($malformed, false);
+    }
+
+    /** @test */
+    public function los_intentos_repetidos_siguen_limitados_por_ip()
+    {
+        for ($intento = 0; $intento < 10; $intento++) {
+            $this->post(route('consulta.publica.buscar'), ['cedula' => '1234567890'])
+                ->assertRedirect(route('consulta.publica'));
+        }
+
+        $this->post(route('consulta.publica.buscar'), ['cedula' => '1234567890'])
+            ->assertStatus(429);
     }
 
     /** @test */

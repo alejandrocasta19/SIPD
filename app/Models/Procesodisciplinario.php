@@ -392,6 +392,9 @@ class ProcesoDisciplinario extends Model
             if (!$this->tieneLosCuatroDocumentosGenerados()) {
                 return ['texto' => 'Generar documentos', 'tono' => 'info'];
             }
+            if (!$this->tieneLosCuatroDocumentosGeneradosYDescargados()) {
+                return ['texto' => 'Descargar documentos', 'tono' => 'info'];
+            }
             if (!filled($this->descargos)) {
                 return ['texto' => 'Registrar descargos', 'tono' => 'warn'];
             }
@@ -548,8 +551,8 @@ class ProcesoDisciplinario extends Model
             $paso = 'elaboracion';
             $titulo = 'En Proceso';
             if ($this->puedeEnviarAProceso()) {
-                $detalle = 'Los 4 documentos están listos. Envíe el caso a revisión.';
-                $subMedio = '4 de 4 listos · Enviar a revisión';
+                $detalle = 'Los 4 documentos están generados y descargados. Envíe el caso a revisión.';
+                $subMedio = '4 de 4 descargados · Enviar a revisión';
                 $slotActual = null;
             } else {
                 $detalle = $generados . ' de 4 documentos listos';
@@ -660,8 +663,20 @@ class ProcesoDisciplinario extends Model
         return true;
     }
 
+    public function tieneLosCuatroDocumentosGeneradosYDescargados(): bool
+    {
+        foreach (array_keys(CasoDocumentoEstado::SLOTS) as $slot) {
+            $documento = $this->estadoDelSlot($slot);
+            if (!$documento->estaGenerado() || !$documento->estaDescargado()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /**
-     * Pendiente + los 4 documentos generados → se puede enviar a En Proceso.
+     * Pendiente + los 4 documentos generados y descargados → se puede enviar.
      */
     public function puedeEnviarAProceso(): bool
     {
@@ -669,7 +684,7 @@ class ProcesoDisciplinario extends Model
             return false;
         }
 
-        return $this->tieneLosCuatroDocumentosGenerados();
+        return $this->tieneLosCuatroDocumentosGeneradosYDescargados();
     }
 
     /**

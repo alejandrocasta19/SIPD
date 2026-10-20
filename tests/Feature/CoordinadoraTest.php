@@ -3,11 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\PermisoSolicitud;
+use App\Models\CasoAnexo;
+use App\Models\CasoDocumentoEstado;
+use App\Models\CasoEvidencia;
 use App\Models\ProcesoDisciplinario;
 use App\Models\Aviso;
+use App\Models\RecuperacionContrasena;
 use App\Models\User;
-use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\QueryException;
 use Tests\TestCase;
 
 class CoordinadoraTest extends TestCase
@@ -25,95 +32,24 @@ class CoordinadoraTest extends TestCase
     }
 
     /** @test */
-    public function casos_de_prueba_recorren_el_flujo_real_y_notifican_al_responsable()
-    {
-        $coord = $this->makeUser('coordinadora');
-        $kelly = $this->makeUser('equipo', ['name' => 'Kelly Johanna Rodríguez']);
-        $marshall = $this->makeUser('equipo', ['name' => 'Marshall Stephen Rincón Peña']);
-        $jorge = $this->makeUser('equipo', ['name' => 'Jorge Rosado']);
-        app()->detectEnvironment(function () {
-            return 'local';
-        });
-        $this->withoutMiddleware(VerifyCsrfToken::class);
-
-        $this->actingAs($coord)
-            ->post(route('coordinadora.veredictos.preparar-demo'))
-            ->assertRedirect(route('coordinadora.veredictos'))
-            ->assertSessionHas('success');
-
-        $casoMarshall = ProcesoDisciplinario::where('user_id', $marshall->id)
-            ->where('observacion', '[SIPD-PRUEBA-VEREDICTO]')
-            ->firstOrFail();
-        $this->assertSame('En Proceso', $casoMarshall->estado);
-        $this->assertSame(3, ProcesoDisciplinario::where('observacion', '[SIPD-PRUEBA-VEREDICTO]')->count());
-        $this->assertDatabaseHas('disciplinario', [
-            'user_id' => $kelly->id,
-            'observacion' => '[SIPD-PRUEBA-VEREDICTO]',
-            'nombre' => 'Camila Caso de Prueba',
-        ]);
-        $this->assertDatabaseHas('disciplinario', [
-            'user_id' => $jorge->id,
-            'observacion' => '[SIPD-PRUEBA-VEREDICTO]',
-            'nombre' => 'Valentina Caso de Prueba',
-        ]);
-
-        $this->get(route('coordinadora.veredictos'))
-            ->assertOk()
-            ->assertSee('Preparar casos de prueba reales')
-            ->assertSee('Camila Caso de Prueba')
-            ->assertSee('Andrés Caso de Prueba')
-            ->assertSee('Valentina Caso de Prueba')
-            ->assertSee('Marshall Stephen Rincón Peña');
-
-        $this->put(route('abogado.actualizarestado', $casoMarshall->id), [
-            'veredicto_tipo' => 'sancion',
-            'dias_sancion' => 4,
-            'decision_final' => 'Prueba local de notificación real.',
-        ])->assertRedirect()->assertSessionHas('success');
-
-        $this->assertSame('Sancionado', $casoMarshall->fresh()->estado);
-        $this->assertDatabaseHas('sipd_avisos', [
-            'user_id' => $marshall->id,
-            'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
-            'proceso_id' => $casoMarshall->id,
-        ]);
-        $this->actingAs($marshall)
-            ->get(route('notificaciones.index'))
-            ->assertOk()
-            ->assertSee('Veredicto registrado')
-            ->assertSee('Prueba local de notificación real.');
-
-        $this->actingAs($coord)
-            ->post(route('coordinadora.veredictos.preparar-demo'))
-            ->assertRedirect(route('coordinadora.veredictos'));
-        $this->assertSame(3, ProcesoDisciplinario::where('observacion', '[SIPD-PRUEBA-VEREDICTO]')->count());
-        $this->assertSame(1, Aviso::where('tipo', Aviso::TIPO_RESULTADO_VEREDICTO)
-            ->where('proceso_id', $casoMarshall->id)
-            ->count());
-    }
-
-    /** @test */
-    public function no_se_pueden_preparar_casos_de_prueba_fuera_de_entorno_local()
-    {
-        $coord = $this->makeUser('coordinadora');
-
-        $this->actingAs($coord)
-            ->post(route('coordinadora.veredictos.preparar-demo'))
-            ->assertNotFound();
-
-        $this->get(route('coordinadora.veredictos'))
-            ->assertOk()
-            ->assertDontSee('Preparar casos de prueba reales');
-        $this->assertDatabaseCount('disciplinario', 0);
-    }
-
-    /** @test */
     public function coordinadora_ve_panel_de_supervision()
     {
         $coord = $this->makeUser('coordinadora');
         $rh = $this->makeUser('abogado', ['name' => 'Kelly RH']);
         $caso = $this->makeCaso($rh, ['estado' => 'En Proceso', 'nombre' => 'Conductor Veredicto']);
         $caso->estadoDocumento('disciplinario');
+
+        $this->actingAs($coord)
+            ->get(route('coordinadora.veredictos'))
+            ->assertOk()
+            ->assertSee('Conductor Veredicto')
+            ->assertDontSee('Preparar casos de prueba')
+            ->assertDontSee('Prueba real del flujo')
+            ->assertDontSee('Camila Caso de Prueba');
+
+        $this->actingAs($coord)
+            ->post('/coordinadora/veredictos/preparar-pruebas')
+            ->assertNotFound();
 
         $this->actingAs($coord)
             ->get(route('abogado.dashboard'))
@@ -124,6 +60,43 @@ class CoordinadoraTest extends TestCase
             ->assertSee('Carga del equipo')
             ->assertSee('Kelly RH')
             ->assertDontSee('Sin responsable de RH');
+    }
+
+    /** @test */
+    public function dashboard_cuenta_solo_los_casos_realmente_en_espera_de_veredicto()
+    {
+        $coord = $this->makeUser('coordinadora');
+
+        for ($i = 1; $i <= 7; $i++) {
+            $caso = $this->makeCaso($coord, [
+                'nombre' => 'Descargado sin enviar ' . $i,
+                'estado' => 'Pendiente',
+            ]);
+            $caso->estadoDocumento('disciplinario')->update([
+                'estado' => 'generado',
+                'generado_en' => now(),
+                'descargado_en' => now(),
+            ]);
+        }
+
+        $enEspera = $this->makeCaso($coord, [
+            'nombre' => 'Caso realmente en espera',
+            'estado' => 'En Proceso',
+        ]);
+        $enEspera->estadoDocumento('disciplinario')->update([
+            'estado' => 'generado',
+            'generado_en' => now(),
+            'descargado_en' => now(),
+        ]);
+
+        $this->actingAs($coord)
+            ->get(route('abogado.dashboard'))
+            ->assertOk()
+            ->assertSee('1 pendiente de veredicto.')
+            ->assertSee('1 veredicto')
+            ->assertSee('class="dash-pipe-num">1</div>', false)
+            ->assertSee('Caso realmente en espera')
+            ->assertDontSee('8 pendientes de veredicto.');
     }
 
     /** @test */
@@ -228,6 +201,111 @@ class CoordinadoraTest extends TestCase
     }
 
     /** @test */
+    public function no_reasigna_un_caso_si_no_existe_la_tabla_de_historial()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $origen = $this->makeUser('equipo');
+        $destino = $this->makeUser('equipo');
+        $caso = $this->makeCaso($origen);
+
+        $this->app['db']->connection()
+            ->getSchemaBuilder()
+            ->drop('disciplinario_asignaciones');
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.asignar', $caso->id), [
+                'user_id' => $destino->id,
+            ])
+            ->assertStatus(409);
+
+        $this->assertSame((int) $origen->id, (int) $caso->fresh()->user_id);
+    }
+
+    /** @test */
+    public function las_reasignaciones_y_borrados_conservan_la_atribucion_de_todos_los_responsables()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $responsableInicial = $this->makeUser('equipo', ['name' => 'Responsable inicial de prueba']);
+        $responsableIntermedio = $this->makeUser('equipo', ['name' => 'Responsable intermedio de prueba']);
+        $responsableActual = $this->makeUser('equipo', ['name' => 'Responsable actual de prueba']);
+        $caso = $this->makeCaso($responsableInicial);
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.asignar', $caso->id), [
+                'user_id' => $responsableIntermedio->id,
+            ])
+            ->assertRedirect();
+
+        $this->put(route('coordinadora.asignar', $caso->id), [
+            'user_id' => $responsableActual->id,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('disciplinario_asignaciones', [
+            'caso_id' => $caso->id,
+            'user_id_snapshot' => $responsableInicial->id,
+            'user_name_snapshot' => 'Responsable inicial de prueba',
+            'assigned_at' => null,
+        ]);
+        $this->assertDatabaseHas('disciplinario_asignaciones', [
+            'caso_id' => $caso->id,
+            'user_id_snapshot' => $responsableIntermedio->id,
+            'user_name_snapshot' => 'Responsable intermedio de prueba',
+        ]);
+        $this->assertSame(1, DB::table('disciplinario_asignaciones')
+            ->where('active_case_id', $caso->id)
+            ->count());
+
+        try {
+            DB::table('disciplinario_asignaciones')->insert([
+                'caso_id' => $caso->id,
+                'user_id' => $responsableIntermedio->id,
+                'active_case_id' => $caso->id,
+                'user_id_snapshot' => $responsableIntermedio->id,
+                'user_name_snapshot' => 'Responsable duplicado de prueba',
+                'assigned_at' => now(),
+                'unassigned_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->fail('La base de datos aceptó dos asignaciones activas para el mismo caso.');
+        } catch (QueryException $exception) {
+            $this->assertSame(1, DB::table('disciplinario_asignaciones')
+                ->where('active_case_id', $caso->id)
+                ->count());
+        }
+
+        foreach ([$responsableInicial, $responsableIntermedio, $responsableActual] as $responsable) {
+            $this->from(route('coordinadora.abogados'))
+                ->delete(route('coordinadora.abogados.eliminar', $responsable->id))
+                ->assertRedirect(route('coordinadora.abogados'));
+        }
+
+        $this->assertSame((int) $responsableActual->id, (int) $caso->fresh()->user_id_snapshot);
+        $this->assertDatabaseHas('disciplinario_asignaciones', [
+            'caso_id' => $caso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $responsableInicial->id,
+            'user_name_snapshot' => 'Responsable inicial de prueba',
+        ]);
+        $this->assertDatabaseHas('disciplinario_asignaciones', [
+            'caso_id' => $caso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $responsableIntermedio->id,
+            'user_name_snapshot' => 'Responsable intermedio de prueba',
+        ]);
+        $this->assertDatabaseHas('disciplinario_asignaciones', [
+            'caso_id' => $caso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $responsableActual->id,
+            'user_name_snapshot' => 'Responsable actual de prueba',
+        ]);
+        $this->assertNotNull(DB::table('disciplinario_asignaciones')
+            ->where('caso_id', $caso->id)
+            ->where('user_id_snapshot', $responsableActual->id)
+            ->value('unassigned_at'));
+    }
+
+    /** @test */
     public function equipo_rh_no_puede_asignar_procesos()
     {
         $rh = $this->makeUser('abogado');
@@ -256,7 +334,7 @@ class CoordinadoraTest extends TestCase
                 'nombre' => $caso->nombre,
                 'descripcion_falta' => 'Cambiado',
             ])
-            ->assertRedirect(route('abogado.dashboard'));
+            ->assertForbidden();
 
         $this->assertSame($original, $caso->fresh()->descripcion_falta);
 
@@ -498,7 +576,10 @@ class CoordinadoraTest extends TestCase
             ->assertOk()
             ->assertSee('Aviso de coordinación')
             ->assertSee('Revisar descargos')
-            ->assertSee('El conductor ya respondió');
+            ->assertSee('El conductor ya respondió')
+            ->assertSee('aria-label="Paginación"', false)
+            ->assertSee('Anterior')
+            ->assertSee('Siguiente');
     }
 
     /** @test */
@@ -728,9 +809,9 @@ class CoordinadoraTest extends TestCase
             ->assertSee('Habilitado')
             ->assertSee('Editar integrante ·')
             ->assertSee('Guardar integrante y permisos')
-            ->assertSee('.team-actions button.edit-rh:hover i', false)
-            ->assertSee('color: #f97316 !important', false)
-            ->assertSee('.team-actions button.edit-rh i { color: #94a3b8; }', false)
+            ->assertSee('.team-actions button.edit-rh:hover,', false)
+            ->assertSee('background: #dbeafe; color: #1d4ed8;', false)
+            ->assertSee('background: #f1f5f9;', false)
             ->assertSee('sipd_scroll_restore', false)
             ->assertSee('anchorTop', false)
             ->assertSee('pagerIndex', false)
@@ -748,7 +829,11 @@ class CoordinadoraTest extends TestCase
             ->assertDontSee('Última IP')
             ->assertDontSee('Configurar permisos')
             ->assertDontSee('class="eq-card"', false)
-            ->assertSee('class="sipd-pager"', false)
+            ->assertDontSee('sipd-pager-size', false)
+            ->assertSee('aria-label="Paginación"', false)
+            ->assertSee('Anterior')
+            ->assertSee('class="sipd-page is-current">1</span>', false)
+            ->assertSee('Siguiente')
             ->assertSee('name="cargo"', false)
             ->assertSee('<select name="cargo"', false)
             ->assertSee('Jefe de personal')
@@ -822,12 +907,13 @@ class CoordinadoraTest extends TestCase
     {
         $coord = $this->makeUser('coordinadora');
         $rh = $this->makeUser('abogado', [
-            'name' => 'Marshall Stephen Rincón Peña',
-            'email' => 'marshallrincon@sipd.co',
+            'name' => 'Integrante Inactivo Prueba',
+            'email' => 'integranteinactivo@sipd.co',
             'cargo' => 'Jefe de personal',
         ]);
-        $otro = $this->makeUser('abogado', ['name' => 'Kelly RH']);
+        $otro = $this->makeUser('abogado', ['name' => 'Otra Integrante Prueba']);
         $caso = $this->makeCaso($otro);
+        $casoRh = $this->makeCaso($rh);
 
         $this->actingAs($coord)
             ->put(route('coordinadora.abogados.editar', $rh->id), [
@@ -840,6 +926,11 @@ class CoordinadoraTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertFalse($rh->fresh()->estaActivo());
+        $this->assertDatabaseHas('disciplinario', [
+            'id' => $casoRh->id,
+            'user_id' => $rh->id,
+            'deleted_at' => null,
+        ]);
 
         $this->actingAs($coord)
             ->get(route('coordinadora.abogados'))
@@ -850,8 +941,8 @@ class CoordinadoraTest extends TestCase
         $this->actingAs($coord)
             ->get(route('coordinadora.notificar'))
             ->assertOk()
-            ->assertDontSee('marshallrincon@sipd.co')
-            ->assertDontSee('Marshall Stephen');
+            ->assertDontSee('integranteinactivo@sipd.co')
+            ->assertDontSee('Integrante Inactivo Prueba');
 
         $this->actingAs($coord)
             ->put(route('coordinadora.asignar', $caso->id), [
@@ -870,6 +961,280 @@ class CoordinadoraTest extends TestCase
             ->assertSessionHasErrors('email');
 
         $this->assertGuest();
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.abogados.editar', $rh->id), [
+                'name' => $rh->name,
+                'email' => $rh->email,
+                'cargo' => $rh->cargo,
+                'activo' => '1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertTrue($rh->fresh()->estaActivo());
+        $this->assertDatabaseHas('disciplinario', [
+            'id' => $casoRh->id,
+            'user_id' => $rh->id,
+            'deleted_at' => null,
+        ]);
+        $this->assertSame(1, $rh->fresh()->procesos()->count());
+    }
+
+    /** @test */
+    public function eliminar_integrante_conserva_el_expediente_activo_y_su_atribucion()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('equipo', ['name' => 'Integrante de prueba']);
+        $casoActivo = $this->makeCaso($rh);
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.abogados'))
+            ->delete(route('coordinadora.abogados.eliminar', $rh->id))
+            ->assertRedirect(route('coordinadora.abogados'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('users', ['id' => $rh->id]);
+        $this->assertDatabaseHas('disciplinario', [
+            'id' => $casoActivo->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'user_name_snapshot' => 'Integrante de prueba',
+            'deleted_at' => null,
+        ]);
+    }
+
+    /** @test */
+    public function eliminar_integrante_conserva_expedientes_eliminados_logicamente()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('equipo', ['name' => 'Integrante archivado de prueba']);
+        $casoArchivado = $this->makeCaso($rh, ['estado' => 'Archivado']);
+        $casoArchivado->delete();
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.abogados'))
+            ->delete(route('coordinadora.abogados.eliminar', $rh->id))
+            ->assertRedirect(route('coordinadora.abogados'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('users', ['id' => $rh->id]);
+        $this->assertSoftDeleted('disciplinario', [
+            'id' => $casoArchivado->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'user_name_snapshot' => 'Integrante archivado de prueba',
+        ]);
+    }
+
+    /** @test */
+    public function eliminar_integrante_conserva_expedientes_en_distintos_estados()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('equipo');
+        $casos = [
+            $this->makeCaso($rh, ['estado' => 'Pendiente']),
+            $this->makeCaso($rh, ['estado' => 'En Proceso']),
+            $this->makeCaso($rh, [
+                'estado' => 'Sancionado',
+                'veredicto_tipo' => 'terminacion_justa_causa',
+            ]),
+            $this->makeCaso($rh, ['estado' => 'Archivado']),
+        ];
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.abogados'))
+            ->delete(route('coordinadora.abogados.eliminar', $rh->id))
+            ->assertRedirect(route('coordinadora.abogados'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('users', ['id' => $rh->id]);
+        foreach ($casos as $caso) {
+            $this->assertDatabaseHas('disciplinario', [
+                'id' => $caso->id,
+                'user_id' => null,
+                'user_id_snapshot' => $rh->id,
+                'deleted_at' => null,
+            ]);
+        }
+    }
+
+    /** @test */
+    public function eliminar_integrante_conserva_archivos_descargos_documentos_y_registros_auxiliares()
+    {
+        Storage::fake('local');
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('equipo', ['name' => 'Responsable histórico de prueba']);
+        $caso = $this->makeCaso($rh);
+
+        CasoDocumentoEstado::create([
+            'caso_id' => $caso->id,
+            'tipo_documento' => 'disciplinario',
+            'estado' => 'generado',
+            'generado_en' => now(),
+        ]);
+
+        $evidenciaPath = 'evidencias/historica.pdf';
+        Storage::disk('local')->put($evidenciaPath, 'evidencia de prueba');
+        $evidencia = CasoEvidencia::create([
+            'caso_id' => $caso->id,
+            'user_id' => $rh->id,
+            'nombre_original' => 'evidencia.pdf',
+            'nombre_almacenado' => 'evidencia.pdf',
+            'extension' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'tamano' => 19,
+            'ruta_segura' => $evidenciaPath,
+        ]);
+
+        $anexoPath = 'anexos/' . $caso->id . '/descargo.pdf';
+        Storage::disk('local')->put($anexoPath, 'descargo de prueba');
+        $anexo = CasoAnexo::create([
+            'caso_id' => $caso->id,
+            'user_id' => $rh->id,
+            'tipo' => CasoAnexo::TIPO_DESCARGOS,
+            'estado' => CasoAnexo::ESTADO_CARGADO,
+            'nombre_original' => 'descargo.pdf',
+            'nombre_almacenado' => 'descargo.pdf',
+            'extension' => 'pdf',
+            'mime_type' => 'application/pdf',
+            'tamano' => 18,
+            'ruta_segura' => $anexoPath,
+        ]);
+
+        $permiso = $rh->permisos()->firstOrFail();
+        $solicitud = PermisoSolicitud::create([
+            'user_id' => $rh->id,
+            'permiso' => 'editar_casos',
+            'que_hara' => 'Actualizar un expediente de prueba',
+            'motivo' => 'Prueba de conservación histórica',
+            'horas' => 1,
+            'estado' => PermisoSolicitud::OTORGADA,
+            'responded_by' => $rh->id,
+            'responded_at' => now(),
+        ]);
+        $aviso = Aviso::enviar($rh, [
+            'remitente_id' => $rh->id,
+            'tipo' => Aviso::TIPO_AVISO,
+            'titulo' => 'Aviso de prueba',
+            'cuerpo' => 'Registro histórico de prueba.',
+        ]);
+        $recuperacion = RecuperacionContrasena::create([
+            'user_id' => $rh->id,
+            'estado' => RecuperacionContrasena::RECHAZADA,
+            'responded_by' => $rh->id,
+            'responded_at' => now(),
+        ]);
+        DB::table('sipd_alerta_silencios')->insert([
+            'user_id' => $rh->id,
+            'tipo' => 'caso',
+            'proceso_id' => $caso->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.abogados'))
+            ->delete(route('coordinadora.abogados.eliminar', $rh->id))
+            ->assertRedirect(route('coordinadora.abogados'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('users', ['id' => $rh->id]);
+        $this->assertDatabaseHas('caso_documento_estados', ['caso_id' => $caso->id]);
+        $this->assertDatabaseHas('caso_evidencias', [
+            'id' => $evidencia->id,
+            'caso_id' => $caso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'user_name_snapshot' => 'Responsable histórico de prueba',
+        ]);
+        $this->assertDatabaseHas('caso_anexos', [
+            'id' => $anexo->id,
+            'caso_id' => $caso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'user_name_snapshot' => 'Responsable histórico de prueba',
+        ]);
+        $this->assertDatabaseHas('user_permisos', [
+            'id' => $permiso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'user_name_snapshot' => 'Responsable histórico de prueba',
+        ]);
+        $this->assertDatabaseHas('permiso_solicitudes', [
+            'id' => $solicitud->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'user_name_snapshot' => 'Responsable histórico de prueba',
+            'responded_by' => $rh->id,
+            'responded_by_id_snapshot' => $rh->id,
+        ]);
+        $this->assertDatabaseHas('sipd_avisos', [
+            'id' => $aviso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'remitente_id_snapshot' => $rh->id,
+        ]);
+        $this->assertDatabaseHas('sipd_recuperaciones_contrasena', [
+            'id' => $recuperacion->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'responded_by' => null,
+            'responded_by_id_snapshot' => $rh->id,
+        ]);
+        $this->assertDatabaseHas('sipd_alerta_silencios', [
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+            'proceso_id' => $caso->id,
+        ]);
+        Storage::disk('local')->assertExists($evidenciaPath);
+        Storage::disk('local')->assertExists($anexoPath);
+    }
+
+    /** @test */
+    public function la_ruta_de_eliminacion_del_equipo_no_acepta_cuentas_de_coordinacion()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $otroRol = User::factory()->create(['role' => 'auditor']);
+
+        $this->actingAs($coord)
+            ->delete(route('coordinadora.abogados.eliminar', $coord->id))
+            ->assertNotFound();
+
+        $this->actingAs($coord)
+            ->delete(route('coordinadora.abogados.eliminar', $otroRol->id))
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $coord->id,
+            'role' => User::ROLE_ADMIN,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $otroRol->id,
+            'role' => 'auditor',
+        ]);
+    }
+
+    /** @test */
+    public function eliminar_integrante_sin_expedientes_conserva_el_historial_de_permisos()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $rh = $this->makeUser('equipo');
+        $permiso = $rh->permisos()->firstOrFail();
+        $this->assertSame(0, $rh->procesos()->count());
+
+        $this->actingAs($coord)
+            ->from(route('coordinadora.abogados'))
+            ->delete(route('coordinadora.abogados.eliminar', $rh->id))
+            ->assertRedirect(route('coordinadora.abogados'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('users', ['id' => $rh->id]);
+        $this->assertDatabaseHas('user_permisos', [
+            'id' => $permiso->id,
+            'user_id' => null,
+            'user_id_snapshot' => $rh->id,
+        ]);
     }
 
     /** @test */

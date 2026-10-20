@@ -37,8 +37,8 @@
         <article class="recovery-card">
             <div class="recovery-top">
                 <div>
-                    <b>{{ $solicitud->user->name }}</b>
-                    <small>{{ $solicitud->user->email }} · {{ $solicitud->created_at->format('d/m/Y H:i') }}</small>
+                    <b>{{ $solicitud->user->name ?? $solicitud->user_name_snapshot ?? 'Cuenta eliminada' }}</b>
+                    <small>{{ $solicitud->user->email ?? 'Cuenta eliminada' }} · {{ $solicitud->created_at->format('d/m/Y H:i') }}</small>
                 </div>
                 <span class="stat-chip yellow">Pendiente</span>
             </div>
@@ -46,10 +46,14 @@
             <form class="recovery-actions" method="POST" action="{{ route('coordinadora.recuperaciones.responder', $solicitud->id) }}">
                 @csrf
                 @method('PUT')
-                <button type="submit" name="accion" value="enviar_enlace" class="recovery-send"
-                        data-confirm="Se enviará al correo registrado un enlace de un solo uso para crear una contraseña nueva."
-                        data-confirm-title="Aprobar recuperación"
-                        data-confirm-ok="Enviar enlace">Aprobar y enviar enlace</button>
+                @if($solicitud->user)
+                    <button type="submit" name="accion" value="enviar_enlace" class="recovery-send"
+                            data-confirm="Se enviará al correo registrado un enlace de un solo uso para crear una contraseña nueva."
+                            data-confirm-title="Aprobar recuperación"
+                            data-confirm-ok="Enviar enlace">Aprobar y enviar enlace</button>
+                @else
+                    <small>La cuenta fue eliminada; solo se conserva el registro histórico.</small>
+                @endif
                 <button type="submit" name="accion" value="rechazar" class="recovery-reject"
                         data-confirm="La solicitud quedará rechazada. La persona podrá volver a solicitarla."
                         data-confirm-title="Rechazar solicitud"
@@ -68,9 +72,14 @@
         @foreach($historial as $solicitud)
             <div class="recovery-history">
                 <div>
-                    <b>{{ $solicitud->user->name }}</b> · {{ $solicitud->user->email }} ·
+                    <b>{{ $solicitud->user->name ?? $solicitud->user_name_snapshot ?? 'Cuenta eliminada' }}</b> ·
+                    {{ $solicitud->user->email ?? 'Cuenta eliminada' }} ·
                     {{ $solicitud->estado === \App\Models\RecuperacionContrasena::ENLACE_ENVIADO ? 'Enlace enviado' : 'Rechazada' }}
-                    @if($solicitud->respondente) · {{ $solicitud->respondente->name }} @endif
+                    @if($solicitud->respondente)
+                        · {{ $solicitud->respondente->name }}
+                    @elseif($solicitud->responded_by_name_snapshot)
+                        · {{ $solicitud->responded_by_name_snapshot }}
+                    @endif
                 </div>
                 <time>{{ optional($solicitud->responded_at)->format('d/m/Y H:i') }}</time>
             </div>

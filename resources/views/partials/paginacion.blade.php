@@ -1,8 +1,6 @@
 @php
     $paginador = $paginador ?? null;
-    $etiqueta  = $etiqueta  ?? 'registros';
     if ($paginador) {
-        $hayDatos = $paginador->total() > 0;
         $pagina   = $paginador->currentPage();
         $ultima   = $paginador->lastPage();
         $desde    = max(1, $pagina - 2);
@@ -11,21 +9,13 @@
 @endphp
 @if($paginador)
     <div class="sipd-pager">
-        @if($hayDatos)
-            <span class="sipd-pager-count">
-                {{ $paginador->firstItem() }}-{{ $paginador->lastItem() }} de {{ $paginador->total() }} {{ $etiqueta }}
-            </span>
-        @else
-            <span class="sipd-pager-count">0 {{ $etiqueta }}</span>
-        @endif
-
-        @if($hayDatos && $paginador->hasPages())
-            <nav class="sipd-pager-pages" aria-label="Paginación">
-                @if($paginador->onFirstPage())
-                    <span class="sipd-page is-off">Anterior</span>
-                @else
-                    <a class="sipd-page sipd-page-nav" href="{{ $paginador->previousPageUrl() }}">Anterior</a>
-                @endif
+        <nav class="sipd-pager-pages" aria-label="Paginación">
+            @if($paginador->onFirstPage())
+                <span class="sipd-page is-off">Anterior</span>
+            @else
+                <a class="sipd-page sipd-page-nav" href="{{ $paginador->previousPageUrl() }}">Anterior</a>
+            @endif
+            @if($paginador->total() > 0)
                 @for($n = $desde; $n <= $hasta; $n++)
                     @if($n === $pagina)
                         <span class="sipd-page is-current">{{ $n }}</span>
@@ -33,13 +23,13 @@
                         <a class="sipd-page sipd-page-nav" href="{{ $paginador->url($n) }}">{{ $n }}</a>
                     @endif
                 @endfor
-                @if($paginador->hasMorePages())
-                    <a class="sipd-page sipd-page-nav" href="{{ $paginador->nextPageUrl() }}">Siguiente</a>
-                @else
-                    <span class="sipd-page is-off">Siguiente</span>
-                @endif
-            </nav>
-        @endif
+            @endif
+            @if($paginador->hasMorePages())
+                <a class="sipd-page sipd-page-nav" href="{{ $paginador->nextPageUrl() }}">Siguiente</a>
+            @else
+                <span class="sipd-page is-off">Siguiente</span>
+            @endif
+        </nav>
     </div>
 
     <script>

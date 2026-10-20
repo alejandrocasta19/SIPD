@@ -5,22 +5,24 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use App\Models\ProcesoDisciplinario;
 use App\Models\Aviso;
 use App\Models\CasoEvidencia;
 use App\Models\CasoDocumentoEstado;
 use App\Support\Paginacion;
+use App\Support\CaseFilePath;
 use App\Services\OfficialDocumentService;
 use App\Services\FirmaDocumentoService;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 class DocumentoController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permiso:ver_documentos')->only(['hub', 'index', 'edit', 'preview']);
+        $this->middleware('permiso:ver_documentos')->only(['hub', 'index', 'edit']);
         $this->middleware('permiso:editar_documentos')->only(['elegirVariante']);
-        // download() maneja su propio control: primera descarga libre, las siguientes requieren permiso
         $this->middleware('permiso:subir_anexos')->only(['storeEvidencia']);
         $this->middleware('permiso:eliminar_anexos')->only(['destroyEvidencia']);
     }
@@ -360,14 +362,11 @@ class DocumentoController extends Controller
     {
         $this->assertValidTipo($tipo);
         $caso = $this->accessibleCase($id);
+        $user = auth()->user();
 
-        // Verificar acceso: la primera descarga de un documento es libre.
-        // Si ya fue descargado antes, se necesita el permiso descargar_documentos.
         $estadoDocPrev = $caso->estadoDocumento($tipo);
-        $yaGenerado = $estadoDocPrev->estado === 'generado';
-        $esPrimeraDescarga = $estadoDocPrev->descargado_en === null;
-        if (!$esPrimeraDescarga) {
-            auth()->user()->exigir('descargar_documentos');
+        if ($estadoDocPrev->descargado_en !== null) {
+            $user->exigir('descargar_documentos');
         }
 
         try {
@@ -388,28 +387,93 @@ class DocumentoController extends Controller
                 $response = $documents->downloadOfficial($caso, $tipo, $filename);
             }
 
+            if (!$response instanceof BinaryFileResponse) {
+                throw new \RuntimeException('El generador no devolvió un archivo descargable.');
+            }
+
+            $filePath = $response->getFile()->getPathname();
+            if (!is_file($filePath) || !is_readable($filePath) || ($file = @fopen($filePath, 'rb')) === false) {
+                throw new \RuntimeException('El archivo generado no está disponible para su descarga.');
+            }
+            fclose($file);
         } catch (ValidationException $e) {
             return back()
                 ->withErrors($e->errors())
                 ->with('error', 'Completa todos los bloques obligatorios antes de generar el documento.');
         } catch (Throwable $e) {
+            if (isset($response) && $response instanceof BinaryFileResponse) {
+                $this->discardPendingDownload($response);
+            }
             report($e);
             return back()->with('error', 'No fue posible generar el documento institucional.');
         }
 
-        $estadoDoc = $caso->estadoDocumento($tipo);
-        $payload = ['descargado_en' => now()];
-        if (!$yaGenerado) {
-            $payload['estado'] = 'generado';
-            $payload['generado_en'] = $estadoDoc->generado_en ?? now();
-        }
-        $estadoDoc->update($payload);
+        try {
+            $resultadoDescarga = DB::transaction(function () use ($caso, $tipo, $user) {
+                $estadoDoc = CasoDocumentoEstado::query()
+                    ->where('caso_id', $caso->id)
+                    ->where('tipo_documento', $tipo)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-        if (!$yaGenerado) {
+                if ($estadoDoc->descargado_en !== null && !$user->puede('descargar_documentos')) {
+                    return [false, false];
+                }
+
+                if ($estadoDoc->descargado_en !== null) {
+                    return [true, false];
+                }
+
+                $generadoAhora = $estadoDoc->estado !== 'generado';
+                $payload = [
+                    'descargado_en' => now(),
+                    'updated_at' => now(),
+                ];
+                if ($generadoAhora) {
+                    $payload['estado'] = 'generado';
+                    $payload['generado_en'] = $estadoDoc->generado_en ?? now();
+                }
+                $actualizado = CasoDocumentoEstado::query()
+                    ->whereKey($estadoDoc->id)
+                    ->whereNull('descargado_en')
+                    ->update($payload);
+
+                if ($actualizado === 1) {
+                    return [true, $generadoAhora];
+                }
+
+                $estadoDoc->refresh();
+                return [
+                    $estadoDoc->descargado_en !== null && $user->puede('descargar_documentos'),
+                    false,
+                ];
+            });
+        } catch (Throwable $e) {
+            $this->discardPendingDownload($response);
+            throw $e;
+        }
+
+        [$puedeCompletarDescarga, $generadoAhora] = $resultadoDescarga;
+        if (!$puedeCompletarDescarga) {
+            $this->discardPendingDownload($response);
+            abort(403, 'No tienes permiso para volver a descargar este documento.');
+        }
+
+        if ($generadoAhora) {
             $this->notificarFirmaPendiente($caso, $tipo);
         }
 
+        $response->headers->set('X-SIPD-Download-Registered', '1');
+
         return $response;
+    }
+
+    private function discardPendingDownload(BinaryFileResponse $response): void
+    {
+        $path = $response->getFile()->getPathname();
+        if (is_file($path) && !@unlink($path)) {
+            report(new \RuntimeException('No se pudo eliminar un archivo temporal de descarga rechazado.'));
+        }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -472,11 +536,23 @@ class DocumentoController extends Controller
      */
     public function downloadEvidencia(int $id, int $evidenciaId)
     {
+        auth()->user()->exigir('descargar_anexos');
+
         $caso      = $this->accessibleCase($id);
         $evidencia = $caso->evidencias()->findOrFail($evidenciaId);
 
-        $ruta = storage_path('app/' . $evidencia->ruta_segura);
-        abort_unless(file_exists($ruta), 404);
+        $rutaPersistida = (string) $evidencia->ruta_segura;
+        if (strpos($rutaPersistida, 'public/') === 0) {
+            $rutaPublica = substr($rutaPersistida, strlen('public/'));
+            $ruta = CaseFilePath::resolve($rutaPublica, ['documentos'], 'public');
+        } else {
+            $ruta = CaseFilePath::resolve(
+                $rutaPersistida,
+                ['documentos', 'evidencias/' . $caso->id],
+                'local'
+            );
+        }
+        abort_unless($ruta, 404);
 
         return response()->download($ruta, $evidencia->nombre_original);
     }

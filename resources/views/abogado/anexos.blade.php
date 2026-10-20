@@ -206,7 +206,7 @@
                 </td>
                 <td>
                     {{ optional($anexo->created_at)->format('d/m/Y') }}
-                    <span class="hub-sub">{{ $anexo->user->name ?? '—' }}</span>
+                    <span class="hub-sub">{{ $anexo->user->name ?? $anexo->user_name_snapshot ?? '—' }}</span>
                 </td>
                 <td>
                     @php

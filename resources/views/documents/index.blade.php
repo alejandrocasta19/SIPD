@@ -66,7 +66,11 @@
                 <strong>{{ $evidencia->nombre_original }}</strong>
                 @if($evidencia->descripcion)<small>{{ $evidencia->descripcion }}</small>@endif
             </div>
-            <a href="{{ route('documentos.evidencias.download', [$caso->id, $evidencia->id]) }}">Descargar</a>
+            @if(auth()->user()->puede('descargar_anexos'))
+                <a href="{{ route('documentos.evidencias.download', [$caso->id, $evidencia->id]) }}">Descargar</a>
+            @else
+                <span>{{ $evidencia->nombre_original }}</span>
+            @endif
         </div>
     @empty
         <p>No hay evidencias cargadas en este expediente.</p>

@@ -30,51 +30,6 @@ class CoordinadoraController extends Controller
         ]);
     }
 
-    public function prepararCasosDemoVeredictos()
-    {
-        abort_unless(app()->environment('local'), 404);
-        abort_unless(auth()->user()->esCoordinadora(), 403);
-
-        $responsables = collect(['Kelly', 'Marshall', 'Jorge'])->map(function ($nombre) {
-            return User::where('role', User::ROLE_EQUIPO)
-                ->where('name', 'like', '%' . $nombre . '%')
-                ->first();
-        });
-
-        if ($responsables->contains(null)) {
-            return redirect()->route('coordinadora.veredictos')
-                ->with('error', 'No se encontraron las cuentas Kelly, Marshall y Jorge con rol de abogado/RH para preparar los casos de prueba.');
-        }
-
-        $marcador = '[SIPD-PRUEBA-VEREDICTO]';
-        $nombres = ['Camila Caso de Prueba', 'Andrés Caso de Prueba', 'Valentina Caso de Prueba'];
-
-        \Illuminate\Support\Facades\DB::transaction(function () use ($responsables, $marcador, $nombres) {
-            foreach ($responsables as $index => $responsable) {
-                ProcesoDisciplinario::firstOrCreate(
-                    [
-                        'user_id' => $responsable->id,
-                        'observacion' => $marcador,
-                    ],
-                    [
-                        'nombre' => $nombres[$index],
-                        'cedula' => 'DEMO-' . $responsable->id,
-                        'cargo' => 'Caso ficticio para validar veredictos',
-                        'modalidad' => 'Administrativos',
-                        'tipo_proceso' => 'disciplinario',
-                        'tipo_falta' => 'Caso de prueba de veredicto',
-                        'descripcion_falta' => 'Registro ficticio local para comprobar el cambio de estado y el aviso real al responsable.',
-                        'fecha_falta' => now()->toDateString(),
-                        'estado' => 'En Proceso',
-                    ]
-                );
-            }
-        });
-
-        return redirect()->route('coordinadora.veredictos')
-            ->with('success', 'Casos de prueba creados en la cola real. Al registrar cada veredicto se guardará el resultado y se enviará un aviso a la cuenta RH asignada.');
-    }
-
     public function solicitudes()
     {
         abort_unless(auth()->user()->esCoordinadora(), 403);
@@ -156,7 +111,7 @@ class CoordinadoraController extends Controller
             return back()->with('success', 'Solicitud rechazada.');
         }
 
-        if (!$solicitud->user->esEquipo() || !$solicitud->user->estaActivo()) {
+        if (!$solicitud->user || !$solicitud->user->esEquipo() || !$solicitud->user->estaActivo()) {
             return back()->with('error', 'Solo se puede recuperar la contraseña de una cuenta activa del equipo.');
         }
 
@@ -195,16 +150,22 @@ class CoordinadoraController extends Controller
                 'respuesta' => $request->input('respuesta'),
             ]);
 
-            Aviso::enviar($solicitud->user, [
-                'remitente_id' => auth()->id(),
-                'tipo' => Aviso::TIPO_PERMISO,
-                'titulo' => 'Permiso rechazado',
-                'cuerpo' => 'No se otorgó ' . $solicitud->etiquetaPermiso() . '.',
-                'motivo' => $request->input('respuesta'),
-                'solicitud_id' => $solicitud->id,
-            ]);
+            if ($solicitud->user) {
+                Aviso::enviar($solicitud->user, [
+                    'remitente_id' => auth()->id(),
+                    'tipo' => Aviso::TIPO_PERMISO,
+                    'titulo' => 'Permiso rechazado',
+                    'cuerpo' => 'No se otorgó ' . $solicitud->etiquetaPermiso() . '.',
+                    'motivo' => $request->input('respuesta'),
+                    'solicitud_id' => $solicitud->id,
+                ]);
+            }
 
             return back()->with('success', 'Solicitud rechazada.');
+        }
+
+        if (!$solicitud->user) {
+            return back()->with('error', 'No se puede otorgar un permiso a una cuenta eliminada; el registro se conserva.');
         }
 
         $solicitables = array_keys(RhPermisos::solicitables());

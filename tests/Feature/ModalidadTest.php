@@ -153,6 +153,7 @@ class ModalidadTest extends TestCase
                 'cedula' => '1075000002',
                 'modalidad' => 'Terminal',
                 'placa' => 'GRK206',
+                'numero_interno' => '042',
                 'cargo' => 'Conductor',
             ])
             ->assertRedirect();
@@ -171,6 +172,7 @@ class ModalidadTest extends TestCase
                 'cedula' => '1075123458',
                 'modalidad' => 'Urbanos',
                 'placa' => 'URB100',
+                'numero_interno' => '043',
                 'cargo' => 'Conductor',
             ])
             ->assertRedirect();
@@ -182,6 +184,7 @@ class ModalidadTest extends TestCase
                 'cedula' => '1075123459',
                 'modalidad' => 'Encomiendas',
                 'placa' => 'ENC200',
+                'numero_interno' => '044',
                 'cargo' => 'Conductor',
             ])
             ->assertRedirect();
@@ -282,13 +285,13 @@ class ModalidadTest extends TestCase
             ->assertOk()
             ->assertSee('Placa del vehículo')
             ->assertSee('field-label">Cargo', false)
-            ->assertSee('id="placa-field" style="margin-top:14px;" hidden', false)
+            ->assertSee('id="placa-fields-row" style="display:flex;gap:14px;margin-top:14px;" hidden', false)
             ->assertDontSee('id="cargo-field" style="margin-top:14px;" hidden', false);
 
         $this->actingAs($kelly)
             ->get(route('abogado.registro', ['modalidad' => 'Recursos humanos']))
             ->assertOk()
-            ->assertSee('id="placa-field" style="margin-top:14px;" hidden', false)
+            ->assertSee('id="placa-fields-row" style="display:flex;gap:14px;margin-top:14px;" hidden', false)
             ->assertSee('id="cargo-field" style="margin-top:14px;" hidden', false);
 
         $this->actingAs($kelly)

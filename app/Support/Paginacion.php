@@ -8,21 +8,13 @@ use Illuminate\Support\Collection;
 
 class Paginacion
 {
-    public const OPCIONES = [5, 10, 15];
+    public const OPCIONES = [5];
     public const DEFAULT = 5;
-    public const MAX = 100;
+    public const MAX = 5;
 
     public static function porPagina(?Request $request = null, int $default = self::DEFAULT, string $pageName = 'page'): int
     {
-        $request = $request ?: request();
-        $paramName = $pageName === 'page' ? 'per_page' : "per_page_{$pageName}";
-        $valor = (int) $request->input($paramName, $default);
-
-        if ($valor < 1) {
-            return $default;
-        }
-
-        return min($valor, self::MAX);
+        return self::DEFAULT;
     }
 
     public static function esPreset(int $cantidad): bool

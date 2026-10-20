@@ -62,7 +62,7 @@
         <article class="sol-card">
             <div class="sol-top">
                 <div>
-                    <b>{{ $solicitud->user->name }}</b>
+                    <b>{{ $solicitud->user->name ?? $solicitud->user_name_snapshot ?? 'Cuenta eliminada' }}</b>
                     <small>{{ $solicitud->created_at->format('d/m/Y H:i') }} · pidió {{ $solicitud->horas }} hora{{ $solicitud->horas === 1 ? '' : 's' }}</small>
                 </div>
                 <span class="stat-chip yellow">{{ $solicitud->etiquetaPermiso() }}</span>
@@ -71,6 +71,7 @@
                 <div><span>Qué va a hacer</span><div>{{ $solicitud->que_hara }}</div></div>
                 <div><span>Por qué</span><div>{{ $solicitud->motivo }}</div></div>
             </div>
+            @if($solicitud->user)
             <form class="sol-form" method="POST" action="{{ route('coordinadora.solicitudes.responder', $solicitud->id) }}" data-grant>
                 @csrf
                 @method('PUT')
@@ -105,6 +106,14 @@
                         data-confirm-ok="Rechazar"
                         data-confirm-danger="1">Rechazar</button>
             </form>
+            @else
+                <p>La cuenta asociada fue eliminada; no se puede otorgar el permiso. Puedes cerrar la solicitud conservada en el historial.</p>
+                <form method="POST" action="{{ route('coordinadora.solicitudes.responder', $solicitud->id) }}">
+                    @csrf
+                    @method('PUT')
+                    <button type="submit" name="accion" value="rechazar" class="no">Cerrar solicitud</button>
+                </form>
+            @endif
         </article>
     @empty
         <div class="sol-card empty">No hay solicitudes pendientes.</div>
@@ -129,10 +138,14 @@
         @foreach($historial as $item)
             <div class="hist">
                 <div>
-                    <b>{{ $item->user->name }}</b> · {{ $item->etiquetaPermiso() }} ·
+                    <b>{{ $item->user->name ?? $item->user_name_snapshot ?? 'Cuenta eliminada' }}</b> · {{ $item->etiquetaPermiso() }} ·
                     {{ $item->estado === 'otorgada' ? 'Otorgada' : 'Rechazada' }}
                     ({{ $item->horas }} h)
-                    @if($item->respondente) · {{ $item->respondente->name }} @endif
+                    @if($item->respondente)
+                        · {{ $item->respondente->name }}
+                    @elseif($item->responded_by_name_snapshot)
+                        · {{ $item->responded_by_name_snapshot }}
+                    @endif
                     · {{ optional($item->responded_at)->format('d/m/Y H:i') }}
                 </div>
                 <form method="POST" action="{{ route('coordinadora.solicitudes.destroy', $item->id) }}"

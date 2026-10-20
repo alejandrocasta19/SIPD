@@ -22,7 +22,7 @@
                         </button>
                     </form>
                 @endif
-                @if($avisos->total() > 0)
+                @if($avisos->total() > 0 && $puedeBorrar)
                     <form method="POST" action="{{ route('notificaciones.leidas') }}"
                           data-confirm="Se borrarán las notificaciones que ya leíste."
                           data-confirm-title="Eliminar leídas"
@@ -287,7 +287,7 @@
                         <b>{{ $aviso->titulo }}</b>
                         <div class="av-meta">
                             <i class="fas fa-user-circle" style="font-size:11px;"></i>
-                            {{ $aviso->remitente->name ?? 'SIPD' }}
+                            {{ $aviso->remitente->name ?? $aviso->remitente_name_snapshot ?? 'SIPD' }}
                             <span class="av-sep">·</span>
                             <time title="{{ $aviso->created_at->format('d/m/Y H:i') }}">
                                 {{ $aviso->created_at->diffForHumans() }}
@@ -313,17 +313,19 @@
                     @else
                         <small class="av-state" data-state="{{ $aviso->id }}">Nueva</small>
                     @endif
-                    <form method="POST" action="{{ route('notificaciones.destroy', $aviso->id) }}"
-                          data-confirm="Esta notificación se quitará de tu bandeja permanentemente."
-                          data-confirm-title="Eliminar notificación"
-                          data-confirm-ok="Eliminar"
-                          data-confirm-danger="1">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="av-del" title="Eliminar">
-                            <i class="far fa-trash-alt"></i>
-                        </button>
-                    </form>
+                    @if($puedeBorrar)
+                        <form method="POST" action="{{ route('notificaciones.destroy', $aviso->id) }}"
+                              data-confirm="Esta notificación se quitará de tu bandeja permanentemente."
+                              data-confirm-title="Eliminar notificación"
+                              data-confirm-ok="Eliminar"
+                              data-confirm-danger="1">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="av-del" title="Eliminar">
+                                <i class="far fa-trash-alt"></i>
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </article>
         @empty

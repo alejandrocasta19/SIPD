@@ -737,11 +737,15 @@
             var permisoModal = document.getElementById('modalSolicitarPermiso');
             var openPermiso = document.getElementById('open-permiso-modal');
             var closePermiso = document.getElementById('cerrar-permiso-modal');
-            function abrirPermisoModal(permiso) {
+            function abrirPermisoModal(permiso, queHara) {
                 if (!permisoModal) return;
                 if (permiso) {
                     var sel = document.getElementById('sol-permiso');
                     if (sel) sel.value = permiso;
+                }
+                if (queHara) {
+                    var queHaraInput = document.querySelector('#formSolicitarPermiso textarea[name="que_hara"]');
+                    if (queHaraInput) queHaraInput.value = queHara;
                 }
                 permisoModal.style.display = 'flex';
             }
@@ -821,29 +825,6 @@
                     input.type = visible ? 'password' : 'text';
                     button.textContent = visible ? 'Ver' : 'Ocultar';
                 });
-            });
-
-            document.querySelectorAll('.sipd-pager-size').forEach(function (form) {
-                var choice = form.querySelector('.sipd-pager-choice');
-                var input = form.querySelector('.sipd-pager-custom');
-                var go = form.querySelector('.sipd-pager-go');
-                if (!choice || !input) return;
-                function sync(submitPreset) {
-                    var custom = choice.value === 'custom';
-                    input.classList.toggle('is-hidden', !custom);
-                    if (go) go.classList.toggle('is-hidden', !custom);
-                    if (!custom) {
-                        input.value = choice.value;
-                        if (submitPreset) {
-                            guardarScrollAntesDeNavegar(form.action, form.closest('.sipd-pager'));
-                            form.submit();
-                        }
-                    } else if (submitPreset) {
-                        input.focus();
-                        input.select();
-                    }
-                }
-                choice.addEventListener('change', function () { sync(true); });
             });
 
             function guardarScrollAntesDeNavegar(url, ancla) {

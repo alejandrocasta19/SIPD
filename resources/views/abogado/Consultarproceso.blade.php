@@ -321,7 +321,7 @@
                         <td>{{ $proceso->tipo_falta ?: '—' }}</td>
                         <td>{{ $proceso->fecha_falta ? \Carbon\Carbon::parse($proceso->fecha_falta)->format('Y-m-d') : '—' }}</td>
                         @if($esCoordinadora)
-                            <td>{{ $proceso->user->name ?? 'Sin asignar' }}</td>
+                            <td>{{ $proceso->user->name ?? $proceso->user_name_snapshot ?? 'Sin asignar' }}</td>
                         @endif
                         <td>
                             @if($estadoLista === 'Pendiente')

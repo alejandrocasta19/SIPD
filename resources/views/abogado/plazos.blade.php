@@ -312,6 +312,7 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                                                     default                         => '#64748b',
                                                 };
                                             @endphp
+                                            @if(auth()->user()->puede('descargar_anexos'))
                                             <a href="{{ route('abogado.plazos.descargos.download', $af->id) }}"
                                                style="display:inline-flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:3px 7px;text-decoration:none;max-width:230px;"
                                                title="{{ $af->nombre_original }}">
@@ -319,6 +320,12 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                                                 <span style="font-size:11px;color:#334155;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ Str::limit($af->nombre_original, 20) }}</span>
                                                 <span style="font-size:10px;color:#94a3b8;flex-shrink:0;">{{ $af->tamanoLegible() }}</span>
                                             </a>
+                                            @else
+                                                <span title="No tienes permiso para descargar este archivo">
+                                                    <i class="fas {{ $iconoCls }}" style="color:{{ $iconoColor }};font-size:12px;"></i>
+                                                    {{ Str::limit($af->nombre_original, 20) }}
+                                                </span>
+                                            @endif
                                         @endforeach
                                     </div>
                                 @endif

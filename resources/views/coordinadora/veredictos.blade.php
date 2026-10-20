@@ -15,12 +15,6 @@
         </div>
         <div class="proc-head-side">
             <span class="stat-chip">{{ $procesos->total() }} pendiente{{ $procesos->total() === 1 ? '' : 's' }}</span>
-            @if(app()->environment('local'))
-                <form method="POST" action="{{ route('coordinadora.veredictos.preparar-demo') }}">
-                    @csrf
-                    <button class="btn-alt" type="submit"><i class="fas fa-flask"></i> Preparar casos de prueba reales</button>
-                </form>
-            @endif
             <a class="btn-alt" href="{{ route('abogado.consultarproceso') }}"><i class="fas fa-search"></i> Todos los procesos</a>
         </div>
     </div>
@@ -70,7 +64,7 @@
                     <b>{{ $proceso->nombre }}</b>
                     <small>{{ \App\Support\Modalidades::etiquetaCaso($proceso->modalidad, $proceso->cargo) }} · {{ $proceso->tipo_falta ?: 'Sin tipificar' }} · En Proceso</small>
                 </div>
-                <div class="ver-rh">{{ $proceso->user->name ?? 'Sin RH asignado' }}</div>
+                <div class="ver-rh">{{ $proceso->user->name ?? $proceso->user_name_snapshot ?? 'Sin RH asignado' }}</div>
                 <div class="ver-acts">
                     <form id="veredicto-form-{{ $proceso->id }}" action="{{ route('abogado.actualizarestado', $proceso->id) }}" method="POST"
                           data-confirm="El veredicto será definitivo y se notificará al responsable para comunicar el resultado al trabajador."
@@ -94,8 +88,8 @@
                             <input type="number" name="dias_sancion" min="1" step="1" inputmode="numeric" pattern="[0-9]*" placeholder="Ej. 5" disabled data-veredicto-days>
                         </label>
                         <label class="ver-field">
-                            <span>Justificación <small style="font-weight:400;color:#94a3b8">(opcional)</small></span>
-                            <textarea name="decision_final" rows="1" maxlength="5000" placeholder="Escribe la justificación del resultado"></textarea>
+                            <span>Justificación <small data-veredicto-justification-label style="font-weight:400;color:#94a3b8">(opcional)</small></span>
+                            <textarea name="decision_final" rows="1" maxlength="5000" placeholder="Escribe la justificación del resultado" data-veredicto-justification></textarea>
                         </label>
                         <div class="ver-acts-btns">
                             <a class="ver-view" href="{{ route('abogado.detalleproceso', $proceso->id) }}"><i class="fas fa-folder-open"></i> Ver expediente</a>
@@ -110,9 +104,6 @@
 
         @include('partials.paginacion', ['paginador' => $procesos])
     </div>
-    @if(app()->environment('local'))
-        @include('coordinadora.partials.veredictos-demo')
-    @endif
 @endsection
 
 @section('scripts')
@@ -122,11 +113,15 @@
         if (!form) return;
         var daysWrap = form.querySelector('.ver-days');
         var daysInput = form.querySelector('[data-veredicto-days]');
+        var justification = form.querySelector('[data-veredicto-justification]');
+        var justificationLabel = form.querySelector('[data-veredicto-justification-label]');
         function syncVerdictFields() {
             var isSanction = select.value === 'sancion';
             daysWrap.hidden = !isSanction;
             daysInput.disabled = !isSanction;
             daysInput.required = isSanction;
+            justification.required = isSanction;
+            justificationLabel.textContent = isSanction ? '(obligatoria)' : '(opcional)';
         }
         select.addEventListener('change', syncVerdictFields);
         syncVerdictFields();
