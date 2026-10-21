@@ -87,7 +87,7 @@
         }
 
         $notifVeredictos = $isManager ? (clone $visibleProcesses)->whereIn('estado', ['En Proceso', 'En proceso'])->count() : 0;
-        $bandeja = \App\Models\Aviso::noLeidosPara($me)->take(8);
+        $bandeja = \App\Models\Aviso::noLeidosPara($me, 8);
         $bandejaCount = \App\Models\Aviso::where('user_id', $me->id)
             ->whereNull('leida_at')
             ->where('tipo', '!=', \App\Models\Aviso::TIPO_SESION)

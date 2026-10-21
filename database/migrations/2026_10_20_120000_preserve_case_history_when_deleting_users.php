@@ -200,21 +200,20 @@ class PreserveCaseHistoryWhenDeletingUsers extends Migration
         }
 
         $quotedTable = '`' . $tableName . '`';
-        $actions = [];
         if ($foreignKey) {
             if (!preg_match('/^[A-Za-z0-9_$]+$/', $foreignKey->constraint_name)) {
                 throw new RuntimeException('El nombre de una clave foránea no se pudo validar.');
             }
-            $actions[] = 'DROP FOREIGN KEY `' . $foreignKey->constraint_name . '`';
+            DB::statement('ALTER TABLE ' . $quotedTable . ' DROP FOREIGN KEY `' . $foreignKey->constraint_name . '`');
         }
         if (strtoupper($column->is_nullable) !== 'YES') {
-            $actions[] = 'MODIFY COLUMN `user_id` BIGINT UNSIGNED NULL';
+            DB::statement('ALTER TABLE ' . $quotedTable . ' MODIFY COLUMN `user_id` BIGINT UNSIGNED NULL');
         }
-        $actions[] = 'ADD CONSTRAINT `' . $tableName . '_user_id_foreign` ' .
+        DB::statement(
+            'ALTER TABLE ' . $quotedTable . ' ADD CONSTRAINT `' . $tableName . '_user_id_foreign` ' .
             'FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ' .
-            'ON DELETE SET NULL ON UPDATE ' . $updateRule;
-
-        DB::statement('ALTER TABLE ' . $quotedTable . ' ' . implode(', ', $actions));
+            'ON DELETE SET NULL ON UPDATE ' . $updateRule
+        );
     }
 
     private function createAssignmentHistoryTable(): void

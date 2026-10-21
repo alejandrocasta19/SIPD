@@ -222,11 +222,23 @@ class ProcesoDisciplinario extends Model
      */
     public function estadoDocumento(string $tipo): CasoDocumentoEstado
     {
-        return $this->documentoEstados()
-            ->firstOrCreate(
-                ['tipo_documento' => $tipo],
-                ['estado' => 'no_iniciado']
-            );
+        if ($this->relationLoaded('documentoEstados')) {
+            $existente = $this->documentoEstados->firstWhere('tipo_documento', $tipo);
+            if ($existente) {
+                return $existente;
+            }
+        }
+
+        $estado = $this->documentoEstados()->firstOrCreate(
+            ['tipo_documento' => $tipo],
+            ['estado' => 'no_iniciado']
+        );
+
+        if ($this->relationLoaded('documentoEstados') && !$this->documentoEstados->contains('id', $estado->id)) {
+            $this->documentoEstados->push($estado);
+        }
+
+        return $estado;
     }
 
     public function varianteDelSlot(string $slot): string

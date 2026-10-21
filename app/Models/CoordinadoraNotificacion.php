@@ -24,7 +24,7 @@ class CoordinadoraNotificacion extends Model
 
     public function proceso()
     {
-        return $this->belongsTo(ProcesoDisciplinario::class, 'proceso_id');
+        return $this->belongsTo(ProcesoDisciplinario::class, 'proceso_id')->withTrashed();
     }
 
     public function estaLeida(): bool

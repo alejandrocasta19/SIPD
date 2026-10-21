@@ -78,7 +78,7 @@ class CasoDocumentoEstado extends Model
 
     public function caso()
     {
-        return $this->belongsTo(ProcesoDisciplinario::class, 'caso_id');
+        return $this->belongsTo(ProcesoDisciplinario::class, 'caso_id')->withTrashed();
     }
 
     public function estaGenerado(): bool

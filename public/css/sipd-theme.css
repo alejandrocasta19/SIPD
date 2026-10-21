@@ -2064,10 +2064,9 @@ html:has(.guest-split) *::after {
 }
 .consulta-brand > img {
     display: block;
-<<<<<<< HEAD
     width: clamp(190px, 24vw, 270px);
     height: auto;
-    filter: drop-shadow(0 5px 12px rgba(0,0,0,.2));
+    filter: none;
 }
 .consulta-brand > span {
     display: block;
@@ -2086,22 +2085,7 @@ html:has(.guest-split) *::after {
 .consulta-brand img.guest-sipd-mark {
     width: 48px;
     height: 48px;
-    border-radius: 50%;
-=======
-    width: clamp(260px, 40vw, 400px);
-    height: auto;
-    filter: none;
-    background: transparent;
-    padding: 0;
     border-radius: 0;
-    box-shadow: none;
-}
-.consulta-brand .guest-sipd-mark,
-img.guest-sipd-mark {
-    width: 68px;
-    height: auto;
-    border-radius: 0;
->>>>>>> origin/main
     object-fit: contain;
     filter: brightness(0) invert(1);
     background: transparent;

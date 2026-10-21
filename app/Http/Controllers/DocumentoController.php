@@ -49,7 +49,7 @@ class DocumentoController extends Controller
      */
     private function accessibleCase($id): ProcesoDisciplinario
     {
-        return $this->visibleProcesses()->with(['evidencias.user', 'documentoEstados', 'anexos.user'])->findOrFail($id);
+        return $this->visibleProcesses()->withTrashed()->with(['evidencias.user', 'documentoEstados', 'anexos.user'])->findOrFail($id);
     }
 
     /**
@@ -614,7 +614,7 @@ class DocumentoController extends Controller
             return redirect()
                 ->route('documentos.index', $id)
                 ->with('success', 'Evidencia eliminada.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Error al eliminar la evidencia: ' . $e->getMessage());
         }
     }

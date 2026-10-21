@@ -9,13 +9,17 @@ use App\Models\User;
 class WorkflowNotifications
 {
     public static function caseEvent(
-        ProcesoDisciplinario $proceso,
+        ?ProcesoDisciplinario $proceso,
         User $actor,
         string $accion,
         ?string $detalle = null,
         ?string $tipoDocumento = null,
         bool $includeProcessLink = true
     ): void {
+        if (!$proceso) {
+            return;
+        }
+
         $codigo = 'PRO-' . str_pad((string) $proceso->id, 3, '0', STR_PAD_LEFT);
         $data = [
             'remitente_id' => $actor->id,

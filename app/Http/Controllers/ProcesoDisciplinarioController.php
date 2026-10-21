@@ -52,7 +52,7 @@ class ProcesoDisciplinarioController extends Controller
 
     private function accessibleProcess($id)
     {
-        return $this->visibleProcesses()->with(['user', 'evidencias', 'anexos'])->findOrFail($id);
+        return $this->visibleProcesses()->withTrashed()->with(['user', 'evidencias', 'anexos'])->findOrFail($id);
     }
 
     /**
@@ -255,7 +255,23 @@ class ProcesoDisciplinarioController extends Controller
             });
         }
 
-        $allProcesses = $query->withCount('anexos')->orderBy('created_at', 'desc')->get();
+        $allProcesses = $query
+            ->select([
+                'id',
+                'nombre',
+                'cedula',
+                'modalidad',
+                'cargo',
+                'telefono',
+                'placa',
+                'estado',
+                'tipo_falta',
+                'fecha_falta',
+                'created_at',
+            ])
+            ->withCount('anexos')
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         // Agrupar por trabajador (cédula o nombre)
         $workersGrouped = $allProcesses->groupBy(function ($item) {
@@ -481,14 +497,14 @@ class ProcesoDisciplinarioController extends Controller
                 foreach ($owners as $owner) {
                     $data['by_user'][] = array_merge(
                         ['name' => $owner->name],
-                        $reports->statistics((clone $query)->where('user_id', $owner->id), $from, $to)
+                        $reports->statistics((clone $query)->where('user_id', $owner->id), $from, $to, false)
                     );
                 }
 
                 if ((clone $filtered)->whereNull('user_id')->exists()) {
                     $data['by_user'][] = array_merge(
                         ['name' => 'Sin responsable'],
-                        $reports->statistics((clone $query)->whereNull('user_id'), $from, $to)
+                        $reports->statistics((clone $query)->whereNull('user_id'), $from, $to, false)
                     );
                 }
             }
@@ -1170,19 +1186,23 @@ class ProcesoDisciplinarioController extends Controller
                 ? ' Justificación: ' . $decisionFinal
                 : '';
 
-            Aviso::enviar($proceso->user, [
-                'remitente_id' => auth()->id(),
-                'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
-                'titulo' => 'Comunicar resultado del caso ' . $codigo,
-                'cuerpo' => 'La coordinadora registró el veredicto: ' . $etiqueta . '.'
-                    . $detalleDias
-                    . $justificacionTexto
-                    . ' Comunica formalmente esta decisión al trabajador.',
-                'proceso_id' => $proceso->id,
-            ]);
+            if ($proceso->user) {
+                Aviso::enviar($proceso->user, [
+                    'remitente_id' => auth()->id(),
+                    'tipo' => Aviso::TIPO_RESULTADO_VEREDICTO,
+                    'titulo' => 'Comunicar resultado del caso ' . $codigo,
+                    'cuerpo' => 'La coordinadora registró el veredicto: ' . $etiqueta . '.'
+                        . $detalleDias
+                        . $justificacionTexto
+                        . ' Comunica formalmente esta decisión al trabajador.',
+                    'proceso_id' => $proceso->id,
+                ]);
+            }
         });
 
-        $mensaje = 'Veredicto registrado. Se notificó al responsable del expediente para comunicar el resultado al trabajador.';
+        $mensaje = $proceso->user
+            ? 'Veredicto registrado. Se notificó al responsable del expediente para comunicar el resultado al trabajador.'
+            : 'Veredicto registrado. El expediente no tiene responsable asignado; no se envió aviso.';
 
         return redirect()->back()->with('success', $mensaje);
     }
@@ -1255,7 +1275,7 @@ class ProcesoDisciplinarioController extends Controller
             return redirect()
                 ->route('abogado.consultarproceso')
                 ->with('success', 'Proceso disciplinario eliminado correctamente');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Error al eliminar el proceso: ' . $e->getMessage());
         }
     }
@@ -1273,7 +1293,7 @@ class ProcesoDisciplinarioController extends Controller
         ];
 
         $plazos = $this->visibleProcesses()
-            ->with(['anexos' => fn ($q) => $q->where('tipo', CasoAnexo::TIPO_DESCARGOS)->latest()])
+            ->withCount(['anexos as descargos_count' => fn ($q) => $q->where('tipo', CasoAnexo::TIPO_DESCARGOS)])
             ->latest()
             ->get()
             ->map(function ($proceso) use ($tipos) {
@@ -1284,7 +1304,7 @@ class ProcesoDisciplinarioController extends Controller
                     $tipo = 'Audiencia';
                 }
 
-                $tieneArchivosDescargos = $proceso->anexos->isNotEmpty();
+                $tieneArchivosDescargos = (int) $proceso->descargos_count > 0;
                 $presentado = in_array($proceso->descargosPresentacionValue(), ['presencial', 'virtual'], true)
                     || filled($proceso->descargos)
                     || $tieneArchivosDescargos;
@@ -1319,7 +1339,7 @@ class ProcesoDisciplinarioController extends Controller
                     'semaforo'               => $semaforo,
                     'presentado'             => $presentado,
                     'presentacion_sin_fecha' => $presentado && !$fechaPresentacion,
-                    'descargos_archivos'     => $proceso->anexos,
+                    'descargos_archivos'     => collect(),
                 ];
             });
 
@@ -1337,6 +1357,20 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         $plazosPaginated = Paginacion::deColeccion($plazos);
+        $idsPagina = $plazosPaginated->getCollection()->pluck('id')->filter()->all();
+        if ($idsPagina !== []) {
+            $anexosPagina = CasoAnexo::query()
+                ->whereIn('caso_id', $idsPagina)
+                ->where('tipo', CasoAnexo::TIPO_DESCARGOS)
+                ->latest()
+                ->get()
+                ->groupBy('caso_id');
+            $plazosPaginated->getCollection()->transform(function ($plazo) use ($anexosPagina) {
+                $plazo->descargos_archivos = $anexosPagina->get($plazo->id, collect());
+
+                return $plazo;
+            });
+        }
 
         return view('abogado.plazos', [
             'pageTitle' => 'Plazos y términos',
@@ -1635,8 +1669,8 @@ class ProcesoDisciplinarioController extends Controller
         $request->validate([
             'name' => Formatos::reglasNombre(),
             'email' => Formatos::reglasEmail(),
-            'cargo' => $request->cargo,
-            'activo' => true,
+            'password' => ['required', 'string', 'min:8'],
+            'cargo' => ['required', 'string', 'in:' . $permitidos],
         ], Formatos::mensajes());
 
         User::create([
@@ -1674,7 +1708,7 @@ class ProcesoDisciplinarioController extends Controller
                 'duracion.*' => 'in:permanente,1,3,5,custom',
                 'horas' => 'sometimes|array',
                 'horas.*' => 'nullable|integer|min:1|max:168',
-            ] + Formatos::mensajes());
+            ], Formatos::mensajes());
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()
                 ->back()
@@ -1865,6 +1899,10 @@ class ProcesoDisciplinarioController extends Controller
         $registrada = in_array($presentacion, ['presencial', 'virtual'], true)
             || $incluyeArchivos
             || $incluyeTexto;
+
+        if (!Schema::hasColumn('disciplinario', 'descargos_presentados_at')) {
+            return;
+        }
 
         if (!$yaPresentado && $registrada) {
             $proceso->update(['descargos_presentados_at' => now()]);

@@ -100,7 +100,18 @@ class AnexoController extends Controller
         return view('abogado.anexos', [
             'pageTitle' => 'Anexos escaneados',
             'anexos' => Paginacion::deQuery($query),
-            'casos' => $this->visibleProcesses()->latest()->get(['id', 'nombre', 'cedula', 'estado']),
+            'casos' => $this->visibleProcesses()
+                ->when($request->filled('caso'), function ($query) use ($request) {
+                    $query->where(function ($inner) use ($request) {
+                        $inner->whereNotIn('estado', ['Sancionado', 'Archivado'])
+                            ->orWhere('id', $request->get('caso'));
+                    });
+                }, function ($query) {
+                    $query->whereNotIn('estado', ['Sancionado', 'Archivado']);
+                })
+                ->latest()
+                ->limit(200)
+                ->get(['id', 'nombre', 'cedula', 'estado']),
             'conteos' => $conteos,
             'filtro' => $filtro,
             'casoSeleccionado' => $request->get('caso', old('caso_id')),
@@ -337,7 +348,7 @@ class AnexoController extends Controller
             );
 
             return redirect()->route('abogado.anexos')->with('success', 'Anexo eliminado.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Error al eliminar el anexo: ' . $e->getMessage());
         }
     }

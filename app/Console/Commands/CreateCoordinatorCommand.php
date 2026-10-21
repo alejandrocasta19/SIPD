@@ -34,7 +34,7 @@ class CreateCoordinatorCommand extends Command
             'password_confirmation' => $confirmation,
         ], [
             'name' => Formatos::reglasNombre(),
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => Formatos::reglasEmail(),
             'password' => ['required', 'string', 'min:12', 'same:password_confirmation'],
         ], Formatos::mensajes());
 

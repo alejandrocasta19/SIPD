@@ -50,7 +50,7 @@ class Aviso extends Model
 
     public function proceso()
     {
-        return $this->belongsTo(ProcesoDisciplinario::class, 'proceso_id');
+        return $this->belongsTo(ProcesoDisciplinario::class, 'proceso_id')->withTrashed();
     }
 
     public function solicitud()
@@ -152,7 +152,7 @@ class Aviso extends Model
         });
     }
 
-    public static function noLeidosPara(User $user)
+    public static function noLeidosPara(User $user, int $limite = 8)
     {
         return self::query()
             ->where('user_id', $user->id)
@@ -160,6 +160,7 @@ class Aviso extends Model
             ->where('tipo', '!=', self::TIPO_SESION)
             ->with(['remitente', 'proceso'])
             ->latest()
+            ->limit($limite)
             ->get();
     }
 }

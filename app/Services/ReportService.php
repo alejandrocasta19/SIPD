@@ -24,7 +24,7 @@ use PhpOffice\PhpWord\Style\Language;
 
 class ReportService
 {
-    public function statistics(Builder $query, ?string $from, ?string $to): array
+    public function statistics(Builder $query, ?string $from, ?string $to, bool $full = true): array
     {
         $filtered = $this->applyDateRange($query, $from, $to);
         $abiertos = (clone $filtered)->whereNotIn('estado', ['Sancionado', 'Archivado']);
@@ -95,12 +95,23 @@ class ReportService
             : ($dailyBounds && $dailyBounds->max_date ? Carbon::parse($dailyBounds->max_date)->startOfDay() : null);
         $daily = [];
         if ($dailyStart && $dailyEnd && $dailyStart->lte($dailyEnd)) {
-            foreach (CarbonPeriod::create($dailyStart, '1 day', $dailyEnd) as $day) {
-                $period = $day->format('Y-m-d');
-                $daily[] = [
-                    'period' => $period,
-                    'total' => $dailyByPeriod[$period] ?? 0,
-                ];
+            if ($dailyStart->diffInDays($dailyEnd) > 366) {
+                foreach ($dailyRows as $row) {
+                    if ($row->period) {
+                        $daily[] = [
+                            'period' => $row->period,
+                            'total' => (int) $row->total,
+                        ];
+                    }
+                }
+            } else {
+                foreach (CarbonPeriod::create($dailyStart, '1 day', $dailyEnd) as $day) {
+                    $period = $day->format('Y-m-d');
+                    $daily[] = [
+                        'period' => $period,
+                        'total' => $dailyByPeriod[$period] ?? 0,
+                    ];
+                }
             }
         }
 
@@ -125,6 +136,19 @@ class ReportService
             }
         }
 
+        $total = array_sum($states);
+        if (!$full) {
+            return [
+                'from' => $from,
+                'to' => $to,
+                'total' => $total,
+                'states' => $states,
+                'daily' => $daily,
+                'monthly' => $monthly,
+                'weekly' => $weekly,
+            ];
+        }
+
         $faults = $this->groupedCounts(
             $filtered,
             "COALESCE(NULLIF(tipo_falta, ''), 'Sin tipo de falta')",
@@ -134,21 +158,21 @@ class ReportService
             ? "CASE WHEN NULLIF(modalidad, '') IS NOT NULL AND NULLIF(cargo, '') IS NOT NULL THEN modalidad || ' - ' || cargo ELSE COALESCE(NULLIF(modalidad, ''), NULLIF(cargo, ''), 'Sin modalidad / cargo') END"
             : "COALESCE(NULLIF(CONCAT_WS(' - ', NULLIF(modalidad, ''), NULLIF(cargo, '')), ''), 'Sin modalidad / cargo')";
 
-        $total = array_sum($states);
         $pendientes = (int) ($states['Pendiente'] ?? 0);
-        $enProceso = (int) ($states['En Proceso'] ?? 0);
+        $enProceso = (int) ($states['En proceso'] ?? 0);
         $sancionados = (int) ($states['Sancionado'] ?? 0);
         $archivados = (int) ($states['Archivado'] ?? 0);
 
-        $cerrados = (clone $filtered)
+        $driver = $filtered->getConnection()->getDriverName();
+        $duracionSql = $driver === 'sqlite'
+            ? 'CAST(julianday(updated_at) - julianday(created_at) AS INTEGER)'
+            : 'DATEDIFF(updated_at, created_at)';
+        $promDias = (clone $filtered)
             ->whereIn('estado', ['Sancionado', 'Archivado'])
-            ->get(['created_at', 'updated_at']);
-        $dias = $cerrados->map(function ($caso) {
-            if (!$caso->created_at || !$caso->updated_at) {
-                return null;
-            }
-            return $caso->created_at->diffInDays($caso->updated_at);
-        })->filter(fn ($n) => $n !== null);
+            ->whereNotNull('created_at')
+            ->whereNotNull('updated_at')
+            ->selectRaw("AVG({$duracionSql}) AS promedio")
+            ->value('promedio');
 
         $sinDescargos = (clone $filtered)
             ->where(function ($q) {
@@ -189,7 +213,7 @@ class ReportService
                 'archivados' => $archivados,
                 'finalizados' => $sancionados + $archivados,
                 'sin_responsable' => (clone $filtered)->whereNull('user_id')->count(),
-                'prom_dias' => $dias->count() ? (int) round($dias->avg()) : null,
+                'prom_dias' => $promDias !== null ? (int) round((float) $promDias) : null,
             ],
             'meta' => $this->reportMeta(
                 'Informe de gestión disciplinaria',
