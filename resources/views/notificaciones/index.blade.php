@@ -6,7 +6,10 @@
     <div class="proc-head">
         <div>
             <h1>Bandeja de notificaciones</h1>
-            <p>Los avisos de coordinación llegan aparte de las alertas del sistema.</p>
+            <p>
+                {{ $avisos->total() }} {{ $avisos->total() === 1 ? 'aviso' : 'avisos' }} en la bandeja;
+                se muestran de cinco en cinco. Las alertas del sistema aparecen aparte.
+            </p>
         </div>
         @if($avisos->total() > 0 || count($alertasSistema) > 0)
             <div class="proc-head-side">
@@ -22,7 +25,7 @@
                         </button>
                     </form>
                 @endif
-                @if($avisos->total() > 0 && $puedeBorrar)
+                @if($avisos->total() > 0)
                     <form method="POST" action="{{ route('notificaciones.leidas') }}"
                           data-confirm="Se borrarán las notificaciones que ya leíste."
                           data-confirm-title="Eliminar leídas"
@@ -313,19 +316,30 @@
                     @else
                         <small class="av-state" data-state="{{ $aviso->id }}">Nueva</small>
                     @endif
-                    @if($puedeBorrar)
-                        <form method="POST" action="{{ route('notificaciones.destroy', $aviso->id) }}"
-                              data-confirm="Esta notificación se quitará de tu bandeja permanentemente."
-                              data-confirm-title="Eliminar notificación"
-                              data-confirm-ok="Eliminar"
-                              data-confirm-danger="1">
+                    @if(
+                        $aviso->tipo === \App\Models\Aviso::TIPO_ASIGNACION
+                        && $aviso->proceso_id
+                        && isset($asignacionesPendientes[$aviso->proceso_id])
+                    )
+                        <form method="POST" action="{{ route('abogado.confirmar_recepcion', $aviso->proceso_id) }}">
                             @csrf
-                            @method('DELETE')
-                            <button type="submit" class="av-del" title="Eliminar">
-                                <i class="far fa-trash-alt"></i>
+                            @method('PUT')
+                            <button type="submit" class="btn-alt">
+                                <i class="fas fa-check"></i> Confirmar recepción
                             </button>
                         </form>
                     @endif
+                    <form method="POST" action="{{ route('notificaciones.destroy', $aviso->id) }}"
+                          data-confirm="Esta notificación se quitará de tu bandeja permanentemente."
+                          data-confirm-title="Eliminar notificación"
+                          data-confirm-ok="Eliminar"
+                          data-confirm-danger="1">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="av-del" title="Eliminar">
+                            <i class="far fa-trash-alt"></i>
+                        </button>
+                    </form>
                 </div>
             </article>
         @empty

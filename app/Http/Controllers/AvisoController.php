@@ -8,6 +8,8 @@ use App\Support\AlertasSistema;
 use App\Support\Paginacion;
 use App\Support\RhPermisos;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AvisoController extends Controller
 {
@@ -18,16 +20,40 @@ class AvisoController extends Controller
                 ->where('user_id', auth()->id())
                 ->where('tipo', '!=', Aviso::TIPO_SESION)
                 ->with(['remitente', 'proceso', 'solicitud'])
-                ->latest()
+                ->latest('created_at')
+                ->orderByDesc('id')
         );
 
         $user = auth()->user();
+        $asignacionesPendientes = collect();
+        if (
+            $user->esEquipo()
+            && Schema::hasTable('disciplinario_asignaciones')
+            && Schema::hasColumn('disciplinario_asignaciones', 'received_at')
+        ) {
+            $casoIds = $avisos->getCollection()
+                ->where('tipo', Aviso::TIPO_ASIGNACION)
+                ->pluck('proceso_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($casoIds->isNotEmpty()) {
+                $asignacionesPendientes = DB::table('disciplinario_asignaciones')
+                    ->where('user_id', $user->id)
+                    ->whereIn('caso_id', $casoIds)
+                    ->whereColumn('active_case_id', 'caso_id')
+                    ->whereNull('received_at')
+                    ->pluck('caso_id')
+                    ->flip();
+            }
+        }
 
         return view('notificaciones.index', [
             'pageTitle' => 'Notificaciones',
             'avisos' => $avisos,
             'alertasSistema' => AlertasSistema::visibles($user),
-            'puedeBorrar' => $user->puede('eliminar_notificaciones'),
+            'asignacionesPendientes' => $asignacionesPendientes,
         ]);
     }
 
@@ -98,10 +124,6 @@ class AvisoController extends Controller
 
     public function destroy($id)
     {
-        if (!auth()->user()->puede('eliminar_notificaciones')) {
-            return back()->with('error', 'No tienes permiso para eliminar notificaciones.');
-        }
-
         $aviso = Aviso::where('user_id', auth()->id())->findOrFail($id);
         $aviso->delete();
 
@@ -110,10 +132,6 @@ class AvisoController extends Controller
 
     public function destroyLeidas()
     {
-        if (!auth()->user()->puede('eliminar_notificaciones')) {
-            return back()->with('error', 'No tienes permiso para eliminar notificaciones.');
-        }
-
         $borradas = Aviso::where('user_id', auth()->id())
             ->whereNotNull('leida_at')
             ->delete();

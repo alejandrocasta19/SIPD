@@ -21,8 +21,7 @@
     <link rel="stylesheet" href="/AdminLTE-3.2.0/dist/css/adminlte.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=55">
-    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-halloween.css?v=2">
+    <link rel="stylesheet" href="{{ rtrim(request()->root(), '/') }}/css/sipd-theme.css?v=57">
     @yield('styles')
     <script>
     (function(){
@@ -74,7 +73,6 @@
     </script>
 </head>
 <body class="theme-cootranshuila">
-    @include('partials.halloween', ['hwMode' => 'app'])
     @php
         $me = auth()->user();
         $me->loadMissing('permisos');
@@ -90,12 +88,14 @@
 
         $notifVeredictos = $isManager ? (clone $visibleProcesses)->whereIn('estado', ['En Proceso', 'En proceso'])->count() : 0;
         $bandeja = \App\Models\Aviso::noLeidosPara($me)->take(8);
-        $bandejaCount = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count();
+        $bandejaCount = \App\Models\Aviso::where('user_id', $me->id)
+            ->whereNull('leida_at')
+            ->where('tipo', '!=', \App\Models\Aviso::TIPO_SESION)
+            ->count();
         $alertasSistema = \App\Support\AlertasSistema::visibles($me);
         $notifSolicitudes = $isManager
             ? \App\Models\PermisoSolicitud::where('estado', \App\Models\PermisoSolicitud::PENDIENTE)->count()
             : 0;
-        $unreadMsgs = \App\Models\Aviso::where('user_id', $me->id)->whereNull('leida_at')->count();
         $notifTotal = $bandejaCount + count($alertasSistema);
         $solicitablesPermiso = \App\Support\RhPermisos::solicitables();
         $duracionesHoras = \App\Support\RhPermisos::duracionesHoras();
@@ -167,7 +167,7 @@
                 <nav class="sipd-nav">
                     @if($me->puede('ver_plazos'))
                     <a href="{{ route('abogado.plazos') }}" class="{{ request()->routeIs('abogado.plazos') ? 'active' : '' }}">
-                        <i class="far fa-clock"></i> Plazos y términos
+                        <i class="far fa-clock"></i> Seguimiento de descargos
                     </a>
                     @endif
                     @if($me->puede('ver_anexos'))
@@ -201,6 +201,13 @@
                     </a>
                 </nav>
                 @endif
+
+                <div class="sipd-nav-label">AYUDA</div>
+                <nav class="sipd-nav">
+                    <a href="{{ route('manual.index') }}" class="{{ request()->routeIs('manual.*') ? 'active' : '' }}">
+                        <i class="far fa-question-circle"></i> Manual de usuario
+                    </a>
+                </nav>
             </div>
 
 
@@ -360,9 +367,17 @@
 
             <div class="sipd-wrap">
                 @hasSection('page-header')
-                    @yield('page-header')
+                    @if(request()->routeIs('manual.index'))
+                        @yield('page-header')
+                    @else
+                        <section class="sipd-page-hero">
+                            @yield('page-header')
+                        </section>
+                    @endif
                 @else
-                    <h1 class="sipd-page-title">{{ $pageTitle }}</h1>
+                    <section class="sipd-page-hero">
+                        <h1 class="sipd-page-title">{{ $pageTitle }}</h1>
+                    </section>
                 @endif
                 @yield('content')
             </div>

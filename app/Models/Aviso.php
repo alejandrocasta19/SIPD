@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection;
 
 class Aviso extends Model
 {
@@ -15,6 +15,9 @@ class Aviso extends Model
     public const TIPO_SESION = 'actividad_sesion';
     public const TIPO_RECUPERACION = 'recuperacion_contrasena';
     public const TIPO_RESULTADO_VEREDICTO = 'resultado_veredicto';
+    public const TIPO_FLUJO = 'flujo_trabajo';
+    public const TIPO_ASIGNACION = 'asignacion_expediente';
+    public const TIPO_RECEPCION = 'recepcion_expediente';
 
     protected $table = 'sipd_avisos';
 
@@ -76,6 +79,9 @@ class Aviso extends Model
             self::TIPO_SESION    => 'Actividad de sesión',
             self::TIPO_RECUPERACION => 'Recuperación de contraseña',
             self::TIPO_RESULTADO_VEREDICTO => 'Veredicto registrado',
+            self::TIPO_FLUJO => 'Actividad del expediente',
+            self::TIPO_ASIGNACION => 'Expediente asignado',
+            self::TIPO_RECEPCION => 'Recepción confirmada',
         ];
 
         return $etiquetas[$this->tipo] ?? 'Notificación';
@@ -92,6 +98,9 @@ class Aviso extends Model
             self::TIPO_SESION    => 'fa-sign-in-alt',
             self::TIPO_RECUPERACION => 'fa-key',
             self::TIPO_RESULTADO_VEREDICTO => 'fa-gavel',
+            self::TIPO_FLUJO => 'fa-exchange-alt',
+            self::TIPO_ASIGNACION => 'fa-folder-plus',
+            self::TIPO_RECEPCION => 'fa-check-circle',
         ];
 
         return $iconos[$this->tipo] ?? 'fa-bell';
@@ -108,6 +117,9 @@ class Aviso extends Model
             self::TIPO_SESION    => 'info',
             self::TIPO_RECUPERACION => 'warn',
             self::TIPO_RESULTADO_VEREDICTO => 'coord',
+            self::TIPO_FLUJO => 'info',
+            self::TIPO_ASIGNACION => 'warn',
+            self::TIPO_RECEPCION => 'ok',
         ];
 
         return $tonos[$this->tipo] ?? 'info';
@@ -140,28 +152,12 @@ class Aviso extends Model
         });
     }
 
-    public static function registrarActividadSesion(User $usuario, bool $inicio): Collection
-    {
-        if (!$usuario->esEquipo()) {
-            return collect();
-        }
-
-        $accion = $inicio ? 'inició sesión' : 'cerró sesión';
-        $fechaHora = now()->format('d/m/Y H:i:s');
-
-        return self::aCoordinadoras([
-            'remitente_id' => $usuario->id,
-            'tipo' => self::TIPO_SESION,
-            'titulo' => $inicio ? 'Inicio de sesión del equipo' : 'Cierre de sesión del equipo',
-            'cuerpo' => $usuario->name . ' ' . $accion . '. Fecha y hora: ' . $fechaHora . '.',
-        ], $usuario->id);
-    }
-
     public static function noLeidosPara(User $user)
     {
         return self::query()
             ->where('user_id', $user->id)
             ->whereNull('leida_at')
+            ->where('tipo', '!=', self::TIPO_SESION)
             ->with(['remitente', 'proceso'])
             ->latest()
             ->get();

@@ -20,6 +20,7 @@ use App\Support\Formatos;
 use App\Support\Modalidades;
 use App\Support\Paginacion;
 use App\Support\CaseFilePath;
+use App\Support\WorkflowNotifications;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -82,13 +83,27 @@ class ProcesoDisciplinarioController extends Controller
         $saludo = $hora < 12 ? 'Buenos días' : ($hora < 19 ? 'Buenas tardes' : 'Buenas noches');
 
         $casosAbiertosQuery = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso']);
+        $casosSinDescargosQuery = function ($query) {
+            return $query
+                ->where(function ($subquery) {
+                    $subquery->whereNull('descargos_forma')
+                        ->orWhere('descargos_forma', 'no_presento');
+                })
+                ->where(function ($subquery) {
+                    $subquery->whereNull('descargos')
+                        ->orWhere('descargos', '');
+                })
+                ->whereDoesntHave('anexos', function ($anexos) {
+                    $anexos->where('tipo', CasoAnexo::TIPO_DESCARGOS);
+                });
+        };
         $hoy = now()->startOfDay();
-        $plazosVencidos = (clone $casosAbiertosQuery)
-            ->whereDate('created_at', '<=', $hoy->copy()->subDays(5)->toDateString())
+        $plazosVencidos = $casosSinDescargosQuery(clone $casosAbiertosQuery)
+            ->whereDate('created_at', '<', $hoy->copy()->subDays(5)->toDateString())
             ->count();
-        $plazosPorVencer = (clone $casosAbiertosQuery)
+        $plazosPorVencer = $casosSinDescargosQuery(clone $casosAbiertosQuery)
             ->whereBetween('created_at', [
-                $hoy->copy()->subDays(4)->toDateString(),
+                $hoy->copy()->subDays(5)->toDateString(),
                 $hoy->copy()->subDays(3)->endOfDay(),
             ])
             ->count();
@@ -765,6 +780,13 @@ class ProcesoDisciplinarioController extends Controller
             'estado' => 'en_diligenciamiento',
         ]);
 
+        WorkflowNotifications::caseEvent(
+            $proceso,
+            $request->user(),
+            'creó el expediente',
+            'quedó registrado como borrador'
+        );
+
         return redirect()
             ->route('documentos.hub')
             ->with('success', 'Proceso registrado como borrador. Genera y descarga en Generar documentos.')
@@ -871,6 +893,12 @@ class ProcesoDisciplinarioController extends Controller
 
         abort_unless($ruta, 404);
 
+        WorkflowNotifications::caseEvent(
+            $proceso,
+            auth()->user(),
+            'descargó el documento fuente'
+        );
+
         return response()->download($ruta);
     }
 
@@ -920,6 +948,9 @@ class ProcesoDisciplinarioController extends Controller
                         $validated['descargos_presentacion']
                     )
                     : [];
+                $yaPresentado = $proceso->descargosPresentacionValue() !== 'no_presento'
+                    || filled($proceso->descargos)
+                    || $proceso->anexos()->where('tipo', CasoAnexo::TIPO_DESCARGOS)->exists();
 
                 if ($descargos === '' && $presentacion === []) {
                     throw ValidationException::withMessages([
@@ -935,6 +966,18 @@ class ProcesoDisciplinarioController extends Controller
                 abort_if($datos === [], 403);
 
                 $proceso->update($datos);
+                $this->registrarFechaPresentacionDescargos(
+                    $proceso,
+                    $yaPresentado,
+                    $validated['descargos_presentacion'] ?? null,
+                    false,
+                    $descargos !== ''
+                );
+                WorkflowNotifications::caseEvent(
+                    $proceso,
+                    auth()->user(),
+                    'registró los descargos'
+                );
 
                 return redirect()
                     ->back()
@@ -954,6 +997,9 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         $primeraInteraccion = $this->esPrimeraInteraccionDescargos($proceso);
+        $yaPresentadoAntes = $proceso->descargosPresentacionValue() !== 'no_presento'
+            || filled($proceso->descargos)
+            || $proceso->anexos()->where('tipo', CasoAnexo::TIPO_DESCARGOS)->exists();
         $actualizaDescargos = $request->exists('descargos');
         $actualizaPresentacion = $request->has('descargos_presentacion');
         if ($primeraInteraccion && (
@@ -1068,6 +1114,22 @@ class ProcesoDisciplinarioController extends Controller
             }
         }
 
+        if ($actualizaDescargos || $actualizaPresentacion) {
+            $this->registrarFechaPresentacionDescargos(
+                $proceso,
+                $yaPresentadoAntes,
+                $request->input('descargos_presentacion'),
+                false,
+                $actualizaDescargos && filled($request->input('descargos'))
+            );
+        }
+
+        WorkflowNotifications::caseEvent(
+            $proceso,
+            $usuario,
+            'actualizó el expediente'
+        );
+
         return redirect()
             ->back()
             ->with('success', 'Proceso actualizado correctamente');
@@ -1158,7 +1220,6 @@ class ProcesoDisciplinarioController extends Controller
         }
 
         $proceso->update(['estado' => 'En Proceso']);
-
         \App\Models\CoordinadoraNotificacion::avisarVeredicto($proceso, auth()->user());
 
         return redirect()->back()->with('success', 'Caso enviado. Ahora está En Proceso y pendiente de veredicto.');
@@ -1181,6 +1242,15 @@ class ProcesoDisciplinarioController extends Controller
                 Storage::disk('local')->delete($proceso->documento_falta);
                 Storage::disk('public')->delete($proceso->documento_falta);
             }
+
+            WorkflowNotifications::caseEvent(
+                $proceso,
+                auth()->user(),
+                'eliminó el expediente',
+                null,
+                null,
+                false
+            );
             
             foreach ($proceso->anexos ?? [] as $anexo) {
                 foreach ([$anexo->ruta_segura, str_replace('.pdf', '_signed.pdf', $anexo->ruta_segura)] as $ruta) {
@@ -1230,6 +1300,23 @@ class ProcesoDisciplinarioController extends Controller
                     $tipo = 'Audiencia';
                 }
 
+                $tieneArchivosDescargos = $proceso->anexos->isNotEmpty();
+                $presentado = in_array($proceso->descargosPresentacionValue(), ['presencial', 'virtual'], true)
+                    || filled($proceso->descargos)
+                    || $tieneArchivosDescargos;
+                $fechaPresentacion = $proceso->descargos_presentados_at;
+                $dias = $presentado && $fechaPresentacion
+                    ? (int) $fechaPresentacion->copy()->startOfDay()->diffInDays(
+                        $proceso->vencimientoPlazo(),
+                        false
+                    )
+                    : ($presentado ? null : $proceso->diasPlazo());
+                $semaforo = !$presentado
+                    ? $proceso->semaforoPlazo()
+                    : ($fechaPresentacion
+                        ? ($dias >= 0 ? 'presentado' : 'presentado_tarde')
+                        : 'presentado_sin_fecha');
+
                 return (object) [
                     'id'                     => $proceso->id,
                     'proceso_id'             => $proceso->id,
@@ -1238,12 +1325,16 @@ class ProcesoDisciplinarioController extends Controller
                     'modalidad'              => $proceso->modalidad,
                     'cargo'                  => $proceso->cargo,
                     'tipo'                   => $tipo,
+                    'descargos'              => $proceso->descargos,
                     'es_descargos'           => $proceso->estado === 'Pendiente',
                     'descargos_presentacion' => $proceso->descargosPresentacionValue(),
                     'tiene_forma_seteada'    => $proceso->descargos_forma !== null,
+                    'fecha_presentacion'     => $fechaPresentacion,
                     'vencimiento'            => $proceso->vencimientoPlazo(),
-                    'dias'                   => $proceso->diasPlazo(),
-                    'semaforo'               => $proceso->semaforoPlazo(),
+                    'dias'                   => $dias,
+                    'semaforo'               => $semaforo,
+                    'presentado'             => $presentado,
+                    'presentacion_sin_fecha' => $presentado && !$fechaPresentacion,
                     'descargos_archivos'     => $proceso->anexos,
                 ];
             });
@@ -1253,6 +1344,7 @@ class ProcesoDisciplinarioController extends Controller
             'vigente' => $plazos->where('semaforo', 'vigente')->count(),
             'por_vencer' => $plazos->where('semaforo', 'por_vencer')->count(),
             'vencido' => $plazos->where('semaforo', 'vencido')->count(),
+            'presentado' => $plazos->filter(fn ($plazo) => $plazo->presentado)->count(),
         ];
 
         $filtro = $request->get('estado', 'todos');
@@ -1319,6 +1411,9 @@ class ProcesoDisciplinarioController extends Controller
                 $presentacion = ProcesoDisciplinario::parseDescargosPresentacion(
                     $validated['descargos_presentacion']
                 );
+                $yaPresentado = $proceso->descargosPresentacionValue() !== 'no_presento'
+                    || filled($proceso->descargos)
+                    || $proceso->anexos()->where('tipo', CasoAnexo::TIPO_DESCARGOS)->exists();
                 $proceso->update($presentacion);
 
                 if ($incluyeArchivos) {
@@ -1349,6 +1444,21 @@ class ProcesoDisciplinarioController extends Controller
                         ]);
                     }
                 }
+
+                $this->registrarFechaPresentacionDescargos(
+                    $proceso,
+                    $yaPresentado,
+                    $validated['descargos_presentacion'],
+                    $incluyeArchivos
+                );
+
+                WorkflowNotifications::caseEvent(
+                    $proceso,
+                    $usuario,
+                    $incluyeArchivos
+                        ? 'actualizó la presentación de descargos y agregó archivos'
+                        : 'actualizó la presentación de descargos'
+                );
 
                 return redirect()
                     ->route('abogado.plazos', array_filter($request->only('estado')))
@@ -1387,6 +1497,12 @@ class ProcesoDisciplinarioController extends Controller
             'local'
         );
         abort_unless($ruta, 404);
+
+        WorkflowNotifications::caseEvent(
+            $anexo->caso,
+            auth()->user(),
+            'descargó el documento de descargos'
+        );
 
         return response()->download($ruta, $anexo->nombre_original);
     }
@@ -1604,6 +1720,12 @@ class ProcesoDisciplinarioController extends Controller
             );
         });
         $abogado = $abogado->fresh();
+        Aviso::enviar($abogado, [
+            'remitente_id' => auth()->id(),
+            'tipo' => Aviso::TIPO_FLUJO,
+            'titulo' => 'Tu cuenta o permisos fueron actualizados',
+            'cuerpo' => 'La coordinadora actualizó los datos de tu cuenta o los permisos disponibles en SIPD.',
+        ]);
 
         if (!$abogado->estaActivo()) {
             $ok = 'El perfil de ' . $abogado->nombreCorto() . ' quedó inactivo. Ya no podrá ingresar al sistema.';
@@ -1631,7 +1753,8 @@ class ProcesoDisciplinarioController extends Controller
             ->activos()
             ->firstOrFail();
 
-        DB::transaction(function () use ($id, $responsable) {
+        $procesoAsignado = null;
+        DB::transaction(function () use ($id, $responsable, &$procesoAsignado) {
             $proceso = $this->visibleProcesses()
                 ->whereKey($id)
                 ->lockForUpdate()
@@ -1678,9 +1801,64 @@ class ProcesoDisciplinarioController extends Controller
             $this->recordInitialAssignment($proceso, $responsable, $now);
 
             $proceso->update(['user_id' => $responsable->id]);
+            $procesoAsignado = $proceso->fresh('user');
+            WorkflowNotifications::assignment($procesoAsignado, $responsable, auth()->user());
         });
 
         return redirect()->back()->with('success', 'Proceso asignado a ' . $responsable->name . '.');
+    }
+
+    public function confirmarRecepcion(int $id)
+    {
+        $user = auth()->user();
+        abort_unless($user->esEquipo(), 403);
+
+        $recibido = DB::transaction(function () use ($id, $user) {
+            $proceso = ProcesoDisciplinario::query()
+                ->whereKey($id)
+                ->where('user_id', $user->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                Schema::hasTable('disciplinario_asignaciones')
+                    && Schema::hasColumn('disciplinario_asignaciones', 'received_at'),
+                409,
+                'La confirmación de recepción no está disponible hasta preparar el historial de asignaciones.'
+            );
+
+            $actualizados = DB::table('disciplinario_asignaciones')
+                ->where('caso_id', $proceso->id)
+                ->where('user_id', $user->id)
+                ->where('active_case_id', $proceso->id)
+                ->whereNull('received_at')
+                ->update([
+                    'received_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            if ($actualizados !== 1) {
+                return false;
+            }
+
+            Aviso::query()
+                ->where('user_id', $user->id)
+                ->where('proceso_id', $proceso->id)
+                ->where('tipo', Aviso::TIPO_ASIGNACION)
+                ->whereNull('leida_at')
+                ->update(['leida_at' => now()]);
+
+            WorkflowNotifications::assignmentReceived($proceso, $user);
+
+            return true;
+        });
+
+        return back()->with(
+            $recibido ? 'success' : 'info',
+            $recibido
+                ? 'Confirmaste la recepción del expediente.'
+                : 'La recepción de este expediente ya estaba confirmada o la asignación cambió.'
+        );
     }
 
     private function esPrimeraInteraccionDescargos(ProcesoDisciplinario $proceso): bool
@@ -1691,6 +1869,31 @@ class ProcesoDisciplinarioController extends Controller
             && !$proceso->anexos()
                 ->where('tipo', CasoAnexo::TIPO_DESCARGOS)
                 ->exists();
+    }
+
+    private function registrarFechaPresentacionDescargos(
+        ProcesoDisciplinario $proceso,
+        bool $yaPresentado,
+        ?string $presentacion,
+        bool $incluyeArchivos,
+        bool $incluyeTexto = false
+    ): void {
+        $registrada = in_array($presentacion, ['presencial', 'virtual'], true)
+            || $incluyeArchivos
+            || $incluyeTexto;
+
+        if (!$yaPresentado && $registrada) {
+            $proceso->update(['descargos_presentados_at' => now()]);
+            return;
+        }
+
+        if ($presentacion === 'no_presento'
+            && !$incluyeArchivos
+            && !$incluyeTexto
+            && !$proceso->anexos()->where('tipo', CasoAnexo::TIPO_DESCARGOS)->exists()
+            && !filled($proceso->descargos)) {
+            $proceso->update(['descargos_presentados_at' => null]);
+        }
     }
 
     private function tieneCambiosFueraDeDescargos(Request $request, ProcesoDisciplinario $proceso): bool
@@ -1748,7 +1951,7 @@ class ProcesoDisciplinarioController extends Controller
             return;
         }
 
-        DB::table('disciplinario_asignaciones')->insert([
+        $asignacion = [
             'caso_id' => $proceso->id,
             'user_id' => $responsable->id,
             'active_case_id' => $proceso->id,
@@ -1758,7 +1961,11 @@ class ProcesoDisciplinarioController extends Controller
             'unassigned_at' => null,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ];
+        if (Schema::hasColumn('disciplinario_asignaciones', 'received_at')) {
+            $asignacion['received_at'] = null;
+        }
+        DB::table('disciplinario_asignaciones')->insert($asignacion);
     }
 
     private function validarDatosTrabajador(Request $request, string $seleccion, ?string $modalidad): void

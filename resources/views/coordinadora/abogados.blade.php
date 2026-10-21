@@ -10,7 +10,7 @@
             <h1>Equipo de RH</h1>
             <p>Personal operativo que tramita los expedientes disciplinarios.</p>
         </div>
-        <button type="button" class="btn-add" id="btnAgregar">
+        <button type="button" class="btn-add" id="btnAgregar" aria-expanded="{{ $errors->any() && !session('abrir_editar_rh') ? 'true' : 'false' }}" aria-controls="formularioContainer">
             <i class="fas fa-plus"></i> Agregar nuevo integrante
         </button>
     </div>
@@ -21,52 +21,96 @@
     button.btn-add { cursor: pointer; border: 0; }
 
     .form-card {
-        display: none;
+        display: {{ $errors->any() && !session('abrir_editar_rh') ? 'block' : 'none' }};
         background: #fff;
-        border-radius: 18px;
-        padding: 20px;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 2px rgba(15,23,42,.04);
+        border: 1px solid var(--cth-border);
+        border-radius: 22px;
+        padding: 26px;
+        margin-bottom: 22px;
+        box-shadow: 0 14px 34px rgba(0,36,18,.07);
+        animation: formReveal .24s ease-out;
+    }
+
+    @keyframes formReveal {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .form-card-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 22px;
+    }
+
+    .form-card-icon {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        border-radius: 15px;
+        color: var(--cth-green);
+        background: #eaf7f0;
+        font-size: 19px;
     }
 
     .form-card h3 {
-        margin: 0 0 6px;
-        font-size: 16px;
-        font-weight: 700;
+        margin: 0 0 5px;
+        color: var(--cth-ink);
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -.02em;
     }
 
     .form-lead {
-        margin: 0 0 16px;
+        margin: 0;
         color: #64748b;
-        font-size: 13px;
+        font-size: 14px;
+        line-height: 1.55;
     }
 
     .form-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr) auto;
-        gap: 12px;
-        align-items: end;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px 20px;
     }
 
+    .form-field { min-width: 0; }
+
     .form-grid label {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 8px;
+        color: #334155;
         font-size: 13px;
-        color: #64748b;
-        margin-bottom: 6px;
+        font-weight: 700;
+    }
+
+    .form-grid label i {
+        color: var(--cth-green);
+        font-size: 12px;
+    }
+
+    .form-required {
+        color: #be123c;
+        font-size: 11px;
         font-weight: 600;
     }
 
     .form-grid input,
     .form-grid select {
         width: 100%;
-        height: 42px;
+        height: 48px;
         border: 1px solid var(--cth-border);
-        border-radius: 10px;
-        padding: 0 12px;
+        border-radius: 12px;
+        padding: 0 14px;
         font: inherit;
         font-size: 14px;
-        outline: none;
-        background: #fff;
+        color: var(--cth-ink);
+        background: #fbfcfd;
+        transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
     }
 
     .form-grid select {
@@ -74,22 +118,78 @@
         appearance: none;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
-        background-position: right 12px center;
-        padding-right: 32px;
+        background-position: right 15px center;
+        padding-right: 38px;
     }
 
     .form-grid input:focus,
-    .form-grid select:focus { border-color: var(--cth-green-bright); }
+    .form-grid select:focus {
+        border-color: var(--cth-green-bright);
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(0,112,67,.11);
+        outline: none;
+    }
+
+    .form-hint {
+        display: block;
+        margin-top: 7px;
+        color: #718096;
+        font-size: 12px;
+        line-height: 1.45;
+    }
+
+    .form-error {
+        margin: 7px 0 0;
+        color: #be123c;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .form-grid input.is-invalid,
+    .form-grid select.is-invalid { border-color: #e11d48; }
+
+    .form-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 22px;
+        padding-top: 18px;
+        border-top: 1px solid #edf1f4;
+    }
+
+    .form-security-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        max-width: 510px;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .form-security-note i { margin-top: 2px; color: var(--cth-green); }
 
     .btn-save {
-        height: 42px;
+        min-height: 46px;
         border: 0;
-        border-radius: 10px;
+        border-radius: 12px;
         background: var(--cth-green);
         color: #fff;
         font-weight: 700;
-        padding: 0 18px;
+        padding: 0 22px;
         cursor: pointer;
+        white-space: nowrap;
+        box-shadow: 0 6px 14px rgba(0,112,67,.17);
+        transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .btn-save:hover { background: #005d38; transform: translateY(-1px); box-shadow: 0 9px 18px rgba(0,112,67,.22); }
+
+    @media (max-width: 760px) {
+        .form-card { padding: 20px; }
+        .form-grid { grid-template-columns: 1fr; gap: 15px; }
+        .form-card-footer { align-items: stretch; flex-direction: column; }
+        .btn-save { width: 100%; }
     }
 
     .eq-board { margin-top: 4px; }
@@ -178,8 +278,8 @@
     .team-actions button.danger:focus-visible { background: #fee2e2; color: #b91c1c; }
     .team-empty { text-align: center; padding: 32px; color: #94a3b8; }
 
-    @media (max-width: 900px) {
-        .form-grid { grid-template-columns: 1fr; }
+    @media (max-width: 900px) and (min-width: 761px) {
+        .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .perm-lead { margin: 0 0 16px; color: #64748b; font-size: 13px; line-height: 1.45; }
     .team-edit-fields label {
@@ -479,33 +579,47 @@
 @section('content')
 
     <div class="form-card" id="formularioContainer">
-        <h3>Agregar nuevo integrante</h3>
-        <p class="form-lead">Crea su cuenta de Equipo RH. Con el correo y la contraseña podrá entrar al sistema.</p>
+        <div class="form-card-head">
+            <span class="form-card-icon"><i class="fas fa-user-plus" aria-hidden="true"></i></span>
+            <div>
+                <h3>Agregar nuevo integrante</h3>
+                <p class="form-lead">Crea una cuenta para que la persona pueda ingresar al sistema. Los campos marcados con * son obligatorios.</p>
+            </div>
+        </div>
         <form action="{{ route('coordinadora.abogados.guardar') }}" method="POST" autocomplete="off">
             @csrf
             <div class="form-grid">
-                <div>
-                    <label>Nombre completo</label>
-                    <input type="text" name="name" required placeholder="Nombre y apellidos" autocomplete="off">
+                <div class="form-field">
+                    <label for="nuevoNombre"><i class="fas fa-user" aria-hidden="true"></i> Nombre completo <span class="form-required">*</span></label>
+                    <input id="nuevoNombre" type="text" name="name" required maxlength="255" value="{{ old('name') }}" placeholder="Ej. María Fernanda Pérez" autocomplete="name" class="{{ $errors->has('name') ? 'is-invalid' : '' }}" aria-describedby="nuevoNombreError">
+                    @error('name') <p class="form-error" id="nuevoNombreError">{{ $message }}</p> @enderror
                 </div>
-                <div>
-                    <label>Correo sipd</label>
-                    <input type="email" name="email" required placeholder="nombreapellido@sipd.co" pattern="[A-Za-z]+@sipd\.co" title="texto@sipd.co" autocomplete="off">
+                <div class="form-field">
+                    <label for="nuevoCorreo"><i class="fas fa-envelope" aria-hidden="true"></i> Correo SIPD <span class="form-required">*</span></label>
+                    <input id="nuevoCorreo" type="email" name="email" required value="{{ old('email') }}" placeholder="nombreapellido@sipd.co" pattern="[A-Za-z]+@sipd\.co" title="Usa el formato nombreapellido@sipd.co" autocomplete="email" class="{{ $errors->has('email') ? 'is-invalid' : '' }}" aria-describedby="nuevoCorreoAyuda nuevoCorreoError">
+                    <small class="form-hint" id="nuevoCorreoAyuda">Debe terminar en @sipd.co y no incluir espacios ni caracteres especiales en el usuario.</small>
+                    @error('email') <p class="form-error" id="nuevoCorreoError">{{ $message }}</p> @enderror
                 </div>
-                <div>
-                    <label>Contraseña</label>
-                    <input type="password" name="password" required placeholder="Contraseña de acceso" autocomplete="new-password">
+                <div class="form-field">
+                    <label for="nuevoPassword"><i class="fas fa-lock" aria-hidden="true"></i> Contraseña inicial <span class="form-required">*</span></label>
+                    <input id="nuevoPassword" type="password" name="password" required placeholder="Escribe una contraseña temporal" autocomplete="new-password" class="{{ $errors->has('password') ? 'is-invalid' : '' }}" aria-describedby="nuevoPasswordAyuda nuevoPasswordError">
+                    <small class="form-hint" id="nuevoPasswordAyuda">La persona podrá cambiarla después desde su cuenta.</small>
+                    @error('password') <p class="form-error" id="nuevoPasswordError">{{ $message }}</p> @enderror
                 </div>
-                <div>
-                    <label>Cargo</label>
-                    <select name="cargo" required>
+                <div class="form-field">
+                    <label for="nuevoCargo"><i class="fas fa-briefcase" aria-hidden="true"></i> Cargo <span class="form-required">*</span></label>
+                    <select id="nuevoCargo" name="cargo" required class="{{ $errors->has('cargo') ? 'is-invalid' : '' }}" aria-describedby="nuevoCargoError">
                         <option value="" disabled {{ old('cargo') ? '' : 'selected' }}>Selecciona el cargo</option>
                         @foreach($cargosEquipo as $cargoOpcion)
                             <option value="{{ $cargoOpcion }}" {{ old('cargo') === $cargoOpcion ? 'selected' : '' }}>{{ $cargoOpcion }}</option>
                         @endforeach
                     </select>
+                    @error('cargo') <p class="form-error" id="nuevoCargoError">{{ $message }}</p> @enderror
                 </div>
-                <button type="submit" class="btn-save">Crear integrante</button>
+            </div>
+            <div class="form-card-footer">
+                <span class="form-security-note"><i class="fas fa-shield-alt" aria-hidden="true"></i><span>La cuenta se creará con los permisos iniciales correspondientes al cargo. Podrás revisarlos o ajustarlos en la tabla del equipo.</span></span>
+                <button type="submit" class="btn-save"><i class="fas fa-user-check" aria-hidden="true"></i> Crear integrante</button>
             </div>
         </form>
     </div>
@@ -698,7 +812,16 @@
 <script>
     document.getElementById('btnAgregar').addEventListener('click', function () {
         var box = document.getElementById('formularioContainer');
-        box.style.display = box.style.display === 'block' ? 'none' : 'block';
+        var abierto = box.style.display === 'block';
+        box.style.display = abierto ? 'none' : 'block';
+        this.setAttribute('aria-expanded', abierto ? 'false' : 'true');
+        if (!abierto) {
+            box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            window.setTimeout(function () {
+                var nombre = document.getElementById('nuevoNombre');
+                if (nombre) nombre.focus();
+            }, 180);
+        }
     });
 
     function limpiarClaveEditar() {

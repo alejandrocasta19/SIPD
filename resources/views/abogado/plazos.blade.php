@@ -1,7 +1,7 @@
 @extends('layouts.master')
 
 @php
-    $pageTitle = 'Plazos y términos';
+    $pageTitle = 'Seguimiento de descargos';
     $codigoPlazo = function ($id) {
         return 'PLZ-' . str_pad($id, 3, '0', STR_PAD_LEFT);
     };
@@ -13,8 +13,8 @@
 @section('page-header')
     <div class="proc-head">
         <div>
-            <h1>Plazos y términos</h1>
-            <p>Control de vencimientos y términos procesales.</p>
+            <h1>Seguimiento de descargos</h1>
+            <p>El límite se calcula a cinco días desde la creación del expediente. Al registrar descargos se compara la fecha registrada con ese límite; los registros históricos sin fecha no permiten verificar si se presentaron a tiempo.</p>
         </div>
         <div class="proc-head-side">
             <span class="stat-chip">{{ $conteos['todos'] }} total</span>
@@ -38,11 +38,12 @@
     --p-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.08);
     --p-hover: 0 20px 40px -10px rgba(15, 23, 42, 0.12);
     --t-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    --p-primary: var(--cth-green);
 }
 
 
 
-.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); margin-bottom: 24px; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); margin-bottom: 24px; }
 .kpi {
     background: var(--p-surface); border-radius: var(--radius); padding: 24px; box-shadow: var(--p-shadow); border-top: 4px solid #e2e8f0; transition: var(--t-smooth); animation: fadeInUp 0.6s ease-out backwards;
 }
@@ -73,6 +74,9 @@ table.plz tr:hover td { background: #f8fafc; }
 table.plz tr.sem-vigente td:first-child { border-left: 3px solid var(--cth-green-bright); }
 table.plz tr.sem-por-vencer td:first-child { border-left: 3px solid #f59e0b; }
 table.plz tr.sem-vencido td:first-child { border-left: 3px solid #ef4444; }
+table.plz tr.sem-presentado td:first-child { border-left: 3px solid var(--cth-green-bright); }
+table.plz tr.sem-presentado-tarde td:first-child { border-left: 3px solid #f59e0b; }
+table.plz tr.sem-presentado-sin-fecha td:first-child { border-left: 3px solid #64748b; }
 
 .id:hover { background: #e2e8f0; color: var(--p-dark); }
 .pro { color: var(--cth-green); font-weight: 700; text-decoration: none; font-family: var(--font-head); }
@@ -130,8 +134,8 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
 .pager-pages { display: flex; gap: 6px; align-items: center; }
 .pager a, .pager span.current { min-width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; text-decoration: none; color: #64748b; background: #fff; border: 1px solid var(--cth-border); }
 .pager span.current { background: var(--p-primary); border-color: var(--p-primary); color: #fff; font-weight: 700; }
-@media (max-width: 900px) { .kpis { grid-template-columns: 1fr; } .table-card { overflow-x: auto; } .proc-head { flex-direction: column; } }
-@media (max-width: 1100px) and (min-width: 901px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .table-card { overflow-x: auto; } .proc-head { flex-direction: column; } }
+@media (max-width: 560px) { .kpis { grid-template-columns: 1fr; } }
 </style>
 @endsection
 
@@ -147,7 +151,11 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
         </article>
         <article class="kpi vencido">
             <strong>{{ $conteos['vencido'] }}</strong>
-            <span>Vencido</span>
+            <span>Sin presentar · vencido</span>
+        </article>
+        <article class="kpi vigente">
+            <strong>{{ $conteos['presentado'] }}</strong>
+            <span>Descargos registrados</span>
         </article>
     </section>
 
@@ -165,7 +173,7 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                     <th>PROCESO</th>
                     <th>TRABAJADOR</th>
                     <th>MODALIDAD</th>
-                    <th>TIPO DE PLAZO</th>
+                    <th>DESCARGOS</th>
                     <th>VENCIMIENTO</th>
                     <th>DÍAS RESTANTES</th>
                     <th>ESTADO</th>
@@ -178,6 +186,9 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                         $semClass = match($plazo->semaforo) {
                             'vigente'    => 'sem-vigente',
                             'por_vencer' => 'sem-por-vencer',
+                            'presentado' => 'sem-presentado',
+                            'presentado_tarde' => 'sem-presentado-tarde',
+                            'presentado_sin_fecha' => 'sem-presentado-sin-fecha',
                             default      => 'sem-vencido',
                         };
                     @endphp
@@ -190,7 +201,7 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                         <td>
                             @php
                                 $puedeEditar = auth()->user()->puede('editar_casos') || auth()->user()->esCoordinadora();
-                                $yaVencido = $plazo->semaforo === 'vencido';
+                                $yaVencido = in_array($plazo->semaforo, ['vencido', 'presentado_tarde'], true);
                                 $editable = (!$plazo->tiene_forma_seteada || $puedeEditar) && !$yaVencido;
                                 $soloCoordinadora = in_array($plazo->estado, ['Sancionado', 'Archivado'], true) && !auth()->user()->esCoordinadora();
                             @endphp
@@ -330,7 +341,20 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                                     </div>
                                 @endif
                             @else
-                                {{ $plazo->tipo }}
+                                @php
+                                    $presentacionRegistrada = $plazo->descargos_presentacion;
+                                    $tieneArchivosDescargos = ($plazo->descargos_archivos ?? collect())->isNotEmpty();
+                                    if ($presentacionRegistrada === 'no_presento'
+                                        && ($tieneArchivosDescargos || filled($plazo->descargos))) {
+                                        $presentacionRegistrada = 'virtual';
+                                    }
+                                    $etiquetasPresentacion = [
+                                        'presencial' => 'Presentados · Presencial',
+                                        'virtual' => 'Presentados · Virtual',
+                                        'no_presento' => 'Sin registro de presentación',
+                                    ];
+                                @endphp
+                                {{ $etiquetasPresentacion[$presentacionRegistrada] ?? 'Sin registro de presentación' }}
                             @endif
 
                         </td>
@@ -339,12 +363,35 @@ table.plz td.col-acts { text-align: center; width: 1%; white-space: nowrap; }
                             @php
                                 $diasCls = $plazo->semaforo === 'vigente' ? 'ok' : ($plazo->semaforo === 'por_vencer' ? 'warn' : 'late');
                             @endphp
-                            <span class="dias {{ $diasCls }}">
-                                {{ $plazo->dias }} día{{ abs((int) $plazo->dias) === 1 ? '' : 's' }}
-                            </span>
+                            @if($plazo->presentado && $plazo->dias !== null)
+                                <span class="dias {{ $plazo->semaforo === 'presentado' ? 'ok' : 'late' }}">
+                                    @if($plazo->dias === 0)
+                                        Presentó el día límite
+                                    @elseif($plazo->semaforo === 'presentado')
+                                        Presentó {{ abs($plazo->dias) }} día{{ abs($plazo->dias) === 1 ? '' : 's' }} antes
+                                    @else
+                                        Presentó {{ abs($plazo->dias) }} día{{ abs($plazo->dias) === 1 ? '' : 's' }} tarde
+                                    @endif
+                                </span>
+                                <small class="dias-date" style="display:block;margin-top:4px;color:#64748b;">
+                                    Fecha de presentación: {{ $plazo->fecha_presentacion->format('d/m/Y H:i') }}
+                                </small>
+                            @elseif($plazo->presentacion_sin_fecha)
+                                <span class="dias">Presentado · fecha no registrada</span>
+                            @else
+                                <span class="dias {{ $diasCls }}">
+                                    {{ $plazo->dias }} día{{ abs((int) $plazo->dias) === 1 ? '' : 's' }}
+                                </span>
+                            @endif
                         </td>
                         <td>
-                            @if($plazo->semaforo === 'vigente')
+                            @if($plazo->semaforo === 'presentado')
+                                <span class="st vigente"><i class="fas fa-check-circle"></i> Presentado en plazo</span>
+                            @elseif($plazo->semaforo === 'presentado_tarde')
+                                <span class="st vencer"><i class="fas fa-check-circle"></i> Presentado tarde</span>
+                            @elseif($plazo->semaforo === 'presentado_sin_fecha')
+                                <span class="st"><i class="fas fa-check-circle"></i> Presentado</span>
+                            @elseif($plazo->semaforo === 'vigente')
                                 <span class="st vigente"><i class="fas fa-circle"></i> Vigente</span>
                             @elseif($plazo->semaforo === 'por_vencer')
                                 <span class="st vencer"><i class="fas fa-circle"></i> Por vencer</span>

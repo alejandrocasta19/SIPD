@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\Aviso;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 
@@ -47,8 +46,6 @@ class LoginController extends Controller
             if ($user->esEquipo()) {
                 $user->update(['last_login_at' => now()]);
             }
-            Aviso::registrarActividadSesion($user, true);
-
             return null;
         }
 
@@ -63,10 +60,6 @@ class LoginController extends Controller
 
     public function logout(Request $request)
     {
-        if ($user = $request->user()) {
-            Aviso::registrarActividadSesion($user, false);
-        }
-
         $this->guard()->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

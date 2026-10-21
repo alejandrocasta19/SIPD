@@ -43,13 +43,7 @@ class CoordinadoraTest extends TestCase
             ->get(route('coordinadora.veredictos'))
             ->assertOk()
             ->assertSee('Conductor Veredicto')
-            ->assertDontSee('Preparar casos de prueba')
-            ->assertDontSee('Prueba real del flujo')
-            ->assertDontSee('Camila Caso de Prueba');
-
-        $this->actingAs($coord)
-            ->post('/coordinadora/veredictos/preparar-pruebas')
-            ->assertNotFound();
+            ->assertDontSee('Preparar casos de prueba');
 
         $this->actingAs($coord)
             ->get(route('abogado.dashboard'))
@@ -153,7 +147,7 @@ class CoordinadoraTest extends TestCase
     }
 
     /** @test */
-    public function contador_de_bandeja_en_sidebar_coincide_con_campana_al_incluir_alertas_del_sistema()
+    public function contador_de_bandeja_omite_actividad_de_sesion_y_cuenta_alertas_del_sistema()
     {
         $coord = $this->makeUser('coordinadora');
         $rh = $this->makeUser('abogado');
@@ -166,8 +160,9 @@ class CoordinadoraTest extends TestCase
         $this->actingAs($coord)
             ->get(route('abogado.dashboard'))
             ->assertOk()
-            ->assertSee('class="badge-dot">2', false)
-            ->assertSee('class="sipd-nav-count">2', false);
+            ->assertSee('class="badge-dot">1', false)
+            ->assertSee('class="sipd-nav-count">1', false)
+            ->assertDontSee('Inicio de sesión');
     }
 
     /** @test */
@@ -198,6 +193,93 @@ class CoordinadoraTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame($destino->id, $caso->fresh()->user_id);
+    }
+
+    /** @test */
+    public function el_integrante_confirma_una_asignacion_una_sola_vez_y_se_avisa_a_coordinacion()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $origen = $this->makeUser('equipo');
+        $destino = $this->makeUser('equipo');
+        $caso = $this->makeCaso($origen);
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.asignar', $caso->id), ['user_id' => $destino->id])
+            ->assertRedirect();
+
+        $asignacion = DB::table('disciplinario_asignaciones')
+            ->where('caso_id', $caso->id)
+            ->where('active_case_id', $caso->id)
+            ->first();
+
+        $this->assertNotNull($asignacion);
+        $this->assertNull($asignacion->received_at);
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $destino->id,
+            'tipo' => Aviso::TIPO_ASIGNACION,
+            'proceso_id' => $caso->id,
+        ]);
+
+        $this->actingAs($destino)
+            ->put(route('abogado.confirmar_recepcion', $caso->id))
+            ->assertSessionHas('success');
+
+        $this->assertNotNull(DB::table('disciplinario_asignaciones')
+            ->where('caso_id', $caso->id)
+            ->where('active_case_id', $caso->id)
+            ->value('received_at'));
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $coord->id,
+            'tipo' => Aviso::TIPO_RECEPCION,
+            'proceso_id' => $caso->id,
+        ]);
+
+        $this->put(route('abogado.confirmar_recepcion', $caso->id))
+            ->assertSessionHas('info');
+
+        $this->assertSame(1, Aviso::where('user_id', $coord->id)
+            ->where('tipo', Aviso::TIPO_RECEPCION)
+            ->where('proceso_id', $caso->id)
+            ->count());
+    }
+
+    /** @test */
+    public function la_resolucion_de_recuperacion_notifica_al_integrante()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $integranteRechazado = $this->makeUser('equipo');
+        $integranteNotificado = $this->makeUser('equipo');
+        $rechazo = RecuperacionContrasena::create([
+            'user_id' => $integranteRechazado->id,
+            'estado' => RecuperacionContrasena::PENDIENTE,
+        ]);
+        $envio = RecuperacionContrasena::create([
+            'user_id' => $integranteNotificado->id,
+            'estado' => RecuperacionContrasena::PENDIENTE,
+        ]);
+
+        $this->actingAs($coord)
+            ->put(route('coordinadora.recuperaciones.responder', $rechazo->id), [
+                'accion' => 'rechazar',
+            ])
+            ->assertSessionHas('success');
+
+        $this->put(route('coordinadora.recuperaciones.responder', $envio->id), [
+            'accion' => 'enviar_enlace',
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $integranteRechazado->id,
+            'tipo' => Aviso::TIPO_RECUPERACION,
+            'titulo' => 'Solicitud de recuperación rechazada',
+        ]);
+        $this->assertDatabaseHas('sipd_avisos', [
+            'user_id' => $integranteNotificado->id,
+            'tipo' => Aviso::TIPO_RECUPERACION,
+            'titulo' => 'Enlace de recuperación enviado',
+        ]);
+        $this->assertSame(RecuperacionContrasena::RECHAZADA, $rechazo->fresh()->estado);
+        $this->assertSame(RecuperacionContrasena::ENLACE_ENVIADO, $envio->fresh()->estado);
     }
 
     /** @test */
@@ -583,7 +665,7 @@ class CoordinadoraTest extends TestCase
     }
 
     /** @test */
-    public function rh_no_borra_notificaciones_sin_permiso()
+    public function rh_puede_borrar_notificaciones_sin_permiso()
     {
         $coord = $this->makeUser('coordinadora');
         $rh = $this->makeUser('abogado');
@@ -594,53 +676,47 @@ class CoordinadoraTest extends TestCase
             'motivo' => 'Motivo',
         ]);
 
+        $this->assertFalse($rh->puede('eliminar_notificaciones'));
+
+        $this->actingAs($rh)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertSee(route('notificaciones.destroy', $aviso->id), false)
+            ->assertSee(route('notificaciones.leidas'), false);
+
         $this->actingAs($rh)
             ->from(route('notificaciones.index'))
             ->delete(route('notificaciones.destroy', $aviso->id))
             ->assertRedirect(route('notificaciones.index'))
-            ->assertSessionHas('error');
+            ->assertSessionHas('success');
 
-        $this->assertDatabaseHas('sipd_avisos', ['id' => $aviso->id]);
+        $this->assertDatabaseMissing('sipd_avisos', ['id' => $aviso->id]);
     }
 
     /** @test */
-    public function rh_solicita_borrar_notificaciones_y_coordinadora_otorga()
+    public function rh_puede_borrar_todas_sus_notificaciones_leidas_sin_permiso()
     {
-        $coord = $this->makeUser('coordinadora');
-        $rh = $this->makeUser('abogado', ['name' => 'Kelly RH']);
-        $aviso = \App\Models\Aviso::enviar($rh, [
-            'remitente_id' => $coord->id,
+        $rh = $this->makeUser('abogado');
+        $leido = \App\Models\Aviso::enviar($rh, [
             'tipo' => \App\Models\Aviso::TIPO_AVISO,
-            'titulo' => 'Para borrar',
-            'motivo' => 'Motivo',
+            'titulo' => 'Aviso leído',
+            'leida_at' => now(),
+        ]);
+        $noLeido = \App\Models\Aviso::enviar($rh, [
+            'tipo' => \App\Models\Aviso::TIPO_AVISO,
+            'titulo' => 'Aviso nuevo',
         ]);
 
-        $this->actingAs($rh)
-            ->post(route('permisos.solicitar'), [
-                'permiso' => 'eliminar_notificaciones',
-                'que_hara' => 'Borrar avisos de la bandeja',
-                'motivo' => 'Ya los atendí',
-                'duracion' => '1',
-            ])
-            ->assertRedirect();
-
-        $solicitud = \App\Models\PermisoSolicitud::first();
-        $this->actingAs($coord)
-            ->put(route('coordinadora.solicitudes.responder', $solicitud->id), [
-                'accion' => 'otorgar',
-                'permiso' => 'eliminar_notificaciones',
-                'duracion' => '1',
-            ])
-            ->assertRedirect();
-
-        $this->assertTrue($rh->fresh()->puede('eliminar_notificaciones'));
+        $this->assertFalse($rh->puede('eliminar_notificaciones'));
 
         $this->actingAs($rh)
             ->from(route('notificaciones.index'))
-            ->delete(route('notificaciones.destroy', $aviso->id))
-            ->assertRedirect();
+            ->delete(route('notificaciones.leidas'))
+            ->assertRedirect(route('notificaciones.index'))
+            ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('sipd_avisos', ['id' => $aviso->id]);
+        $this->assertDatabaseMissing('sipd_avisos', ['id' => $leido->id]);
+        $this->assertDatabaseHas('sipd_avisos', ['id' => $noLeido->id]);
     }
 
     /** @test */
@@ -742,7 +818,7 @@ class CoordinadoraTest extends TestCase
             ->assertSee('Nuevo Proceso')
             ->assertSee('Mis Casos')
             ->assertSee('Reincidencias')
-            ->assertSee('Plazos y términos')
+            ->assertSee('Seguimiento de descargos')
             ->assertDontSee('Resoluciones')
             ->assertSee('Estadísticas / Reportes')
             ->assertSee('class="perm-mod-card"', false)

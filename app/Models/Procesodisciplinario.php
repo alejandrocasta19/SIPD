@@ -41,6 +41,7 @@ class ProcesoDisciplinario extends Model
         'descargos',
         'descargos_forma',
         'descargos_medio',
+        'descargos_presentados_at',
         'decision_final',
         'veredicto_tipo',
         'dias_sancion',
@@ -56,6 +57,7 @@ class ProcesoDisciplinario extends Model
         'fecha_falta' => 'date',
         'datos_oficiales' => 'array',
         'dias_sancion' => 'integer',
+        'descargos_presentados_at' => 'datetime',
     ];
 
     public const DESCARGOS_MEDIOS = [
@@ -107,6 +109,12 @@ class ProcesoDisciplinario extends Model
             return 'no_presento';
         }
         return filled($this->descargos) ? 'presencial' : 'no_presento';
+    }
+
+    public function tieneDescargosRegistrados(): bool
+    {
+        return in_array($this->descargosPresentacionValue(), ['presencial', 'virtual'], true)
+            || filled($this->descargos);
     }
 
     public function etiquetaTipoDescargos(): string
@@ -363,7 +371,7 @@ class ProcesoDisciplinario extends Model
     public function semaforoPlazo(): string
     {
         $dias = $this->diasPlazo();
-        if ($dias <= 0) {
+        if ($dias < 0) {
             return 'vencido';
         }
         if ($dias <= 2) {
@@ -378,10 +386,10 @@ class ProcesoDisciplinario extends Model
         $abierto = in_array($this->estado, ['Pendiente', 'En Proceso'], true);
         $dias = $this->diasPlazo();
 
-        if ($abierto && $dias <= 0) {
+        if ($abierto && !$this->tieneDescargosRegistrados() && $dias < 0) {
             return ['texto' => 'Plazo vencido', 'tono' => 'late'];
         }
-        if ($abierto && $dias <= 2) {
+        if ($abierto && !$this->tieneDescargosRegistrados() && $dias <= 2) {
             return [
                 'texto' => $dias === 1 ? 'Vence mañana' : 'Vence en ' . $dias . ' días',
                 'tono' => 'warn',
@@ -395,7 +403,7 @@ class ProcesoDisciplinario extends Model
             if (!$this->tieneLosCuatroDocumentosGeneradosYDescargados()) {
                 return ['texto' => 'Descargar documentos', 'tono' => 'info'];
             }
-            if (!filled($this->descargos)) {
+            if (!$this->tieneDescargosRegistrados()) {
                 return ['texto' => 'Registrar descargos', 'tono' => 'warn'];
             }
 

@@ -99,7 +99,11 @@ class AnexoTest extends TestCase
             ->assertRedirect(route('abogado.plazos'));
 
         $this->assertSame('virtual', $caso->fresh()->descargos_forma);
+        $this->assertNotNull($caso->fresh()->descargos_presentados_at);
         $this->assertDatabaseMissing('caso_anexos', ['caso_id' => $caso->id]);
+        $this->get(route('abogado.plazos'))
+            ->assertOk()
+            ->assertSee('Presentado en plazo');
     }
 
     /** @test */
@@ -143,6 +147,98 @@ class AnexoTest extends TestCase
             ->assertForbidden();
 
         $this->assertNull($caso->fresh()->descargos_forma);
+    }
+
+    /** @test */
+    public function muestra_presentacion_historica_sin_inventar_fecha_aunque_el_plazo_original_este_vencido()
+    {
+        $user = $this->makeUser();
+        $caso = $this->makeCaso($user, [
+            'descargos_forma' => 'virtual',
+            'created_at' => now()->subDays(10),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('abogado.plazos'))
+            ->assertOk()
+            ->assertSee('Seguimiento de descargos')
+            ->assertSee('DESCARGOS')
+            ->assertSee('Virtual')
+            ->assertSee('Presentado · fecha no registrada')
+            ->assertSee('no permiten verificar si se presentaron a tiempo');
+    }
+
+    /** @test */
+    public function un_descargo_presentado_despues_del_limite_se_muestra_como_presentado_tarde()
+    {
+        $user = $this->makeUser();
+        $caso = $this->makeCaso($user, [
+            'created_at' => now()->subDays(10),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('abogado.plazos.descargos', $caso->id), [
+                'descargos_presentacion' => 'virtual',
+            ])
+            ->assertRedirect(route('abogado.plazos'));
+
+        $this->actingAs($user)
+            ->get(route('abogado.plazos'))
+            ->assertOk()
+            ->assertSee('Presentado tarde')
+            ->assertSee('días tarde')
+            ->assertDontSee('Presentado · fecha no registrada');
+    }
+
+    /** @test */
+    public function seguimiento_muestra_fecha_y_hora_de_presentacion_de_descargos()
+    {
+        $user = $this->makeUser();
+        $fechaPresentacion = now()->subDays(2)->setTime(9, 15);
+        $caso = $this->makeCaso($user, [
+            'descargos_forma' => 'virtual',
+            'descargos_presentados_at' => $fechaPresentacion,
+            'created_at' => now()->subDays(6),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('abogado.plazos'))
+            ->assertOk()
+            ->assertSee('Virtual')
+            ->assertSee('Fecha de presentación: ' . $fechaPresentacion->format('d/m/Y H:i'));
+    }
+
+    /** @test */
+    public function un_expediente_con_descargos_registrados_no_sigue_apareciendo_como_plazo_pendiente()
+    {
+        $user = $this->makeUser();
+        $caso = $this->makeCaso($user, [
+            'descargos_forma' => 'presencial',
+            'created_at' => now()->subDays(10),
+        ]);
+
+        $this->assertNotSame('Plazo vencido', $caso->siguienteAccion()['texto']);
+
+        $this->actingAs($user)
+            ->get(route('abogado.dashboard'))
+            ->assertOk()
+            ->assertViewHas('plazosVencidos', 0);
+    }
+
+    /** @test */
+    public function el_dia_del_vencimiento_sigue_en_plazo_y_se_vuelve_vencido_al_dia_siguiente()
+    {
+        $enFechaLimite = $this->makeCaso($this->makeUser(), [
+            'created_at' => now()->startOfDay()->subDays(5),
+        ]);
+        $despuesDelLimite = $this->makeCaso($this->makeUser(), [
+            'created_at' => now()->startOfDay()->subDays(6),
+        ]);
+
+        $this->assertSame(0, $enFechaLimite->diasPlazo());
+        $this->assertSame('por_vencer', $enFechaLimite->semaforoPlazo());
+        $this->assertSame(-1, $despuesDelLimite->diasPlazo());
+        $this->assertSame('vencido', $despuesDelLimite->semaforoPlazo());
     }
 
     /** @test */

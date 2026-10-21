@@ -7,6 +7,7 @@ use App\Models\CasoDocumentoEstado;
 use App\Models\ProcesoDisciplinario;
 use App\Support\Paginacion;
 use App\Support\CaseFilePath;
+use App\Support\WorkflowNotifications;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -139,6 +140,12 @@ class AnexoController extends Controller
             'titulo' => $resuelto['titulo'],
             'firmado_at' => $esTerminacion ? now() : null,
         ]));
+        WorkflowNotifications::caseEvent(
+            $caso,
+            auth()->user(),
+            'cargó un anexo',
+            $resuelto['titulo']
+        );
 
         $slot = CasoDocumentoEstado::slotDe($resuelto['tipo']);
         $mensaje = $esTerminacion
@@ -165,6 +172,13 @@ class AnexoController extends Controller
             'local'
         );
         abort_unless($ruta, 404);
+
+        WorkflowNotifications::caseEvent(
+            $anexo->caso,
+            auth()->user(),
+            'descargó un anexo',
+            $anexo->nombreVisible()
+        );
 
         return response()->download($ruta, $anexo->nombreDescarga());
     }
@@ -220,6 +234,12 @@ class AnexoController extends Controller
                 Storage::disk('local')->delete($ruta);
             }
         }
+        WorkflowNotifications::caseEvent(
+            $anexo->caso,
+            auth()->user(),
+            'registró el escaneo firmado',
+            $anexo->titulo
+        );
 
         return redirect()
             ->route('abogado.anexos', ['filtro' => 'firmado'])
@@ -286,6 +306,12 @@ class AnexoController extends Controller
         }
 
         $anexo->update($payload);
+        WorkflowNotifications::caseEvent(
+            $anexo->caso,
+            auth()->user(),
+            $archivo ? 'reemplazó un anexo' : 'actualizó un anexo',
+            $resuelto['titulo']
+        );
 
         return redirect()
             ->route('abogado.anexos', array_filter([
@@ -303,6 +329,12 @@ class AnexoController extends Controller
 
             $this->borrarArchivos($anexo);
             $anexo->delete();
+            WorkflowNotifications::caseEvent(
+                $anexo->caso,
+                auth()->user(),
+                'eliminó un anexo',
+                $anexo->nombreVisible()
+            );
 
             return redirect()->route('abogado.anexos')->with('success', 'Anexo eliminado.');
         } catch (\Exception $e) {

@@ -310,7 +310,11 @@
         @endforeach
 
         <div class="table-card">
-            @include('partials.paginacion', ['paginador' => $workersGrouped, 'etiqueta' => 'personas'])
+            @include('partials.paginacion', [
+                'paginador' => $workersGrouped,
+                'etiqueta' => 'personas',
+                'reiniciarScrollAlPaginar' => true,
+            ])
         </div>
     @endif
 @endsection

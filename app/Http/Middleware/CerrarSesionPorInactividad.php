@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use Closure;
-use App\Models\Aviso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -34,10 +33,6 @@ class CerrarSesionPorInactividad
 
     private function cerrar(Request $request)
     {
-        if ($user = $request->user()) {
-            Aviso::registrarActividadSesion($user, false);
-        }
-
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

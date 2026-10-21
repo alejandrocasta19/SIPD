@@ -107,7 +107,7 @@
                             <span class="dash-chip">{{ $atencion->count() }}</span>
                         @endif
                     </span>
-                    <a href="{{ route('abogado.plazos') }}">Plazos &rarr;</a>
+                    <a href="{{ route('abogado.plazos') }}">Seguimiento de descargos &rarr;</a>
                 </div>
 
                 @forelse($atencion as $proceso)
@@ -158,7 +158,7 @@
                         <i class="fas fa-chevron-right right"></i>
                     </a>
                     <a href="{{ route('abogado.plazos') }}">
-                        <span><i class="far fa-clock left"></i> Plazos y términos</span>
+                        <span><i class="far fa-clock left"></i> Seguimiento de descargos</span>
                         @if(($plazosVencidos + $plazosPorVencer) > 0)<em class="count">{{ $plazosVencidos + $plazosPorVencer }}</em>@endif
                         <i class="fas fa-chevron-right right"></i>
                     </a>

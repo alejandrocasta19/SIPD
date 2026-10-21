@@ -108,6 +108,15 @@ class CoordinadoraController extends Controller
                 'responded_at' => now(),
             ]);
 
+            if ($solicitud->user) {
+                Aviso::enviar($solicitud->user, [
+                    'remitente_id' => auth()->id(),
+                    'tipo' => Aviso::TIPO_RECUPERACION,
+                    'titulo' => 'Solicitud de recuperación rechazada',
+                    'cuerpo' => 'La coordinadora rechazó tu solicitud para restablecer la contraseña.',
+                ]);
+            }
+
             return back()->with('success', 'Solicitud rechazada.');
         }
 
@@ -127,6 +136,13 @@ class CoordinadoraController extends Controller
             'estado' => RecuperacionContrasena::ENLACE_ENVIADO,
             'responded_by' => auth()->id(),
             'responded_at' => now(),
+        ]);
+
+        Aviso::enviar($solicitud->user, [
+            'remitente_id' => auth()->id(),
+            'tipo' => Aviso::TIPO_RECUPERACION,
+            'titulo' => 'Enlace de recuperación enviado',
+            'cuerpo' => 'La coordinadora envió a tu correo un enlace de un solo uso para restablecer la contraseña.',
         ]);
 
         return back()->with('success', 'Se envió al correo del usuario un enlace de un solo uso para crear su contraseña.');
@@ -291,6 +307,12 @@ class CoordinadoraController extends Controller
         }
 
         $miembro->sincronizarPermisos($claves, $duraciones, auth()->id(), $horasCustom);
+        Aviso::enviar($miembro, [
+            'remitente_id' => auth()->id(),
+            'tipo' => Aviso::TIPO_FLUJO,
+            'titulo' => 'Tus permisos de SIPD fueron actualizados',
+            'cuerpo' => 'La coordinadora actualizó los permisos asignados a tu cuenta. Revisa las opciones disponibles en el menú.',
+        ]);
 
         return redirect()
             ->route('coordinadora.abogados')

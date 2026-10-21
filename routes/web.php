@@ -9,6 +9,7 @@ use App\Http\Controllers\DocumentoController;
 use App\Http\Controllers\AnexoController;
 use App\Http\Controllers\AvisoController;
 use App\Http\Controllers\CoordinadoraController;
+use App\Http\Controllers\ManualUsuarioController;
 use App\Http\Controllers\Auth\SesionInactividadController;
 
 /*
@@ -45,6 +46,9 @@ Route::middleware(['auth', 'role:admin,equipo'])->group(function () {
 
     Route::get('/abogado', [ProcesoDisciplinarioController::class, 'dashboard'])
         ->name('abogado.dashboard');
+
+    Route::get('/manual-usuario', [ManualUsuarioController::class, 'index'])
+        ->name('manual.index');
 
     Route::post('/sesion/actividad', [SesionInactividadController::class, 'actividad'])
         ->name('sesion.actividad');
@@ -264,6 +268,11 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
         ->name('coordinadora.notificar');
     Route::post('/coordinadora/avisos', [CoordinadoraController::class, 'notificarEquipo'])
         ->name('coordinadora.notificar.enviar');
+});
+
+Route::middleware(['auth', 'role:equipo'])->group(function () {
+    Route::put('/abogado/procesos/{id}/confirmar-recepcion', [ProcesoDisciplinarioController::class, 'confirmarRecepcion'])
+        ->name('abogado.confirmar_recepcion');
 });
 
 Route::middleware(['auth'])->group(function () {

@@ -12,6 +12,7 @@ use App\Models\CasoEvidencia;
 use App\Models\CasoDocumentoEstado;
 use App\Support\Paginacion;
 use App\Support\CaseFilePath;
+use App\Support\WorkflowNotifications;
 use App\Services\OfficialDocumentService;
 use App\Services\FirmaDocumentoService;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -232,6 +233,14 @@ class DocumentoController extends Controller
             $firmas->guardarFirmaTrabajador($archivo, $caso);
         }
 
+        WorkflowNotifications::caseEvent(
+            $caso,
+            $user,
+            'actualizó las firmas del documento',
+            CasoDocumentoEstado::etiqueta($tipo),
+            $tipo
+        );
+
         return back()->with('success', 'Firma(s) guardada(s) de forma privada para este expediente.');
     }
 
@@ -274,6 +283,7 @@ class DocumentoController extends Controller
         $definitions = $documents->blockDefinitions($tipo);
 
         $bloques = $this->bloquesDesdeRequest($request, $tipo, count($definitions));
+        $actor = auth()->user();
 
         $data = $caso->datos_oficiales ?: [];
         $data['yellow_blocks'][$tipo] = $bloques;
@@ -296,6 +306,13 @@ class DocumentoController extends Controller
             if (!$yaGenerado) {
                 $this->notificarFirmaPendiente($caso, $tipo);
             }
+            WorkflowNotifications::caseEvent(
+                $caso,
+                $actor,
+                $yaGenerado ? 'actualizó el documento oficial' : 'generó el documento oficial',
+                CasoDocumentoEstado::etiqueta($tipo),
+                $tipo
+            );
 
             $mensaje = $tipo === 'terminacion'
                 ? 'Documento generado. Descárgalo en Generar documentos, imprímelo para firma del gerente y sube el escaneo en Anexos.'
@@ -309,6 +326,13 @@ class DocumentoController extends Controller
         if ($estadoDoc->estado !== 'generado') {
             $estadoDoc->update(['estado' => $nuevoEstado]);
         }
+        WorkflowNotifications::caseEvent(
+            $caso,
+            $actor,
+            'guardó cambios en el documento',
+            CasoDocumentoEstado::etiqueta($tipo),
+            $tipo
+        );
 
         $redirect = redirect()->route('documentos.edit', [$id, $tipo]);
 
@@ -462,6 +486,13 @@ class DocumentoController extends Controller
         if ($generadoAhora) {
             $this->notificarFirmaPendiente($caso, $tipo);
         }
+        WorkflowNotifications::caseEvent(
+            $caso,
+            $user,
+            'descargó el documento oficial',
+            CasoDocumentoEstado::etiqueta($tipo),
+            $tipo
+        );
 
         $response->headers->set('X-SIPD-Download-Registered', '1');
 
@@ -525,6 +556,8 @@ class DocumentoController extends Controller
             'ruta_segura'       => $ruta,
         ]);
 
+        WorkflowNotifications::caseEvent($caso, auth()->user(), 'cargó una evidencia');
+
         return redirect()
             ->route('documentos.index', $id)
             ->with('success', 'Evidencia cargada correctamente.');
@@ -554,6 +587,8 @@ class DocumentoController extends Controller
         }
         abort_unless($ruta, 404);
 
+        WorkflowNotifications::caseEvent($caso, auth()->user(), 'descargó una evidencia');
+
         return response()->download($ruta, $evidencia->nombre_original);
     }
 
@@ -574,6 +609,7 @@ class DocumentoController extends Controller
 
             Storage::disk('local')->delete($evidencia->ruta_segura);
             $evidencia->delete();
+            WorkflowNotifications::caseEvent($caso, auth()->user(), 'eliminó una evidencia');
 
             return redirect()
                 ->route('documentos.index', $id)

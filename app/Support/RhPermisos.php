@@ -27,7 +27,6 @@ class RhPermisos
     public const EXPORTAR_REPORTES = 'exportar_reportes';
 
     public const EDITAR_PERFIL = 'editar_perfil';
-    public const ELIMINAR_NOTIFICACIONES = 'eliminar_notificaciones';
 
     public static function catalogo(): array
     {
@@ -142,11 +141,9 @@ class RhPermisos
                 'desc' => 'Datos personales y bandeja. No es un módulo del menú; se asigna aparte.',
                 'items' => [
                     self::EDITAR_PERFIL => 'Editar perfil y contraseña',
-                    self::ELIMINAR_NOTIFICACIONES => 'Borrar notificaciones',
                 ],
                 'hints' => [
                     self::EDITAR_PERFIL => 'Nombre, correo y contraseña.',
-                    self::ELIMINAR_NOTIFICACIONES => 'Vaciar avisos de la bandeja.',
                 ],
             ],
         ];
@@ -300,7 +297,6 @@ class RhPermisos
             self::ELIMINAR_ANEXOS,
             self::EXPORTAR_REPORTES,
             self::EDITAR_PERFIL,
-            self::ELIMINAR_NOTIFICACIONES,
         ];
 
         $grupos = [];

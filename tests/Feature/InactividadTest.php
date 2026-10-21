@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\CerrarSesionPorInactividad;
-use App\Models\Aviso;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,7 +36,7 @@ class InactividadTest extends TestCase
     /** @test */
     public function cierra_la_sesion_a_los_30_minutos_sin_actividad()
     {
-        $coord = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        User::factory()->create(['role' => User::ROLE_ADMIN]);
         $user = User::factory()->create(['role' => User::ROLE_EQUIPO]);
         $ahora = Carbon::parse('2026-10-02 12:00:00');
         Carbon::setTestNow($ahora);
@@ -49,19 +48,11 @@ class InactividadTest extends TestCase
             ->assertSessionHas('status', CerrarSesionPorInactividad::MENSAJE);
 
         $this->assertGuest();
-        $this->assertDatabaseHas('sipd_avisos', [
-            'user_id' => $coord->id,
-            'tipo' => Aviso::TIPO_SESION,
-            'remitente_id' => $user->id,
-        ]);
-        $this->assertStringContainsString(
-            'Fecha y hora: 02/10/2026 12:00:00.',
-            Aviso::query()->where('user_id', $coord->id)->firstOrFail()->cuerpo
-        );
+        $this->assertDatabaseCount('sipd_avisos', 0);
     }
 
     /** @test */
-    public function login_y_logout_del_equipo_notifican_a_la_coordinadora_con_fecha_y_hora()
+    public function login_y_logout_del_equipo_no_generan_notificaciones_de_trabajo()
     {
         $coord = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $user = User::factory()->create(['role' => User::ROLE_EQUIPO]);
@@ -74,22 +65,9 @@ class InactividadTest extends TestCase
             ])
             ->assertRedirect('/abogado');
 
-        $this->assertDatabaseHas('sipd_avisos', [
-            'user_id' => $coord->id,
-            'tipo' => Aviso::TIPO_SESION,
-            'remitente_id' => $user->id,
-            'titulo' => 'Inicio de sesión del equipo',
-        ]);
-
         $this->post(route('logout'))->assertRedirect('/');
 
-        $this->assertDatabaseCount('sipd_avisos', 2);
-        $this->assertDatabaseHas('sipd_avisos', [
-            'user_id' => $coord->id,
-            'tipo' => Aviso::TIPO_SESION,
-            'remitente_id' => $user->id,
-            'titulo' => 'Cierre de sesión del equipo',
-        ]);
+        $this->assertDatabaseCount('sipd_avisos', 0);
     }
 
     /** @test */

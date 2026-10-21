@@ -65,16 +65,16 @@
 
     /* ── TABLE ───────────────────────────────────── */
     .case-tbl { background:#fff; border: 1px solid var(--cth-border); border-radius:10px; overflow:auto; }
-    .case-tbl table { width:100%; min-width:720px; border-collapse:collapse; font-size:11.5px; }
+    .case-tbl table { width:100%; min-width:720px; border-collapse:collapse; font-size:13px; }
     .case-tbl thead tr { background:#f8fafc; }
-    .case-tbl th { padding:6px 9px; border:1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; text-align:left; color:#64748b; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+    .case-tbl th { padding:6px 9px; border:1px solid var(--cth-border); border-bottom: 2px solid #e2e8f0; text-align:left; color:#64748b; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; }
     .case-tbl td { padding:5px 9px; border:1px solid var(--cth-border); color:#334155; vertical-align:middle; background:#fff; }
     .case-tbl tr:hover td { background:#f8fafc; }
     .case-tbl tr.st-pendiente td:first-child  { border-left: 3px solid #f59e0b; }
     .case-tbl tr.st-en-proceso td:first-child  { border-left: 3px solid #3b82f6; }
     .case-tbl tr.st-sancionado td:first-child  { border-left: 3px solid #f43f5e; }
     .case-tbl tr.st-archivado td:first-child   { border-left: 3px solid #94a3b8; }
-    .proc-lnk { color:var(--cth-green-text); font-weight:700; text-decoration:none; font-size:10.5px; font-family:monospace; }
+    .proc-lnk { color:var(--cth-green-text); font-weight:700; text-decoration:none; font-size:13px; font-family:inherit; }
     .case-tbl td b { font-weight:600; color:#0f172a; }
     .act-lnk  { width: 28px; height: 28px; border-radius: 6px; background: #f1f5f9; color: #64748b; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 12px; transition: all .15s; }
     .act-lnk:hover { background: #ecfdf5; color: var(--cth-green-text); }

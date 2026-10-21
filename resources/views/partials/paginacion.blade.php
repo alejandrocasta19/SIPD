@@ -32,24 +32,23 @@
         </nav>
     </div>
 
-    <script>
-    // Fase bubble (capture=false) → corre DESPUÉS de los listeners capture del master
-    // El master guarda la posición actual en click+capture. Nosotros la sobreescribimos
-    // con top:0 en click+bubble, siendo la última escritura antes de navegar.
-    document.addEventListener('click', function (e) {
-        var a = e.target.closest('a.sipd-page-nav');
-        if (!a) return;
-        if (document.documentElement.scrollHeight <= window.innerHeight * 1.6) return;
-        try {
-            var dest = new URL(a.href, window.location.href);
-            sessionStorage.setItem('sipd_scroll_restore', JSON.stringify({
-                path: dest.pathname,
-                top: 0,
-                anchorTop: null,
-                pagerIndex: null,
-                sidebarTop: null
-            }));
-        } catch (e) {}
-    }); // sin capture — fase bubble, última en ejecutarse
-    </script>
+    @if(!empty($reiniciarScrollAlPaginar))
+        <script>
+        document.addEventListener('click', function (e) {
+            var a = e.target.closest('a.sipd-page-nav');
+            if (!a) return;
+            if (document.documentElement.scrollHeight <= window.innerHeight * 1.6) return;
+            try {
+                var dest = new URL(a.href, window.location.href);
+                sessionStorage.setItem('sipd_scroll_restore', JSON.stringify({
+                    path: dest.pathname,
+                    top: 0,
+                    anchorTop: null,
+                    pagerIndex: null,
+                    sidebarTop: null
+                }));
+            } catch (e) {}
+        });
+        </script>
+    @endif
 @endif
