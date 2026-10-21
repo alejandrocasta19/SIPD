@@ -145,8 +145,6 @@ class AlertasSistema
         }
 
         return $query->whereIn('estado', ['Pendiente', 'En Proceso'])
-            ->where(function ($inner) {
-                $inner->whereNull('descargos')->orWhere('descargos', '');
-            });
+            ->sinDescargosPresentados();
     }
 }

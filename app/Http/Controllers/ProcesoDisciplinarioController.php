@@ -83,25 +83,11 @@ class ProcesoDisciplinarioController extends Controller
         $saludo = $hora < 12 ? 'Buenos días' : ($hora < 19 ? 'Buenas tardes' : 'Buenas noches');
 
         $casosAbiertosQuery = (clone $visible)->whereIn('estado', ['Pendiente', 'En Proceso']);
-        $casosSinDescargosQuery = function ($query) {
-            return $query
-                ->where(function ($subquery) {
-                    $subquery->whereNull('descargos_forma')
-                        ->orWhere('descargos_forma', 'no_presento');
-                })
-                ->where(function ($subquery) {
-                    $subquery->whereNull('descargos')
-                        ->orWhere('descargos', '');
-                })
-                ->whereDoesntHave('anexos', function ($anexos) {
-                    $anexos->where('tipo', CasoAnexo::TIPO_DESCARGOS);
-                });
-        };
         $hoy = now()->startOfDay();
-        $plazosVencidos = $casosSinDescargosQuery(clone $casosAbiertosQuery)
+        $plazosVencidos = (clone $casosAbiertosQuery)->sinDescargosPresentados()
             ->whereDate('created_at', '<', $hoy->copy()->subDays(5)->toDateString())
             ->count();
-        $plazosPorVencer = $casosSinDescargosQuery(clone $casosAbiertosQuery)
+        $plazosPorVencer = (clone $casosAbiertosQuery)->sinDescargosPresentados()
             ->whereBetween('created_at', [
                 $hoy->copy()->subDays(5)->toDateString(),
                 $hoy->copy()->subDays(3)->endOfDay(),
@@ -119,9 +105,7 @@ class ProcesoDisciplinarioController extends Controller
             ->values();
 
         $descargosPendientes = (clone $visible)->whereNotIn('estado', ['Sancionado', 'Archivado'])
-            ->where(function ($query) {
-                $query->whereNull('descargos')->orWhere('descargos', '');
-            })
+            ->sinDescargosPresentados()
             ->count();
 
         $recientes = (clone $visible)->with(['user', 'documentoEstados', 'anexos'])

@@ -10,6 +10,7 @@ use App\Models\ProcesoDisciplinario;
 use App\Models\Aviso;
 use App\Models\RecuperacionContrasena;
 use App\Models\User;
+use App\Support\AlertasSistema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -91,6 +92,60 @@ class CoordinadoraTest extends TestCase
             ->assertSee('class="dash-pipe-num">1</div>', false)
             ->assertSee('Caso realmente en espera')
             ->assertDontSee('8 pendientes de veredicto.');
+    }
+
+    /** @test */
+    public function presentaciones_de_descargos_sin_texto_no_aparecen_como_pendientes()
+    {
+        $coord = $this->makeUser('coordinadora');
+        $presentaciones = [
+            ['forma' => 'presencial', 'texto' => null, 'estado' => 'Pendiente'],
+            ['forma' => 'presencial', 'texto' => 'Presentó su respuesta.', 'estado' => 'En Proceso'],
+            ['forma' => 'virtual', 'texto' => null, 'estado' => 'En Proceso'],
+            ['forma' => 'virtual', 'texto' => 'Respuesta recibida por correo.', 'estado' => 'Pendiente'],
+        ];
+
+        $casosPresentados = collect($presentaciones)->map(function (array $presentacion) use ($coord) {
+            return $this->makeCaso($coord, [
+                'nombre' => 'Presentación ' . $presentacion['forma'] . ' ' . ($presentacion['texto'] ? 'con texto' : 'sin texto'),
+                'estado' => $presentacion['estado'],
+                'descargos_forma' => $presentacion['forma'],
+                'descargos_presentados_at' => now(),
+                'descargos' => $presentacion['texto'],
+            ]);
+        });
+        $pendiente = $this->makeCaso($coord, [
+            'nombre' => 'Aún sin presentación',
+            'estado' => 'Pendiente',
+            'descargos_forma' => null,
+            'descargos_presentados_at' => null,
+            'descargos' => null,
+        ]);
+
+        $this->actingAs($coord)
+            ->get(route('abogado.dashboard'))
+            ->assertOk()
+            ->assertViewHas('descargosPendientes', 1);
+
+        $alertaDescargos = collect(AlertasSistema::visibles($coord))
+            ->firstWhere('tipo', AlertasSistema::DESCARGOS);
+        $this->assertNotNull($alertaDescargos);
+        $this->assertSame(1, $alertaDescargos['count']);
+        $this->assertSame([$pendiente->id], $alertaDescargos['ids']);
+
+        $this->actingAs($coord)
+            ->get(route('notificaciones.index'))
+            ->assertOk()
+            ->assertSee('Descargos pendientes')
+            ->assertSee('1 expediente espera respuesta');
+
+        foreach ($casosPresentados as $index => $caso) {
+            $expected = $presentaciones[$index];
+            $this->assertSame($expected['estado'], $caso->fresh()->estado);
+            $this->assertSame($expected['forma'], $caso->fresh()->descargos_forma);
+            $this->assertNotNull($caso->fresh()->descargos_presentados_at);
+        }
+        $this->assertSame('Pendiente', $pendiente->fresh()->estado);
     }
 
     /** @test */
@@ -911,7 +966,7 @@ class CoordinadoraTest extends TestCase
             ->assertSee('class="sipd-page is-current">1</span>', false)
             ->assertSee('Siguiente')
             ->assertSee('name="cargo"', false)
-            ->assertSee('<select name="cargo"', false)
+            ->assertSee('<select id="nuevoCargo" name="cargo"', false)
             ->assertSee('Jefe de personal')
             ->assertSee('Asesor jurídico')
             ->assertSee('Selecciona el cargo')

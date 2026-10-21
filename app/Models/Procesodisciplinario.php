@@ -175,6 +175,22 @@ class ProcesoDisciplinario extends Model
         });
     }
 
+    public function scopeSinDescargosPresentados($query)
+    {
+        return $query
+            ->where(function ($subquery) {
+                $subquery->whereNull('descargos_forma')
+                    ->orWhere('descargos_forma', 'no_presento');
+            })
+            ->where(function ($subquery) {
+                $subquery->whereNull('descargos')
+                    ->orWhere('descargos', '');
+            })
+            ->whereDoesntHave('anexos', function ($anexos) {
+                $anexos->where('tipo', CasoAnexo::TIPO_DESCARGOS);
+            });
+    }
+
     public function scopeSinDocumentoDescargado($query)
     {
         return $query->whereDoesntHave('documentoEstados', function ($q) {
