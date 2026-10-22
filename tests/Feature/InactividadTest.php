@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\CerrarSesionPorInactividad;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -68,6 +69,85 @@ class InactividadTest extends TestCase
         $this->post(route('logout'))->assertRedirect('/');
 
         $this->assertDatabaseCount('sipd_avisos', 0);
+    }
+
+    /** @test */
+    public function la_cookie_de_sesion_expira_al_cerrar_el_navegador()
+    {
+        $user = User::factory()->create(['role' => User::ROLE_EQUIPO]);
+
+        $response = $this->post(route('login'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $cookie = collect($response->headers->getCookies())
+            ->first(function ($cookie) {
+                return $cookie->getName() === config('session.cookie');
+            });
+
+        $this->assertNotNull($cookie);
+        $this->assertSame(0, $cookie->getExpiresTime());
+    }
+
+    /** @test */
+    public function ignora_y_elimina_cookies_recordar_sesion_anteriores()
+    {
+        $user = User::factory()->create(['role' => User::ROLE_EQUIPO]);
+        $user->setRememberToken('token-recordado-anterior');
+        $user->save();
+
+        $rememberCookie = app('auth')->guard('web')->getRecallerName();
+        $rememberValue = $user->id . '|token-recordado-anterior|' . $user->password;
+        $encryptedRememberCookie = app('encrypter')->encrypt(
+            CookieValuePrefix::create($rememberCookie, app('encrypter')->getKey()) . $rememberValue,
+            false
+        );
+        $response = $this->withCookie($rememberCookie, $encryptedRememberCookie)
+            ->get(route('login'));
+
+        $response->assertOk()
+            ->assertSee('Acceso al sistema')
+            ->assertDontSee('Recordar sesión');
+
+        $this->assertGuest();
+        $forgottenCookie = collect($response->headers->getCookies())
+            ->first(fn ($cookie) => $cookie->getName() === $rememberCookie);
+        $this->assertNotNull($forgottenCookie);
+        $this->assertLessThan(time(), $forgottenCookie->getExpiresTime());
+    }
+
+    /** @test */
+    public function ingresar_a_la_url_raiz_muestra_login_y_cierra_la_sesion_anterior()
+    {
+        $user = User::factory()->create(['role' => User::ROLE_EQUIPO]);
+
+        $this->actingAs($user)
+            ->followingRedirects()
+            ->get('/')
+            ->assertOk()
+            ->assertSee('Acceso al sistema');
+
+        $this->assertGuest();
+    }
+
+    /** @test */
+    public function no_emite_cookie_persistente_aunque_el_login_reciba_remember()
+    {
+        $user = User::factory()->create(['role' => User::ROLE_EQUIPO]);
+
+        $response = $this->from(route('login'))
+            ->post(route('login'), [
+                'email' => $user->email,
+                'password' => 'password',
+                'remember' => '1',
+            ])
+            ->assertRedirect('/abogado');
+
+        $rememberCookie = app('auth')->guard('web')->getRecallerName();
+        $issuedRememberCookie = collect($response->headers->getCookies())
+            ->first(fn ($cookie) => $cookie->getName() === $rememberCookie);
+        $this->assertNull($issuedRememberCookie);
     }
 
     /** @test */

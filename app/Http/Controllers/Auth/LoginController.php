@@ -20,6 +20,17 @@ class LoginController extends Controller
 
     use AuthenticatesUsers;
 
+    public function showLoginForm(Request $request)
+    {
+        if ($this->guard()->check()) {
+            $this->guard()->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
+        return view('auth.login');
+    }
+
     /**
      * Redirect users according to their role.
      *
@@ -37,6 +48,11 @@ class LoginController extends Controller
             default:
                 return '/';
         }
+    }
+
+    protected function attemptLogin(Request $request)
+    {
+        return $this->guard()->attempt($this->credentials($request), false);
     }
 
     protected function authenticated(Request $request, $user)
@@ -67,13 +83,8 @@ class LoginController extends Controller
         return $this->loggedOut($request) ?: redirect('/');
     }
 
-    /**
-     * Create a new controller instance.
-     *
-     * @return void
-     */
     public function __construct()
     {
-        $this->middleware('guest')->except('logout');
+        $this->middleware('guest')->only('login');
     }
 }

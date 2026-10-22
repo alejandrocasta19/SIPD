@@ -92,10 +92,6 @@
                     </div>
 
                     <div class="row-between">
-                        <label class="remember">
-                            <input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }}>
-                            Recordar sesión
-                        </label>
                         @if (Route::has('password.request'))
                             <a class="forgot" href="{{ route('password.request') }}">¿Olvidaste tu contraseña?</a>
                         @endif
