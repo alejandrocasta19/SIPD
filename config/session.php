@@ -35,7 +35,7 @@ return [
 
     'idle' => env('SESSION_IDLE', 30),
 
-    'expire_on_close' => false,
+    'expire_on_close' => true,
 
     /*
     |--------------------------------------------------------------------------
